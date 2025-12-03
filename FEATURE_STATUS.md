@@ -37,10 +37,10 @@
 
 | ツール | 状態 | 備考 |
 |--------|------|------|
-| `add_blueprint_event_node` | 🔲 未確認 | BeginPlay, Tick等 |
+| `add_blueprint_event_node` | ✅ 動作OK | ReceiveBeginPlay確認、node_positionで座標指定可 |
 | `add_blueprint_input_action_node` | 🔲 未確認 | |
-| `add_blueprint_function_node` | 🔲 未確認 | |
-| `connect_blueprint_nodes` | 🔲 未確認 | |
+| `add_blueprint_function_node` | ✅ 動作OK | target指定が重要（self, KismetSystemLibrary等） |
+| `connect_blueprint_nodes` | ✅ 動作OK | ピン名: then → execute |
 | `add_blueprint_variable` | 🔲 未確認 | |
 | `add_blueprint_get_self_component_reference` | 🔲 未確認 | |
 | `add_blueprint_self_reference` | 🔲 未確認 | |

@@ -146,6 +146,52 @@ Unreal MCP統合は、自然言語を通じてUnreal Engineを制御するため
 
 Python環境のセットアップ、MCPサーバーの実行、直接またはサーバーベースの接続の使用など、詳細な手順は [Python/README.md](Python/README.md) を参照してください。
 
+#### クイック起動（Windows）
+
+プロジェクトルートに、便利な起動スクリプトを用意しています：
+
+**PowerShell**:
+```powershell
+.\start_mcp_server.ps1
+```
+
+**コマンドプロンプト**:
+```cmd
+start_mcp_server.bat
+```
+
+起動スクリプトは以下を自動で行います：
+1. ローカル設定ファイルの読み込み（存在する場合）
+2. Pythonディレクトリへの移動
+3. uvのインストール確認
+4. MCPサーバーの起動
+
+#### ローカル設定ファイル（環境固有の設定）
+
+環境固有の設定（RAGサーバーURLなど）は、ローカル設定ファイルで管理できます。これらのファイルはgitに追跡されないため、各環境で異なる設定を安全に保存できます。
+
+**セットアップ方法**:
+1. テンプレートをコピー：
+   ```powershell
+   # PowerShell用
+   cp config.example.ps1 config.local.ps1
+
+   # バッチファイル用
+   copy config.example.bat config.local.bat
+   ```
+
+2. `config.local.ps1` または `config.local.bat` を編集して設定を変更：
+   ```powershell
+   # config.local.ps1 の例
+   $env:RAG_SERVER_URL = "http://your-rag-server:8100"
+   ```
+
+3. 起動スクリプトを実行すると、自動的に設定が読み込まれます
+
+**利用可能な設定**:
+- `RAG_SERVER_URL` - RAGサーバーの接続先（デフォルト: `http://localhost:8100`）
+- 他の環境変数も追加可能
+
 ### MCPクライアントの設定
 
 MCPクライアントに応じて、以下のJSONをmcp設定に使用してください。

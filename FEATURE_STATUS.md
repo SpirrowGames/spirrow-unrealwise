@@ -129,7 +129,9 @@
 - **RAGサーバー**: AIサーバー :8100
 - **Embedding**: BGE-M3
 - **ベクトルDB**: ChromaDB
-- **確認日**: 2024-12-03
+- **起動スクリプト**: start_mcp_server.ps1 / start_mcp_server.bat
+- **設定管理**: config.local.ps1 / config.local.bat（環境固有設定）
+- **最終確認日**: 2025-12-09
 
 ---
 

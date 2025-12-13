@@ -1125,8 +1125,15 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleSetPawnProperties
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
     }
 
+    // Get path parameter (default: /Game/Blueprints)
+    FString Path;
+    if (!Params->TryGetStringField(TEXT("path"), Path))
+    {
+        Path = TEXT("/Game/Blueprints");
+    }
+
     // Find the blueprint
-    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName);
+    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
     if (!Blueprint)
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));

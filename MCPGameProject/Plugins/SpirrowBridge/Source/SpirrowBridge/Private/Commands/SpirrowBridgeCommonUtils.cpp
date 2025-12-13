@@ -526,9 +526,27 @@ bool FSpirrowBridgeCommonUtils::SetObjectProperty(UObject* Object, const FString
         return false;
     }
 
-    FProperty* Property = Object->GetClass()->FindPropertyByName(*PropertyName);
+    // Search through class hierarchy for the property
+    FProperty* Property = nullptr;
+    UClass* CurrentClass = Object->GetClass();
+
+    while (CurrentClass && !Property)
+    {
+        Property = CurrentClass->FindPropertyByName(*PropertyName);
+        if (!Property)
+        {
+            CurrentClass = CurrentClass->GetSuperClass();
+        }
+    }
+
     if (!Property)
     {
+        // Log available properties for debugging
+        UE_LOG(LogTemp, Warning, TEXT("SetObjectProperty - Property '%s' not found. Available properties:"), *PropertyName);
+        for (TFieldIterator<FProperty> PropIt(Object->GetClass()); PropIt; ++PropIt)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("  - %s (%s)"), *PropIt->GetName(), *PropIt->GetCPPType());
+        }
         OutErrorMessage = FString::Printf(TEXT("Property not found: %s"), *PropertyName);
         return false;
     }

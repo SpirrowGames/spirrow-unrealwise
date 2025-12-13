@@ -955,9 +955,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleFindBlueprint
     if (NodeType == TEXT("Event"))
     {
         FString EventName;
-        if (!Params->TryGetStringField(TEXT("event_name"), EventName))
+        if (!Params->TryGetStringField(TEXT("event_type"), EventName))
         {
-            return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'event_name' parameter for Event node search"));
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'event_type' parameter for Event node search"));
         }
         
         // Look for nodes with exact event name (e.g., ReceiveBeginPlay)

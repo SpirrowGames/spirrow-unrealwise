@@ -24,27 +24,27 @@
 
 | ツール | 状態 | 備考 |
 |--------|------|------|
-| `create_blueprint` | ✅ 動作OK | pathパラメータで保存先指定可能（デフォルト: /Game/Blueprints） |
-| `spawn_blueprint_actor` | ❌ タイムアウト | 通信問題の可能性、要調査 |
-| `add_component_to_blueprint` | ✅ 動作OK | pathパラメータで検索先指定可能（デフォルト: /Game/Blueprints） |
-| `set_static_mesh_properties` | ✅ 動作OK | Engine標準メッシュで確認 |
-| `set_component_property` | 🔲 未確認 | |
-| `set_physics_properties` | 🔲 未確認 | |
-| `compile_blueprint` | ✅ 動作OK | pathパラメータで検索先指定可能（デフォルト: /Game/Blueprints） |
-| `set_blueprint_property` | 🔲 未確認 | |
+| `create_blueprint` | ✅ 動作OK | pathパラメータ対応（デフォルト: /Game/Blueprints） |
+| `spawn_blueprint_actor` | ❌ タイムアウト | 通信問題の可能性、要調査。pathパラメータ対応 |
+| `add_component_to_blueprint` | ✅ 動作OK | pathパラメータ対応（デフォルト: /Game/Blueprints） |
+| `set_static_mesh_properties` | ✅ 動作OK | Engine標準メッシュで確認。pathパラメータ対応 |
+| `set_component_property` | 🔲 未確認 | pathパラメータ対応 |
+| `set_physics_properties` | 🔲 未確認 | pathパラメータ対応 |
+| `compile_blueprint` | ✅ 動作OK | pathパラメータ対応（デフォルト: /Game/Blueprints） |
+| `set_blueprint_property` | 🔲 未確認 | pathパラメータ対応 |
 
 ### BPノードグラフ操作
 
 | ツール | 状態 | 備考 |
 |--------|------|------|
-| `add_blueprint_event_node` | ✅ 動作OK | ReceiveBeginPlay確認、node_positionで座標指定可 |
-| `add_blueprint_input_action_node` | 🔲 未確認 | |
-| `add_blueprint_function_node` | ✅ 動作OK | target指定が重要（self, KismetSystemLibrary等） |
-| `connect_blueprint_nodes` | ✅ 動作OK | ピン名: then → execute |
-| `add_blueprint_variable` | 🔲 未確認 | |
-| `add_blueprint_get_self_component_reference` | 🔲 未確認 | |
-| `add_blueprint_self_reference` | 🔲 未確認 | |
-| `find_blueprint_nodes` | 🔲 未確認 | |
+| `add_blueprint_event_node` | ✅ 動作OK | ReceiveBeginPlay確認。pathパラメータ対応 |
+| `add_blueprint_input_action_node` | 🔲 未確認 | pathパラメータ対応 |
+| `add_blueprint_function_node` | ✅ 動作OK | target指定が重要（self, KismetSystemLibrary等）。pathパラメータ対応 |
+| `connect_blueprint_nodes` | ✅ 動作OK | ピン名: then → execute。pathパラメータ対応 |
+| `add_blueprint_variable` | 🔲 未確認 | pathパラメータ対応 |
+| `add_blueprint_get_self_component_reference` | 🔲 未確認 | pathパラメータ対応 |
+| `add_blueprint_self_reference` | 🔲 未確認 | pathパラメータ対応 |
+| `find_blueprint_nodes` | 🔲 未確認 | pathパラメータ対応 |
 
 ### UMG Widget操作
 
@@ -125,6 +125,23 @@
 | `get_blueprint_graph` | 既存BPのノード構成取得 | 💡 アイデア |
 | `duplicate_blueprint` | BP複製 | 💡 アイデア |
 | `rename_actor` | アクター名変更 | 💡 アイデア |
+
+---
+
+## 最新の更新履歴
+
+### 2025-12-14: 全Blueprint関連ツールにpathパラメータ追加
+
+全てのBlueprint関連ツール（26個のツール）にpathパラメータを追加し、カスタムフォルダでのBlueprint操作を可能にしました。
+
+**変更範囲**:
+- C++共通ユーティリティ: FindBlueprint/FindBlueprintByName関数にpath引数追加
+- C++ Blueprint Commands: 6ハンドラ更新
+- C++ Blueprint Node Commands: 8ハンドラ更新
+- Python blueprint_tools.py: 4ツール更新
+- Python node_tools.py: 8ツール更新
+
+**デフォルト動作**: pathパラメータ省略時は従来通り `/Game/Blueprints` を使用するため、既存コードとの互換性を保持
 
 ---
 

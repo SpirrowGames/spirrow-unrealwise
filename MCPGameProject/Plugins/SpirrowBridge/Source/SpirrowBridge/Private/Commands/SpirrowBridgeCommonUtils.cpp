@@ -146,14 +146,22 @@ FRotator FSpirrowBridgeCommonUtils::GetRotatorFromJson(const TSharedPtr<FJsonObj
 }
 
 // Blueprint Utilities
-UBlueprint* FSpirrowBridgeCommonUtils::FindBlueprint(const FString& BlueprintName)
+UBlueprint* FSpirrowBridgeCommonUtils::FindBlueprint(const FString& BlueprintName, const FString& Path)
 {
-    return FindBlueprintByName(BlueprintName);
+    return FindBlueprintByName(BlueprintName, Path);
 }
 
-UBlueprint* FSpirrowBridgeCommonUtils::FindBlueprintByName(const FString& BlueprintName)
+UBlueprint* FSpirrowBridgeCommonUtils::FindBlueprintByName(const FString& BlueprintName, const FString& Path)
 {
-    FString AssetPath = TEXT("/Game/Blueprints/") + BlueprintName;
+    // Normalize path to ensure it ends with /
+    FString NormalizedPath = Path;
+    if (!NormalizedPath.EndsWith(TEXT("/")))
+    {
+        NormalizedPath += TEXT("/");
+    }
+
+    // Construct asset path: /Path/BlueprintName.BlueprintName
+    FString AssetPath = FString::Printf(TEXT("%s%s.%s"), *NormalizedPath, *BlueprintName, *BlueprintName);
     return LoadObject<UBlueprint>(nullptr, *AssetPath);
 }
 

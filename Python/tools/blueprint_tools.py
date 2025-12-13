@@ -139,31 +139,34 @@ def register_blueprint_tools(mcp: FastMCP):
         ctx: Context,
         blueprint_name: str,
         component_name: str,
-        static_mesh: str = "/Engine/BasicShapes/Cube.Cube"
+        static_mesh: str = "/Engine/BasicShapes/Cube.Cube",
+        path: str = "/Game/Blueprints"
     ) -> Dict[str, Any]:
         """
         Set static mesh properties on a StaticMeshComponent.
-        
+
         Args:
             blueprint_name: Name of the target Blueprint
             component_name: Name of the StaticMeshComponent
             static_mesh: Path to the static mesh asset (e.g., "/Engine/BasicShapes/Cube.Cube")
-            
+            path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+
         Returns:
             Response indicating success or failure
         """
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             unreal = get_unreal_connection()
             if not unreal:
                 logger.error("Failed to connect to Unreal Engine")
                 return {"success": False, "message": "Failed to connect to Unreal Engine"}
-            
+
             params = {
                 "blueprint_name": blueprint_name,
                 "component_name": component_name,
-                "static_mesh": static_mesh
+                "static_mesh": static_mesh,
+                "path": path
             }
             
             logger.info(f"Setting static mesh properties with params: {params}")
@@ -188,21 +191,35 @@ def register_blueprint_tools(mcp: FastMCP):
         component_name: str,
         property_name: str,
         property_value,
+        path: str = "/Game/Blueprints"
     ) -> Dict[str, Any]:
-        """Set a property on a component in a Blueprint."""
+        """
+        Set a property on a component in a Blueprint.
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            component_name: Name of the component
+            property_name: Name of the property to set
+            property_value: Value to set the property to
+            path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+
+        Returns:
+            Response indicating success or failure
+        """
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             unreal = get_unreal_connection()
             if not unreal:
                 logger.error("Failed to connect to Unreal Engine")
                 return {"success": False, "message": "Failed to connect to Unreal Engine"}
-            
+
             params = {
                 "blueprint_name": blueprint_name,
                 "component_name": component_name,
                 "property_name": property_name,
-                "property_value": property_value
+                "property_value": property_value,
+                "path": path
             }
             
             logger.info(f"Setting component property with params: {params}")
@@ -229,17 +246,33 @@ def register_blueprint_tools(mcp: FastMCP):
         gravity_enabled: bool = True,
         mass: float = 1.0,
         linear_damping: float = 0.01,
-        angular_damping: float = 0.0
+        angular_damping: float = 0.0,
+        path: str = "/Game/Blueprints"
     ) -> Dict[str, Any]:
-        """Set physics properties on a component."""
+        """
+        Set physics properties on a component.
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            component_name: Name of the component
+            simulate_physics: Whether to enable physics simulation
+            gravity_enabled: Whether gravity is enabled
+            mass: Mass of the component
+            linear_damping: Linear damping factor
+            angular_damping: Angular damping factor
+            path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+
+        Returns:
+            Response indicating success or failure
+        """
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             unreal = get_unreal_connection()
             if not unreal:
                 logger.error("Failed to connect to Unreal Engine")
                 return {"success": False, "message": "Failed to connect to Unreal Engine"}
-            
+
             params = {
                 "blueprint_name": blueprint_name,
                 "component_name": component_name,
@@ -247,7 +280,8 @@ def register_blueprint_tools(mcp: FastMCP):
                 "gravity_enabled": gravity_enabled,
                 "mass": float(mass),
                 "linear_damping": float(linear_damping),
-                "angular_damping": float(angular_damping)
+                "angular_damping": float(angular_damping),
+                "path": path
             }
             
             logger.info(f"Setting physics properties with params: {params}")
@@ -314,31 +348,34 @@ def register_blueprint_tools(mcp: FastMCP):
         ctx: Context,
         blueprint_name: str,
         property_name: str,
-        property_value
+        property_value,
+        path: str = "/Game/Blueprints"
     ) -> Dict[str, Any]:
         """
         Set a property on a Blueprint class default object.
-        
+
         Args:
             blueprint_name: Name of the target Blueprint
             property_name: Name of the property to set
             property_value: Value to set the property to
-            
+            path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+
         Returns:
             Response indicating success or failure
         """
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             unreal = get_unreal_connection()
             if not unreal:
                 logger.error("Failed to connect to Unreal Engine")
                 return {"success": False, "message": "Failed to connect to Unreal Engine"}
-            
+
             params = {
                 "blueprint_name": blueprint_name,
                 "property_name": property_name,
-                "property_value": property_value
+                "property_value": property_value,
+                "path": path
             }
             
             logger.info(f"Setting blueprint property with params: {params}")

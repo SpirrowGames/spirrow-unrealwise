@@ -19,11 +19,12 @@ def register_blueprint_node_tools(mcp: FastMCP):
         ctx: Context,
         blueprint_name: str,
         event_name: str,
-        node_position = None
+        node_position = None,
+        path: str = "/Game/Blueprints"
     ) -> Dict[str, Any]:
         """
         Add an event node to a Blueprint's event graph.
-        
+
         Args:
             blueprint_name: Name of the target Blueprint
             event_name: Name of the event. Use 'Receive' prefix for standard events:
@@ -31,21 +32,23 @@ def register_blueprint_node_tools(mcp: FastMCP):
                        - 'ReceiveTick' for Tick
                        - etc.
             node_position: Optional [X, Y] position in the graph
-            
+            path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+
         Returns:
             Response containing the node ID and success status
         """
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             # Handle default value within the method body
             if node_position is None:
                 node_position = [0, 0]
-            
+
             params = {
                 "blueprint_name": blueprint_name,
                 "event_name": event_name,
-                "node_position": node_position
+                "node_position": node_position,
+                "path": path
             }
             
             unreal = get_unreal_connection()
@@ -73,30 +76,33 @@ def register_blueprint_node_tools(mcp: FastMCP):
         ctx: Context,
         blueprint_name: str,
         action_name: str,
-        node_position = None
+        node_position = None,
+        path: str = "/Game/Blueprints"
     ) -> Dict[str, Any]:
         """
         Add an input action event node to a Blueprint's event graph.
-        
+
         Args:
             blueprint_name: Name of the target Blueprint
             action_name: Name of the input action to respond to
             node_position: Optional [X, Y] position in the graph
-            
+            path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+
         Returns:
             Response containing the node ID and success status
         """
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             # Handle default value within the method body
             if node_position is None:
                 node_position = [0, 0]
-            
+
             params = {
                 "blueprint_name": blueprint_name,
                 "action_name": action_name,
-                "node_position": node_position
+                "node_position": node_position,
+                "path": path
             }
             
             unreal = get_unreal_connection()
@@ -126,36 +132,39 @@ def register_blueprint_node_tools(mcp: FastMCP):
         target: str,
         function_name: str,
         params = None,
-        node_position = None
+        node_position = None,
+        path: str = "/Game/Blueprints"
     ) -> Dict[str, Any]:
         """
         Add a function call node to a Blueprint's event graph.
-        
+
         Args:
             blueprint_name: Name of the target Blueprint
             target: Target object for the function (component name or self)
             function_name: Name of the function to call
             params: Optional parameters to set on the function node
             node_position: Optional [X, Y] position in the graph
-            
+            path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+
         Returns:
             Response containing the node ID and success status
         """
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             # Handle default values within the method body
             if params is None:
                 params = {}
             if node_position is None:
                 node_position = [0, 0]
-            
+
             command_params = {
                 "blueprint_name": blueprint_name,
                 "target": target,
                 "function_name": function_name,
                 "params": params,
-                "node_position": node_position
+                "node_position": node_position,
+                "path": path
             }
             
             unreal = get_unreal_connection()
@@ -185,30 +194,33 @@ def register_blueprint_node_tools(mcp: FastMCP):
         source_node_id: str,
         source_pin: str,
         target_node_id: str,
-        target_pin: str
+        target_pin: str,
+        path: str = "/Game/Blueprints"
     ) -> Dict[str, Any]:
         """
         Connect two nodes in a Blueprint's event graph.
-        
+
         Args:
             blueprint_name: Name of the target Blueprint
             source_node_id: ID of the source node
             source_pin: Name of the output pin on the source node
             target_node_id: ID of the target node
             target_pin: Name of the input pin on the target node
-            
+            path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+
         Returns:
             Response indicating success or failure
         """
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             params = {
                 "blueprint_name": blueprint_name,
                 "source_node_id": source_node_id,
                 "source_pin": source_pin,
                 "target_node_id": target_node_id,
-                "target_pin": target_pin
+                "target_pin": target_pin,
+                "path": path
             }
             
             unreal = get_unreal_connection()
@@ -237,28 +249,31 @@ def register_blueprint_node_tools(mcp: FastMCP):
         blueprint_name: str,
         variable_name: str,
         variable_type: str,
-        is_exposed: bool = False
+        is_exposed: bool = False,
+        path: str = "/Game/Blueprints"
     ) -> Dict[str, Any]:
         """
         Add a variable to a Blueprint.
-        
+
         Args:
             blueprint_name: Name of the target Blueprint
             variable_name: Name of the variable
             variable_type: Type of the variable (Boolean, Integer, Float, Vector, etc.)
             is_exposed: Whether to expose the variable to the editor
-            
+            path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+
         Returns:
             Response indicating success or failure
         """
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             params = {
                 "blueprint_name": blueprint_name,
                 "variable_name": variable_name,
                 "variable_type": variable_type,
-                "is_exposed": is_exposed
+                "is_exposed": is_exposed,
+                "path": path
             }
             
             unreal = get_unreal_connection()
@@ -286,31 +301,34 @@ def register_blueprint_node_tools(mcp: FastMCP):
         ctx: Context,
         blueprint_name: str,
         component_name: str,
-        node_position = None
+        node_position = None,
+        path: str = "/Game/Blueprints"
     ) -> Dict[str, Any]:
         """
         Add a node that gets a reference to a component owned by the current Blueprint.
         This creates a node similar to what you get when dragging a component from the Components panel.
-        
+
         Args:
             blueprint_name: Name of the target Blueprint
             component_name: Name of the component to get a reference to
             node_position: Optional [X, Y] position in the graph
-            
+            path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+
         Returns:
             Response containing the node ID and success status
         """
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             # Handle None case explicitly in the function
             if node_position is None:
                 node_position = [0, 0]
-            
+
             params = {
                 "blueprint_name": blueprint_name,
                 "component_name": component_name,
-                "node_position": node_position
+                "node_position": node_position,
+                "path": path
             }
             
             unreal = get_unreal_connection()
@@ -337,27 +355,30 @@ def register_blueprint_node_tools(mcp: FastMCP):
     def add_blueprint_self_reference(
         ctx: Context,
         blueprint_name: str,
-        node_position = None
+        node_position = None,
+        path: str = "/Game/Blueprints"
     ) -> Dict[str, Any]:
         """
         Add a 'Get Self' node to a Blueprint's event graph that returns a reference to this actor.
-        
+
         Args:
             blueprint_name: Name of the target Blueprint
             node_position: Optional [X, Y] position in the graph
-            
+            path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+
         Returns:
             Response containing the node ID and success status
         """
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             if node_position is None:
                 node_position = [0, 0]
-                
+
             params = {
                 "blueprint_name": blueprint_name,
-                "node_position": node_position
+                "node_position": node_position,
+                "path": path
             }
             
             unreal = get_unreal_connection()
@@ -385,26 +406,29 @@ def register_blueprint_node_tools(mcp: FastMCP):
         ctx: Context,
         blueprint_name: str,
         node_type = None,
-        event_type = None
+        event_type = None,
+        path: str = "/Game/Blueprints"
     ) -> Dict[str, Any]:
         """
         Find nodes in a Blueprint's event graph.
-        
+
         Args:
             blueprint_name: Name of the target Blueprint
             node_type: Optional type of node to find (Event, Function, Variable, etc.)
             event_type: Optional specific event type to find (BeginPlay, Tick, etc.)
-            
+            path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+
         Returns:
             Response containing array of found node IDs and success status
         """
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             params = {
                 "blueprint_name": blueprint_name,
                 "node_type": node_type,
-                "event_type": event_type
+                "event_type": event_type,
+                "path": path
             }
             
             unreal = get_unreal_connection()

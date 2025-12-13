@@ -37,8 +37,8 @@ public:
     static TSharedPtr<FJsonObject> ActorToJsonObject(AActor* Actor, bool bDetailed = false);
     
     // Blueprint utilities
-    static UBlueprint* FindBlueprint(const FString& BlueprintName);
-    static UBlueprint* FindBlueprintByName(const FString& BlueprintName);
+    static UBlueprint* FindBlueprint(const FString& BlueprintName, const FString& Path = TEXT("/Game/Blueprints"));
+    static UBlueprint* FindBlueprintByName(const FString& BlueprintName, const FString& Path = TEXT("/Game/Blueprints"));
     static UEdGraph* FindOrCreateEventGraph(UBlueprint* Blueprint);
     
     // Blueprint node utilities

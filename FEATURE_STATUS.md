@@ -24,7 +24,7 @@
 
 | ツール | 状態 | 備考 |
 |--------|------|------|
-| `create_blueprint` | ✅ 動作OK | /Game/Blueprints/に作成される |
+| `create_blueprint` | ✅ 動作OK | pathパラメータで保存先指定可能（デフォルト: /Game/Blueprints） |
 | `spawn_blueprint_actor` | ❌ タイムアウト | 通信問題の可能性、要調査 |
 | `add_component_to_blueprint` | ✅ 動作OK | |
 | `set_static_mesh_properties` | ✅ 動作OK | Engine標準メッシュで確認 |

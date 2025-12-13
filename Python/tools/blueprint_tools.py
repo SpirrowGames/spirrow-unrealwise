@@ -18,21 +18,33 @@ def register_blueprint_tools(mcp: FastMCP):
     def create_blueprint(
         ctx: Context,
         name: str,
-        parent_class: str
+        parent_class: str,
+        path: str = "/Game/Blueprints"
     ) -> Dict[str, Any]:
-        """Create a new Blueprint class."""
+        """
+        Create a new Blueprint class.
+
+        Args:
+            name: Name of the blueprint (e.g., "BP_PlayerCharacter")
+            parent_class: Parent class to inherit from (e.g., "Actor", "Character", "PlayerCharacterBase")
+            path: Content browser path for the asset (e.g., "/Game/TrapxTrap/Blueprints/Characters")
+
+        Returns:
+            Dict containing the created blueprint path
+        """
         # Import inside function to avoid circular imports
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             unreal = get_unreal_connection()
             if not unreal:
                 logger.error("Failed to connect to Unreal Engine")
                 return {"success": False, "message": "Failed to connect to Unreal Engine"}
-                
+
             response = unreal.send_command("create_blueprint", {
                 "name": name,
-                "parent_class": parent_class
+                "parent_class": parent_class,
+                "path": path
             })
             
             if not response:

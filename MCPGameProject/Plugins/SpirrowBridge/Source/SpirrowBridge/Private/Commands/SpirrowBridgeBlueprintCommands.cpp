@@ -76,8 +76,21 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleCreateBlueprint(c
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
     }
 
+    // Get path parameter (default: /Game/Blueprints)
+    FString Path;
+    if (!Params->TryGetStringField(TEXT("path"), Path))
+    {
+        Path = TEXT("/Game/Blueprints");
+    }
+
+    // Ensure path ends with /
+    if (!Path.EndsWith(TEXT("/")))
+    {
+        Path += TEXT("/");
+    }
+
     // Check if blueprint already exists
-    FString PackagePath = TEXT("/Game/Blueprints/");
+    FString PackagePath = Path;
     FString AssetName = BlueprintName;
     if (UEditorAssetLibrary::DoesAssetExist(PackagePath + AssetName))
     {

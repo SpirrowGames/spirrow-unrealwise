@@ -233,22 +233,22 @@ def register_editor_tools(mcp: FastMCP):
         name: str,
         property_name: str,
         property_value,
-        component_name: str = None,
+        rationale: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Set a property on an actor or its component.
+        Set a property on an actor.
 
         Args:
             name: Name of the actor
             property_name: Name of the property to set
             property_value: Value to set the property to
-            component_name: Optional name of the component (e.g., "StaticMeshComponent0").
-                           If not provided, sets property on the actor itself.
+            rationale: Design rationale - why this property is being set (auto-saved to knowledge base)
 
         Returns:
             Dict containing response from Unreal with operation status
         """
         from unreal_mcp_server import get_unreal_connection
+        from tools.rag_tools import record_rationale
 
         try:
             unreal = get_unreal_connection()
@@ -262,21 +262,98 @@ def register_editor_tools(mcp: FastMCP):
                 "property_value": property_value
             }
 
-            # Add component_name if provided
-            if component_name:
-                params["component_name"] = component_name
-
             response = unreal.send_command("set_actor_property", params)
 
             if not response:
                 logger.error("No response from Unreal Engine")
                 return {"success": False, "message": "No response from Unreal Engine"}
 
+            # Record rationale if provided and operation was successful
+            if response.get("success", True) and rationale:
+                record_rationale(
+                    action="set_actor_property",
+                    details={
+                        "actor_name": name,
+                        "property_name": property_name,
+                        "property_value": property_value
+                    },
+                    rationale=rationale,
+                    category="actor_property"
+                )
+
             logger.info(f"Set actor property response: {response}")
             return response
 
         except Exception as e:
             error_msg = f"Error setting actor property: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def set_actor_component_property(
+        ctx: Context,
+        actor_name: str,
+        component_name: str,
+        property_name: str,
+        property_value,
+        rationale: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Set a property on a component of an actor in the level.
+
+        Args:
+            actor_name: Name of the actor that owns the component
+            component_name: Name of the component (e.g., "StaticMeshComponent0", "LightComponent0")
+                           Use get_actor_components to list available components.
+            property_name: Name of the property to set
+            property_value: Value to set the property to
+            rationale: Design rationale - why this component property is being set (auto-saved to knowledge base)
+
+        Returns:
+            Dict containing response from Unreal with operation status
+        """
+        from unreal_mcp_server import get_unreal_connection
+        from tools.rag_tools import record_rationale
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "name": actor_name,
+                "component_name": component_name,
+                "property_name": property_name,
+                "property_value": property_value
+            }
+
+            # C++側の既存のset_actor_propertyコマンドを再利用
+            response = unreal.send_command("set_actor_property", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            # Record rationale if provided and operation was successful
+            if response.get("success", True) and rationale:
+                record_rationale(
+                    action="set_actor_component_property",
+                    details={
+                        "actor_name": actor_name,
+                        "component_name": component_name,
+                        "property_name": property_name,
+                        "property_value": property_value
+                    },
+                    rationale=rationale,
+                    category="component_property"
+                )
+
+            logger.info(f"Set actor component property response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error setting actor component property: {e}"
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 

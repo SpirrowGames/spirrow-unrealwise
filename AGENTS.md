@@ -312,6 +312,8 @@ def get_actor_components(ctx: Context, name: str) -> Dict[str, Any]:
 | `add_blueprint_event_node` | blueprint_event | イベント使用の意図 |
 | `add_blueprint_function_node` | blueprint_logic | 関数呼び出しの理由 |
 | `add_blueprint_variable` | blueprint_variable | 変数の役割 |
+| `set_actor_property` | actor_property | アクタープロパティ設定の意図 |
+| `set_actor_component_property` | component_property | コンポーネントプロパティ設定の意図 |
 
 ### 使用例
 
@@ -365,6 +367,22 @@ add_blueprint_variable(
     variable_type="Float",
     rationale="現在のHP。0で死亡処理をトリガー"
 )
+
+# アクター・コンポーネントプロパティ
+set_actor_property(
+    name="MyLight",
+    property_name="bHidden",
+    property_value=False,
+    rationale="ゲーム開始時は表示。イベント発生で点灯させる"
+)
+
+set_actor_component_property(
+    actor_name="MyLight",
+    component_name="LightComponent0",
+    property_name="Intensity",
+    property_value=5000,
+    rationale="強調表示用。通常の2倍の明るさで注目を引く"
+)
 ```
 
 ### 書くべき内容
@@ -395,6 +413,7 @@ search_knowledge("質量 設定", category="physics")
 
 ## 更新履歴
 
+- 2024-12-14: set_actor_component_property ツールを追加、set_actor_property と合わせて rationale パラメータを追加
 - 2024-12-14: node_tools.py に rationale パラメータを追加（3ツール）
 - 2024-12-14: rationale パラメータ機能を追加（4ツール）
 - 2024-12-14: 新しいコマンド追加手順、ビルドガイドを追加

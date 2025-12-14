@@ -18,7 +18,8 @@
 | `delete_actor` | 🔲 未確認 | |
 | `set_actor_transform` | 🔲 未確認 | |
 | `get_actor_properties` | ✅ 動作OK | |
-| `set_actor_property` | ⚠️ 制限あり | コンポーネント内プロパティへのアクセス不可 |
+| `set_actor_property` | ✅ 動作OK | アクター自体のプロパティを設定。rationale対応 |
+| `set_actor_component_property` | ✅ 動作OK | アクターのコンポーネントのプロパティを設定。rationale対応 |
 
 ### Blueprint操作
 
@@ -90,8 +91,6 @@
 ## 確認された制限事項
 
 1. **spawn_actor**: アクター作成のみ。StaticMeshの設定は別途Blueprint経由が必要
-2. **set_actor_property**: コンポーネント内のプロパティ（StaticMeshComponent.StaticMesh等）にアクセス不可
-3. **spawn_blueprint_actor**: タイムアウトエラー。MCPサーバー⇔UE間の通信に問題がある可能性
 
 ---
 
@@ -118,12 +117,12 @@
 | `list_knowledge` | 全ナレッジの一覧表示 | ✅ 完了 |
 | `delete_knowledge` | ナレッジの削除 | ✅ 完了 |
 
-### Phase 3: 既存機能の改善（優先度中）
+### Phase 3: 既存機能の改善（完了）
 
 | 項目 | 説明 | 状態 |
 |------|------|------|
 | `spawn_blueprint_actor` の修正 | pathパラメータ対応、通信問題解決 | ✅ 完了 |
-| `set_actor_property` の拡張 | コンポーネントプロパティへのアクセス | 📋 計画中 |
+| `set_actor_property` 分離 | アクター用とコンポーネント用に分離、rationale対応 | ✅ 完了 |
 
 ### Phase 4: 追加ツール（優先度低）
 
@@ -136,6 +135,24 @@
 ---
 
 ## 最新の更新履歴
+
+### 2025-12-15: set_actor_property 分離 & rationale 自動蓄積機能
+
+**新機能**:
+- `set_actor_component_property`: アクターのコンポーネントプロパティ設定用の専用ツール
+- `rationale` パラメータ: 設計判断の自動RAG蓄積機能
+  - 対応ツール: create_blueprint, add_component_to_blueprint, set_physics_properties, spawn_actor, add_blueprint_event_node, add_blueprint_function_node, add_blueprint_variable, set_actor_property, set_actor_component_property
+
+**変更**:
+- `set_actor_property`: コンポーネント指定機能を分離、アクター自体のプロパティ専用に
+- RAGサーバー接続: 環境変数 `RAG_SERVER_URL` で設定可能
+
+**変更範囲**:
+- Python editor_tools.py: set_actor_property分離、set_actor_component_property追加
+- Python blueprint_tools.py: rationaleパラメータ追加（3ツール）
+- Python node_tools.py: rationaleパラメータ追加（3ツール）
+- Python rag_tools.py: record_rationale関数追加
+- AGENTS.md: rationale使用ガイド追加
 
 ### 2025-12-14: SSE Transport サポート & spawn_blueprint_actor 修正
 

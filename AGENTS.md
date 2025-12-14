@@ -309,11 +309,11 @@ def get_actor_components(ctx: Context, name: str) -> Dict[str, Any]:
 | `add_component_to_blueprint` | component | コンポーネント選定理由 |
 | `set_physics_properties` | physics | 物理設定の意図 |
 | `spawn_actor` | level_design | アクター配置の意図 |
+| `set_actor_property` | actor_property | アクタープロパティ設定の意図 |
+| `set_actor_component_property` | component_property | コンポーネントプロパティ設定の意図 |
 | `add_blueprint_event_node` | blueprint_event | イベント使用の意図 |
 | `add_blueprint_function_node` | blueprint_logic | 関数呼び出しの理由 |
 | `add_blueprint_variable` | blueprint_variable | 変数の役割 |
-| `set_actor_property` | actor_property | アクタープロパティ設定の意図 |
-| `set_actor_component_property` | component_property | コンポーネントプロパティ設定の意図 |
 
 ### 使用例
 
@@ -413,8 +413,8 @@ search_knowledge("質量 設定", category="physics")
 
 ## 更新履歴
 
-- 2024-12-14: set_actor_component_property ツールを追加、set_actor_property と合わせて rationale パラメータを追加
-- 2024-12-14: node_tools.py に rationale パラメータを追加（3ツール）
-- 2024-12-14: rationale パラメータ機能を追加（4ツール）
-- 2024-12-14: 新しいコマンド追加手順、ビルドガイドを追加
-- 2024-12-03: 初版作成
+- 2025-12-15: set_actor_component_property ツールを追加、set_actor_property と合わせて rationale パラメータを追加
+- 2025-12-15: node_tools.py に rationale パラメータを追加（3ツール）
+- 2025-12-15: rationale パラメータ機能を追加（4ツール）
+- 2025-12-14: 新しいコマンド追加手順、ビルドガイドを追加
+- 2025-12-03: 初版作成

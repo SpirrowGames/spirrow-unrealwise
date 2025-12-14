@@ -21,6 +21,10 @@
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/GameModeBase.h"
+#include "GameFramework/Controller.h"
+#include "Blueprint/UserWidget.h"
+#include "Animation/AnimInstance.h"
 #include "Misc/App.h"
 #include "UObject/UObjectIterator.h"
 
@@ -1367,6 +1371,15 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleScanProjectClasse
         bIncludeEngine = Params->GetBoolField(TEXT("include_engine"));
     }
 
+    bool bExcludeReinst = true;  // Default: exclude REINST classes
+    if (Params->HasField(TEXT("exclude_reinst")))
+    {
+        bExcludeReinst = Params->GetBoolField(TEXT("exclude_reinst"));
+    }
+
+    FString BlueprintTypeFilter;
+    Params->TryGetStringField(TEXT("blueprint_type"), BlueprintTypeFilter);
+
     // Result arrays
     TArray<TSharedPtr<FJsonValue>> CppClassesArray;
     TArray<TSharedPtr<FJsonValue>> BlueprintsArray;
@@ -1405,6 +1418,16 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleScanProjectClasse
             if (ClassName.EndsWith(TEXT("_C")))
             {
                 continue;
+            }
+
+            // Filter REINST_* classes (Live Coding temporary classes)
+            if (bExcludeReinst)
+            {
+                if (ClassName.StartsWith(TEXT("REINST_")) ||
+                    ClassPath.Contains(TEXT("/Engine/Transient.")))
+                {
+                    continue;
+                }
             }
 
             // Module filter
@@ -1518,6 +1541,64 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleScanProjectClasse
                     ParentClass = ParentClass->GetSuperClass();
                 }
                 if (!bMatchesParent)
+                {
+                    continue;
+                }
+            }
+
+            // Blueprint type filter
+            if (!BlueprintTypeFilter.IsEmpty() && Blueprint->ParentClass)
+            {
+                bool bMatchesType = false;
+                UClass* ParentClass = Blueprint->ParentClass;
+
+                if (BlueprintTypeFilter == TEXT("actor"))
+                {
+                    // Actor-derived but exclude Widget/Anim/ControlRig
+                    bMatchesType = ParentClass->IsChildOf(AActor::StaticClass()) &&
+                                   !ParentClass->IsChildOf(UUserWidget::StaticClass());
+                }
+                else if (BlueprintTypeFilter == TEXT("widget"))
+                {
+                    bMatchesType = ParentClass->IsChildOf(UUserWidget::StaticClass());
+                }
+                else if (BlueprintTypeFilter == TEXT("anim"))
+                {
+                    bMatchesType = ParentClass->IsChildOf(UAnimInstance::StaticClass());
+                }
+                else if (BlueprintTypeFilter == TEXT("controlrig"))
+                {
+                    // ControlRig is a plugin, so check dynamically
+                    static UClass* ControlRigClass = FindObject<UClass>(nullptr, TEXT("/Script/ControlRig.ControlRig"));
+                    if (ControlRigClass)
+                    {
+                        bMatchesType = ParentClass->IsChildOf(ControlRigClass);
+                    }
+                }
+                else if (BlueprintTypeFilter == TEXT("interface"))
+                {
+                    // Interface: parent is UInterface or name starts with BPI_
+                    bMatchesType = ParentClass->IsChildOf(UInterface::StaticClass()) ||
+                                   Asset.AssetName.ToString().StartsWith(TEXT("BPI_"));
+                }
+                else if (BlueprintTypeFilter == TEXT("gamemode"))
+                {
+                    bMatchesType = ParentClass->IsChildOf(AGameModeBase::StaticClass());
+                }
+                else if (BlueprintTypeFilter == TEXT("controller"))
+                {
+                    bMatchesType = ParentClass->IsChildOf(AController::StaticClass());
+                }
+                else if (BlueprintTypeFilter == TEXT("character"))
+                {
+                    bMatchesType = ParentClass->IsChildOf(ACharacter::StaticClass());
+                }
+                else if (BlueprintTypeFilter == TEXT("pawn"))
+                {
+                    bMatchesType = ParentClass->IsChildOf(APawn::StaticClass());
+                }
+
+                if (!bMatchesType)
                 {
                     continue;
                 }

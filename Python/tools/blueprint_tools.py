@@ -487,7 +487,9 @@ def register_blueprint_tools(mcp: FastMCP):
         parent_class: str = None,
         module_filter: str = None,
         path_filter: str = None,
-        include_engine: bool = False
+        include_engine: bool = False,
+        exclude_reinst: bool = True,
+        blueprint_type: str = None
     ) -> Dict[str, Any]:
         """
         Scan the project for C++ classes and Blueprint assets.
@@ -501,6 +503,18 @@ def register_blueprint_tools(mcp: FastMCP):
             module_filter: Filter C++ classes by module name (e.g., "TrapxTrapCpp")
             path_filter: Filter Blueprints by content path (e.g., "/Game/TrapxTrap/")
             include_engine: Whether to include Engine classes (default: False)
+            exclude_reinst: Whether to exclude REINST_* classes from Live Coding (default: True)
+            blueprint_type: Filter Blueprints by type:
+                - "actor": Actor-derived Blueprints (excludes widgets, anims)
+                - "widget": UserWidget-derived Blueprints (UI)
+                - "anim": AnimInstance-derived Blueprints (Animation Blueprints)
+                - "controlrig": ControlRig Blueprints
+                - "interface": Blueprint Interfaces (BPI_*)
+                - "gamemode": GameMode Blueprints
+                - "controller": Controller Blueprints (Player/AI)
+                - "character": Character Blueprints
+                - "pawn": Pawn Blueprints
+                - None: No filter (default)
 
         Returns:
             Dict containing:
@@ -510,24 +524,32 @@ def register_blueprint_tools(mcp: FastMCP):
             - total_blueprints: Count of Blueprints found
 
         Examples:
-            # Get all project classes
+            # Get all project classes (excluding REINST by default)
             scan_project_classes()
 
-            # Get only C++ classes from project module
-            scan_project_classes(class_type="cpp", module_filter="TrapxTrapCpp")
+            # Get only Widget Blueprints
+            scan_project_classes(class_type="blueprint", blueprint_type="widget")
 
-            # Get all Character-derived Blueprints
-            scan_project_classes(class_type="blueprint", parent_class="Character")
+            # Get Animation Blueprints
+            scan_project_classes(class_type="blueprint", blueprint_type="anim")
 
-            # Get Blueprints in a specific folder
-            scan_project_classes(class_type="blueprint", path_filter="/Game/TrapxTrap/Blueprints")
+            # Get Character Blueprints in a specific folder
+            scan_project_classes(
+                class_type="blueprint",
+                blueprint_type="character",
+                path_filter="/Game/TrapxTrap/"
+            )
+
+            # Include REINST classes (for debugging)
+            scan_project_classes(exclude_reinst=False)
         """
         from unreal_mcp_server import get_unreal_connection
 
         try:
             params = {
                 "class_type": class_type,
-                "include_engine": include_engine
+                "include_engine": include_engine,
+                "exclude_reinst": exclude_reinst
             }
 
             if parent_class:
@@ -536,6 +558,8 @@ def register_blueprint_tools(mcp: FastMCP):
                 params["module_filter"] = module_filter
             if path_filter:
                 params["path_filter"] = path_filter
+            if blueprint_type:
+                params["blueprint_type"] = blueprint_type
 
             unreal = get_unreal_connection()
             if not unreal:

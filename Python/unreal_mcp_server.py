@@ -382,5 +382,23 @@ def info():
 
 # Run the server
 if __name__ == "__main__":
-    logger.info("Starting MCP server with stdio transport")
-    mcp.run(transport='stdio') 
+    import sys
+
+    # コマンドライン引数でトランスポートを選択
+    # --sse: SSEモード（開発用、サーバー単独起動）
+    # デフォルト: stdioモード（Claude Desktop統合用）
+    if "--sse" in sys.argv:
+        port = 8000
+        # --port=XXXX で任意のポート指定可能
+        for arg in sys.argv:
+            if arg.startswith("--port="):
+                try:
+                    port = int(arg.split("=")[1])
+                except ValueError:
+                    pass
+        logger.info(f"Starting MCP server in SSE mode on port {port}")
+        print(f"MCP Server running in SSE mode: http://localhost:{port}/sse")
+        mcp.run(transport='sse', port=port)
+    else:
+        logger.info("Starting MCP server in stdio mode")
+        mcp.run(transport='stdio') 

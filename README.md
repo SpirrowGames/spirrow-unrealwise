@@ -253,14 +253,51 @@ start_mcp_server.bat
 - `RAG_SERVER_URL` - RAGサーバーの接続先（デフォルト: `http://localhost:8100`）
 - 他の環境変数も追加可能
 
+### 起動モード
+
+Spirrow-UnrealWiseは2つのトランスポートモードをサポートしています：
+
+#### Stdio モード（デフォルト）
+
+MCPクライアント（Claude Desktop等）のサブプロセスとして動作します。
+設定が簡単ですが、Python側のコード変更時にはMCPクライアントの再起動が必要です。
+
+**起動**: MCPクライアントの設定で自動起動（後述）
+
+#### SSE モード（開発推奨）
+
+独立したHTTPサーバーとして動作します。
+Python側のコード変更時にMCPサーバーだけ再起動すれば反映されるため、開発効率が向上します。
+
+**起動**:
+```powershell
+# PowerShell
+.\start_mcp_server_sse.ps1
+
+# コマンドプロンプト
+start_mcp_server_sse.bat
+```
+
+**エンドポイント**: `http://localhost:8000/sse`
+
+#### ワークフロー比較
+
+| 操作 | Stdio モード | SSE モード |
+|------|-------------|-----------|
+| Python変更の反映 | MCPクライアント再起動 | MCPサーバーのみ再起動（Ctrl+C → 再実行） |
+| 初期設定 | JSON設定のみ | サーバー手動起動 + JSON設定 |
+| 推奨用途 | 本番利用 | 開発・デバッグ |
+
 ### MCPクライアントの設定
+
+#### Stdio モード（デフォルト）
 
 MCPクライアントに応じて、以下のJSONをmcp設定に使用してください。
 
 ```json
 {
   "mcpServers": {
-    "unrealMCP": {
+    "spirrow-unrealwise": {
       "command": "uv",
       "args": [
         "--directory",
@@ -272,6 +309,29 @@ MCPクライアントに応じて、以下のJSONをmcp設定に使用してく�
   }
 }
 ```
+
+#### SSE モード（開発推奨）
+
+1. まずMCPサーバーを手動起動：
+```powershell
+   .\start_mcp_server_sse.ps1
+```
+
+2. MCPクライアントの設定：
+```json
+   {
+     "mcpServers": {
+       "spirrow-unrealwise": {
+         "url": "http://localhost:8000/sse"
+       }
+     }
+   }
+```
+
+3. Python変更時の反映手順：
+   - サーバーを Ctrl+C で停止
+   - `.\start_mcp_server_sse.ps1` で再起動
+   - MCPクライアントの再起動は不要！
 
 例は`mcp.json`にあります。
 

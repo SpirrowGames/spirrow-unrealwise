@@ -52,7 +52,8 @@ public class SpirrowBridge : ModuleRules
 				"KismetCompiler",
 				"BlueprintGraph",
 				"Projects",
-				"AssetRegistry"
+				"AssetRegistry",
+				"AssetTools"
 			}
 		);
 		

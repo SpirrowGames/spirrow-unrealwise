@@ -66,7 +66,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleCommand(const FSt
     {
         return HandleSetPawnProperties(Params);
     }
-    
+    else if (CommandType == TEXT("scan_project_classes"))
+    {
+        return HandleScanProjectClasses(Params);
+    }
+
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown blueprint command: %s"), *CommandType));
 }
 
@@ -1340,4 +1344,208 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleSetPawnProperties
     ResponseObj->SetBoolField(TEXT("success"), bAnyPropertiesSet);
     ResponseObj->SetObjectField(TEXT("results"), ResultsObj);
     return ResponseObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleScanProjectClasses(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get parameters
+    FString ClassType = TEXT("all");
+    Params->TryGetStringField(TEXT("class_type"), ClassType);
+
+    FString ParentClassFilter;
+    Params->TryGetStringField(TEXT("parent_class"), ParentClassFilter);
+
+    FString ModuleFilter;
+    Params->TryGetStringField(TEXT("module_filter"), ModuleFilter);
+
+    FString PathFilter;
+    Params->TryGetStringField(TEXT("path_filter"), PathFilter);
+
+    bool bIncludeEngine = false;
+    if (Params->HasField(TEXT("include_engine")))
+    {
+        bIncludeEngine = Params->GetBoolField(TEXT("include_engine"));
+    }
+
+    // Result arrays
+    TArray<TSharedPtr<FJsonValue>> CppClassesArray;
+    TArray<TSharedPtr<FJsonValue>> BlueprintsArray;
+
+    // === Scan C++ classes ===
+    if (ClassType == TEXT("all") || ClassType == TEXT("cpp"))
+    {
+        for (TObjectIterator<UClass> ClassIt; ClassIt; ++ClassIt)
+        {
+            UClass* TestClass = *ClassIt;
+            if (!TestClass || !TestClass->IsChildOf(AActor::StaticClass()))
+            {
+                continue;
+            }
+
+            FString ClassPath = TestClass->GetPathName();
+            FString ClassName = TestClass->GetName();
+
+            // Filter Engine classes
+            if (!bIncludeEngine)
+            {
+                if (ClassPath.Contains(TEXT("/Script/Engine.")) ||
+                    ClassPath.Contains(TEXT("/Script/CoreUObject.")) ||
+                    ClassPath.Contains(TEXT("/Script/UMG.")) ||
+                    ClassPath.Contains(TEXT("/Script/AIModule.")) ||
+                    ClassPath.Contains(TEXT("/Script/NavigationSystem.")) ||
+                    ClassPath.Contains(TEXT("/Script/PhysicsCore.")) ||
+                    ClassPath.Contains(TEXT("/Script/EnhancedInput.")) ||
+                    ClassPath.Contains(TEXT("/Script/InputCore.")))
+                {
+                    continue;
+                }
+            }
+
+            // Skip Blueprint-generated classes (_C) - handled in Blueprint section
+            if (ClassName.EndsWith(TEXT("_C")))
+            {
+                continue;
+            }
+
+            // Module filter
+            if (!ModuleFilter.IsEmpty())
+            {
+                if (!ClassPath.Contains(FString::Printf(TEXT("/Script/%s."), *ModuleFilter)))
+                {
+                    continue;
+                }
+            }
+
+            // Parent class filter
+            if (!ParentClassFilter.IsEmpty())
+            {
+                UClass* ParentClass = TestClass->GetSuperClass();
+                bool bMatchesParent = false;
+                while (ParentClass)
+                {
+                    if (ParentClass->GetName() == ParentClassFilter ||
+                        ParentClass->GetName() == TEXT("A") + ParentClassFilter ||
+                        ParentClass->GetName() == ParentClassFilter.Mid(1)) // Remove 'A' prefix if present
+                    {
+                        bMatchesParent = true;
+                        break;
+                    }
+                    ParentClass = ParentClass->GetSuperClass();
+                }
+                if (!bMatchesParent)
+                {
+                    continue;
+                }
+            }
+
+            // Extract module name
+            FString ModuleName;
+            if (ClassPath.Contains(TEXT("/Script/")))
+            {
+                int32 ScriptIdx = ClassPath.Find(TEXT("/Script/"));
+                int32 DotIdx = ClassPath.Find(TEXT("."), ESearchCase::IgnoreCase, ESearchDir::FromStart, ScriptIdx + 8);
+                if (DotIdx != INDEX_NONE)
+                {
+                    ModuleName = ClassPath.Mid(ScriptIdx + 8, DotIdx - ScriptIdx - 8);
+                }
+            }
+
+            // Get parent class name
+            FString ParentClassName;
+            if (TestClass->GetSuperClass())
+            {
+                ParentClassName = TestClass->GetSuperClass()->GetName();
+            }
+
+            // Create JSON object
+            TSharedPtr<FJsonObject> ClassObj = MakeShared<FJsonObject>();
+            ClassObj->SetStringField(TEXT("name"), ClassName);
+            ClassObj->SetStringField(TEXT("path"), ClassPath);
+            ClassObj->SetStringField(TEXT("parent"), ParentClassName);
+            ClassObj->SetStringField(TEXT("module"), ModuleName);
+
+            CppClassesArray.Add(MakeShared<FJsonValueObject>(ClassObj));
+        }
+    }
+
+    // === Scan Blueprint assets ===
+    if (ClassType == TEXT("all") || ClassType == TEXT("blueprint"))
+    {
+        FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+        IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+
+        FARFilter Filter;
+        Filter.ClassPaths.Add(UBlueprint::StaticClass()->GetClassPathName());
+        Filter.bRecursiveClasses = true;
+        Filter.bRecursivePaths = true;
+
+        // Path filter
+        if (!PathFilter.IsEmpty())
+        {
+            Filter.PackagePaths.Add(FName(*PathFilter));
+        }
+        else
+        {
+            Filter.PackagePaths.Add(FName(TEXT("/Game")));
+        }
+
+        TArray<FAssetData> AssetList;
+        AssetRegistry.GetAssets(Filter, AssetList);
+
+        for (const FAssetData& Asset : AssetList)
+        {
+            // Load Blueprint
+            UBlueprint* Blueprint = Cast<UBlueprint>(Asset.GetAsset());
+            if (!Blueprint)
+            {
+                continue;
+            }
+
+            // Parent class filter
+            if (!ParentClassFilter.IsEmpty() && Blueprint->ParentClass)
+            {
+                UClass* ParentClass = Blueprint->ParentClass;
+                bool bMatchesParent = false;
+                while (ParentClass)
+                {
+                    if (ParentClass->GetName() == ParentClassFilter ||
+                        ParentClass->GetName() == TEXT("A") + ParentClassFilter ||
+                        ParentClass->GetName() == ParentClassFilter.Mid(1))
+                    {
+                        bMatchesParent = true;
+                        break;
+                    }
+                    ParentClass = ParentClass->GetSuperClass();
+                }
+                if (!bMatchesParent)
+                {
+                    continue;
+                }
+            }
+
+            // Parent class name
+            FString ParentClassName;
+            if (Blueprint->ParentClass)
+            {
+                ParentClassName = Blueprint->ParentClass->GetName();
+            }
+
+            // Create JSON object
+            TSharedPtr<FJsonObject> BPObj = MakeShared<FJsonObject>();
+            BPObj->SetStringField(TEXT("name"), Asset.AssetName.ToString());
+            BPObj->SetStringField(TEXT("path"), Asset.GetObjectPathString());
+            BPObj->SetStringField(TEXT("parent"), ParentClassName);
+
+            BlueprintsArray.Add(MakeShared<FJsonValueObject>(BPObj));
+        }
+    }
+
+    // Build result
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetArrayField(TEXT("cpp_classes"), CppClassesArray);
+    ResultObj->SetArrayField(TEXT("blueprints"), BlueprintsArray);
+    ResultObj->SetNumberField(TEXT("total_cpp"), CppClassesArray.Num());
+    ResultObj->SetNumberField(TEXT("total_blueprints"), BlueprintsArray.Num());
+
+    return ResultObj;
 } 

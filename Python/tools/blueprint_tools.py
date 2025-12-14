@@ -479,5 +479,82 @@ def register_blueprint_tools(mcp: FastMCP):
             error_msg = f"Error setting pawn properties: {e}"
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
-    
+
+    @mcp.tool()
+    def scan_project_classes(
+        ctx: Context,
+        class_type: str = "all",
+        parent_class: str = None,
+        module_filter: str = None,
+        path_filter: str = None,
+        include_engine: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Scan the project for C++ classes and Blueprint assets.
+
+        This is useful for discovering available classes to inherit from,
+        finding existing Blueprints, or understanding the project structure.
+
+        Args:
+            class_type: Type of classes to scan - "cpp", "blueprint", or "all" (default)
+            parent_class: Filter by parent class (e.g., "Actor", "Character", "Pawn")
+            module_filter: Filter C++ classes by module name (e.g., "TrapxTrapCpp")
+            path_filter: Filter Blueprints by content path (e.g., "/Game/TrapxTrap/")
+            include_engine: Whether to include Engine classes (default: False)
+
+        Returns:
+            Dict containing:
+            - cpp_classes: List of C++ classes with name, path, parent, module
+            - blueprints: List of Blueprint assets with name, path, parent
+            - total_cpp: Count of C++ classes found
+            - total_blueprints: Count of Blueprints found
+
+        Examples:
+            # Get all project classes
+            scan_project_classes()
+
+            # Get only C++ classes from project module
+            scan_project_classes(class_type="cpp", module_filter="TrapxTrapCpp")
+
+            # Get all Character-derived Blueprints
+            scan_project_classes(class_type="blueprint", parent_class="Character")
+
+            # Get Blueprints in a specific folder
+            scan_project_classes(class_type="blueprint", path_filter="/Game/TrapxTrap/Blueprints")
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            params = {
+                "class_type": class_type,
+                "include_engine": include_engine
+            }
+
+            if parent_class:
+                params["parent_class"] = parent_class
+            if module_filter:
+                params["module_filter"] = module_filter
+            if path_filter:
+                params["path_filter"] = path_filter
+
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            logger.info(f"Scanning project classes with filters: {params}")
+            response = unreal.send_command("scan_project_classes", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Found {response.get('total_cpp', 0)} C++ classes and {response.get('total_blueprints', 0)} Blueprints")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error scanning project classes: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("Blueprint tools registered successfully") 

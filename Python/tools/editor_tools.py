@@ -312,17 +312,19 @@ def register_editor_tools(mcp: FastMCP):
         blueprint_name: str,
         actor_name: str,
         location: List[float] = [0.0, 0.0, 0.0],
-        rotation: List[float] = [0.0, 0.0, 0.0]
+        rotation: List[float] = [0.0, 0.0, 0.0],
+        path: str = "/Game/Blueprints"
     ) -> Dict[str, Any]:
         """Spawn an actor from a Blueprint.
-        
+
         Args:
             ctx: The MCP context
             blueprint_name: Name of the Blueprint to spawn from
             actor_name: Name to give the spawned actor
             location: The [x, y, z] world location to spawn at
             rotation: The [pitch, yaw, roll] rotation in degrees
-            
+            path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+
         Returns:
             Dict containing the spawned actor's properties
         """
@@ -339,7 +341,8 @@ def register_editor_tools(mcp: FastMCP):
                 "blueprint_name": blueprint_name,
                 "actor_name": actor_name,
                 "location": location or [0.0, 0.0, 0.0],
-                "rotation": rotation or [0.0, 0.0, 0.0]
+                "rotation": rotation or [0.0, 0.0, 0.0],
+                "path": path
             }
             
             # Validate location and rotation formats

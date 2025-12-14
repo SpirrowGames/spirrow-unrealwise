@@ -1732,7 +1732,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleGetBlueprintGraph
     }
 
     // Find the Blueprint
-    UBlueprint* Blueprint = FindBlueprintByName(BlueprintName, Path);
+    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprintByName(BlueprintName, Path);
     if (!Blueprint)
     {
         ResultJson->SetStringField(TEXT("status"), TEXT("error"));

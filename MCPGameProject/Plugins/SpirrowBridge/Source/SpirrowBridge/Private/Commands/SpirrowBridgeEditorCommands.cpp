@@ -10,6 +10,7 @@
 #include "GameFramework/Actor.h"
 #include "Engine/Selection.h"
 #include "Kismet/GameplayStatics.h"
+#include "EngineUtils.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/PointLight.h"

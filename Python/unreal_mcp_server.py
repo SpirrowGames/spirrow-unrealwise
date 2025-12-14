@@ -388,6 +388,8 @@ if __name__ == "__main__":
     # --sse: SSEモード（開発用、サーバー単独起動）
     # デフォルト: stdioモード（Claude Desktop統合用）
     if "--sse" in sys.argv:
+        import uvicorn
+
         port = 8000
         # --port=XXXX で任意のポート指定可能
         for arg in sys.argv:
@@ -396,9 +398,13 @@ if __name__ == "__main__":
                     port = int(arg.split("=")[1])
                 except ValueError:
                     pass
+
         logger.info(f"Starting MCP server in SSE mode on port {port}")
         print(f"MCP Server running in SSE mode: http://localhost:{port}/sse")
-        mcp.run(transport='sse', port=port)
+
+        # FastMCPのSSEアプリケーションを取得して起動
+        app = mcp.sse_app()
+        uvicorn.run(app, host="0.0.0.0", port=port)
     else:
         logger.info("Starting MCP server in stdio mode")
         mcp.run(transport='stdio') 

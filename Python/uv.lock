@@ -481,6 +481,7 @@ source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "fastmcp" },
+    { name = "httpx" },
     { name = "mcp", extra = ["cli"] },
     { name = "pydantic" },
     { name = "requests" },
@@ -491,6 +492,7 @@ dependencies = [
 requires-dist = [
     { name = "fastapi" },
     { name = "fastmcp", specifier = ">=0.2.0" },
+    { name = "httpx", specifier = ">=0.25.0" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.4.1" },
     { name = "pydantic", specifier = ">=2.10.0" },
     { name = "requests" },

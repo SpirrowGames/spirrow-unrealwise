@@ -3,8 +3,8 @@ REM ========================================
 REM Spirrow-UnrealWise MCP Server (SSE Mode)
 REM ========================================
 REM
-REM SSEモード: MCPサーバーを独立したHTTPサーバーとして起動
-REM メリット: Python変更時にClaude Desktopの再起動が不要
+REM SSE Mode: Run MCP server as standalone HTTP server
+REM Benefit: No need to restart Claude Desktop when Python code changes
 REM
 
 echo ========================================

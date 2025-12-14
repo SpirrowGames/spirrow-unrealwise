@@ -190,6 +190,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleCreateInputMappingC
 
     // パッケージパス作成
     FString PackagePath = FString::Printf(TEXT("%s/%s"), *Path, *ContextName);
+
+    // 既存アセットチェック
+    if (UEditorAssetLibrary::DoesAssetExist(PackagePath))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Input Mapping Context already exists: %s"), *PackagePath));
+    }
+
     UPackage* Package = CreatePackage(*PackagePath);
 
     if (!Package)

@@ -62,6 +62,29 @@ Unreal MCP統合は、自然言語を通じてUnreal Engineを制御するため
 
 これらすべての機能は、AIアシスタントを介した自然言語コマンドでアクセスでき、Unreal Engineワークフローの自動化と制御を簡単にします。
 
+### Blueprint親クラス指定について
+
+`create_blueprint`でC++親クラスを指定する際、Aプレフィックスの有無を気にする必要はありません。システムは以下の3段階で親クラスを検索します：
+
+**検索優先順位**:
+1. **直接StaticClass参照** - 一般的なエンジンクラス（APawn、AActor、ACharacter）
+2. **TObjectIterator検索** - ロード済みの全クラスを検索（最も確実）
+3. **LoadClass検索** - 複数のモジュールパスとプレフィックスパターンを試行
+
+**Method 3の検索パターン**（9通り試行）:
+- Aプレフィックスあり: `/Script/Engine.AClassName`、`/Script/Game.AClassName`、`/Script/ProjectName.AClassName`
+- Aプレフィックスなし: `/Script/Engine.ClassName`、`/Script/Game.ClassName`、`/Script/ProjectName.ClassName` ← **UEリフレクション標準**
+- ユーザー入力そのまま: `/Script/Engine.UserInput`、`/Script/Game.UserInput`、`/Script/ProjectName.UserInput`
+
+**重要**: UE5のリフレクションシステムは、C++クラスをAプレフィックス**なし**で登録します（例：`APlayerCharacterBase` → `/Script/TrapxTrapCpp.PlayerCharacterBase`）。そのため、Method 3ではAプレフィックスなしのパスが最も成功しやすいです。
+
+**使用例**:
+```python
+# どちらの指定でも動作します
+create_blueprint(name="BP_Player", parent_class="PlayerCharacterBase")
+create_blueprint(name="BP_Player", parent_class="APlayerCharacterBase")
+```
+
 ## 🧩 コンポーネント
 
 ### サンプルプロジェクト (MCPGameProject) `MCPGameProject`

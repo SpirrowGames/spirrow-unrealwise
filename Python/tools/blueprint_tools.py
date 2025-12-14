@@ -553,7 +553,14 @@ def register_blueprint_tools(mcp: FastMCP):
                 destination_path="/Game/Blueprints/Bosses"
             )
         """
+        from unreal_mcp_server import get_unreal_connection
+
         try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
             # Default destination_path to source_path if not specified
             if destination_path is None:
                 destination_path = source_path
@@ -595,7 +602,14 @@ def register_blueprint_tools(mcp: FastMCP):
                 path="/Game/Blueprints/Characters"
             )
         """
+        from unreal_mcp_server import get_unreal_connection
+
         try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
             params = {
                 "blueprint_name": blueprint_name,
                 "path": path

@@ -411,18 +411,30 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSpawnBlueprintActor(
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'actor_name' parameter"));
     }
 
+    // Get path parameter (default: /Game/Blueprints)
+    FString Path;
+    if (!Params->TryGetStringField(TEXT("path"), Path))
+    {
+        Path = TEXT("/Game/Blueprints");
+    }
+
+    // Ensure path ends with /
+    if (!Path.EndsWith(TEXT("/")))
+    {
+        Path += TEXT("/");
+    }
+
     // Find the blueprint
     if (BlueprintName.IsEmpty())
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Blueprint name is empty"));
     }
 
-    FString Root      = TEXT("/Game/Blueprints/");
-    FString AssetPath = Root + BlueprintName;
+    FString AssetPath = Path + BlueprintName;
 
     if (!FPackageName::DoesPackageExist(AssetPath))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint '%s' not found – it must reside under /Game/Blueprints"), *BlueprintName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint '%s' not found at path: %s"), *BlueprintName, *AssetPath));
     }
 
     UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *AssetPath);

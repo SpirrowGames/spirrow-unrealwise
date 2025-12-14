@@ -133,6 +133,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleCreateInputAction(c
 
     // パッケージパス作成
     FString PackagePath = FString::Printf(TEXT("%s/%s"), *Path, *ActionName);
+
+    // 既存アセットチェック
+    if (UEditorAssetLibrary::DoesAssetExist(PackagePath))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Input Action already exists: %s"), *PackagePath));
+    }
+
     UPackage* Package = CreatePackage(*PackagePath);
 
     if (!Package)

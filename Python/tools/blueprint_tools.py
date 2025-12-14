@@ -5,7 +5,7 @@ This module provides tools for creating and manipulating Blueprint assets in Unr
 """
 
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from mcp.server.fastmcp import FastMCP, Context
 
 # Get logger
@@ -19,7 +19,8 @@ def register_blueprint_tools(mcp: FastMCP):
         ctx: Context,
         name: str,
         parent_class: str,
-        path: str = "/Game/Blueprints"
+        path: str = "/Game/Blueprints",
+        rationale: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Create a new Blueprint class.
@@ -28,12 +29,14 @@ def register_blueprint_tools(mcp: FastMCP):
             name: Name of the blueprint (e.g., "BP_PlayerCharacter")
             parent_class: Parent class to inherit from (e.g., "Actor", "Character", "PlayerCharacterBase")
             path: Content browser path for the asset (e.g., "/Game/TrapxTrap/Blueprints/Characters")
+            rationale: Design rationale - why this blueprint is being created (auto-saved to knowledge base)
 
         Returns:
             Dict containing the created blueprint path
         """
         # Import inside function to avoid circular imports
         from unreal_mcp_server import get_unreal_connection
+        from tools.rag_tools import record_rationale
 
         try:
             unreal = get_unreal_connection()
@@ -46,14 +49,23 @@ def register_blueprint_tools(mcp: FastMCP):
                 "parent_class": parent_class,
                 "path": path
             })
-            
+
             if not response:
                 logger.error("No response from Unreal Engine")
                 return {"success": False, "message": "No response from Unreal Engine"}
-            
+
+            # Record rationale if provided and operation was successful
+            if response.get("success", True) and rationale:
+                record_rationale(
+                    action="create_blueprint",
+                    details={"name": name, "parent_class": parent_class, "path": path},
+                    rationale=rationale,
+                    category="blueprint"
+                )
+
             logger.info(f"Blueprint creation response: {response}")
             return response or {}
-            
+
         except Exception as e:
             error_msg = f"Error creating blueprint: {e}"
             logger.error(error_msg)
@@ -69,7 +81,8 @@ def register_blueprint_tools(mcp: FastMCP):
         rotation: List[float] = [],
         scale: List[float] = [],
         component_properties: Dict[str, Any] = {},
-        path: str = "/Game/Blueprints"
+        path: str = "/Game/Blueprints",
+        rationale: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Add a component to a Blueprint.
@@ -83,11 +96,13 @@ def register_blueprint_tools(mcp: FastMCP):
             scale: [X, Y, Z] values for component's scale
             component_properties: Additional properties to set on the component
             path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+            rationale: Design rationale - why this component is being added (auto-saved to knowledge base)
 
         Returns:
             Information about the added component
         """
         from unreal_mcp_server import get_unreal_connection
+        from tools.rag_tools import record_rationale
         
         try:
             # Ensure all parameters are properly formatted
@@ -121,11 +136,24 @@ def register_blueprint_tools(mcp: FastMCP):
                 
             logger.info(f"Adding component to blueprint with params: {params}")
             response = unreal.send_command("add_component_to_blueprint", params)
-            
+
             if not response:
                 logger.error("No response from Unreal Engine")
                 return {"success": False, "message": "No response from Unreal Engine"}
-            
+
+            # Record rationale if provided and operation was successful
+            if response.get("success", True) and rationale:
+                record_rationale(
+                    action="add_component_to_blueprint",
+                    details={
+                        "blueprint_name": blueprint_name,
+                        "component_type": component_type,
+                        "component_name": component_name
+                    },
+                    rationale=rationale,
+                    category="component"
+                )
+
             logger.info(f"Component addition response: {response}")
             return response
             
@@ -247,7 +275,8 @@ def register_blueprint_tools(mcp: FastMCP):
         mass: float = 1.0,
         linear_damping: float = 0.01,
         angular_damping: float = 0.0,
-        path: str = "/Game/Blueprints"
+        path: str = "/Game/Blueprints",
+        rationale: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Set physics properties on a component.
@@ -261,11 +290,13 @@ def register_blueprint_tools(mcp: FastMCP):
             linear_damping: Linear damping factor
             angular_damping: Angular damping factor
             path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+            rationale: Design rationale - why these physics properties are being set (auto-saved to knowledge base)
 
         Returns:
             Response indicating success or failure
         """
         from unreal_mcp_server import get_unreal_connection
+        from tools.rag_tools import record_rationale
 
         try:
             unreal = get_unreal_connection()
@@ -286,11 +317,25 @@ def register_blueprint_tools(mcp: FastMCP):
             
             logger.info(f"Setting physics properties with params: {params}")
             response = unreal.send_command("set_physics_properties", params)
-            
+
             if not response:
                 logger.error("No response from Unreal Engine")
                 return {"success": False, "message": "No response from Unreal Engine"}
-            
+
+            # Record rationale if provided and operation was successful
+            if response.get("success", True) and rationale:
+                record_rationale(
+                    action="set_physics_properties",
+                    details={
+                        "blueprint_name": blueprint_name,
+                        "component_name": component_name,
+                        "simulate_physics": simulate_physics,
+                        "mass": mass
+                    },
+                    rationale=rationale,
+                    category="physics"
+                )
+
             logger.info(f"Set physics properties response: {response}")
             return response
             

@@ -7,6 +7,7 @@ to store and retrieve project knowledge.
 
 import logging
 import os
+import json
 from typing import Dict, Any, Optional
 import requests
 from mcp.server.fastmcp import FastMCP, Context
@@ -16,6 +17,50 @@ logger = logging.getLogger("SpirrowBridge")
 
 # Get RAG server URL from environment variable or use default
 RAG_SERVER_URL = os.environ.get("RAG_SERVER_URL", "http://localhost:8100")
+
+def record_rationale(
+    action: str,
+    details: Dict[str, Any],
+    rationale: str,
+    category: str = "decision"
+) -> None:
+    """
+    Record design rationale to RAG server (internal function).
+
+    Args:
+        action: Action name (e.g., "create_blueprint")
+        details: Action details (e.g., {"name": "BP_Enemy", "parent": "Character"})
+        rationale: Design rationale
+        category: RAG category (default: "decision")
+    """
+    if not rationale:
+        return
+
+    try:
+        # Format as document
+        document = f"[{action}]\n"
+        document += f"Details: {json.dumps(details, ensure_ascii=False)}\n"
+        document += f"Rationale: {rationale}"
+
+        # Generate tags from action name
+        tags = action.replace("_", ",")
+
+        url = f"{RAG_SERVER_URL}/knowledge/add"
+        payload = {
+            "document": document,
+            "category": category,
+            "tags": tags
+        }
+
+        response = requests.post(url, json=payload, timeout=5)
+        if response.ok:
+            logger.info(f"Rationale recorded for {action}")
+        else:
+            logger.warning(f"Failed to record rationale: {response.status_code}")
+
+    except Exception as e:
+        # Log warning but don't fail the main operation
+        logger.warning(f"Failed to record rationale: {e}")
 
 def register_rag_tools(mcp: FastMCP):
     """Register RAG tools with the MCP server."""

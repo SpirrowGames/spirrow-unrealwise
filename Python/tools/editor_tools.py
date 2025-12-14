@@ -81,21 +81,24 @@ def register_editor_tools(mcp: FastMCP):
         name: str,
         type: str,
         location: List[float] = [0.0, 0.0, 0.0],
-        rotation: List[float] = [0.0, 0.0, 0.0]
+        rotation: List[float] = [0.0, 0.0, 0.0],
+        rationale: Optional[str] = None
     ) -> Dict[str, Any]:
         """Create a new actor in the current level.
-        
+
         Args:
             ctx: The MCP context
             name: The name to give the new actor (must be unique)
             type: The type of actor to create (e.g. StaticMeshActor, PointLight)
             location: The [x, y, z] world location to spawn at
             rotation: The [pitch, yaw, roll] rotation in degrees
-            
+            rationale: Design rationale - why this actor is being spawned (auto-saved to knowledge base)
+
         Returns:
             Dict containing the created actor's properties
         """
         from unreal_mcp_server import get_unreal_connection
+        from tools.rag_tools import record_rationale
         
         try:
             unreal = get_unreal_connection()
@@ -129,13 +132,22 @@ def register_editor_tools(mcp: FastMCP):
             
             # Log the complete response for debugging
             logger.info(f"Actor creation response: {response}")
-            
+
             # Handle error responses correctly
             if response.get("status") == "error":
                 error_message = response.get("error", "Unknown error")
                 logger.error(f"Error creating actor: {error_message}")
                 return {"success": False, "message": error_message}
-            
+
+            # Record rationale if provided and operation was successful
+            if response.get("success", True) and rationale:
+                record_rationale(
+                    action="spawn_actor",
+                    details={"name": name, "type": type, "location": location},
+                    rationale=rationale,
+                    category="level_design"
+                )
+
             return response
             
         except Exception as e:

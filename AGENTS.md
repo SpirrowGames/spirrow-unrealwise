@@ -294,7 +294,83 @@ def get_actor_components(ctx: Context, name: str) -> Dict[str, Any]:
 
 ---
 
+## rationale パラメータ（設計根拠の自動記録）
+
+### 概要
+
+主要なMCPツールには `rationale` パラメータがあります。
+設計判断の理由を記載すると、自動的にナレッジDBに蓄積されます。
+
+### 対象ツール
+
+| ツール | カテゴリ | 理由 |
+|--------|----------|------|
+| `create_blueprint` | blueprint | BP設計の根幹 |
+| `add_component_to_blueprint` | component | コンポーネント選定理由 |
+| `set_physics_properties` | physics | 物理設定の意図 |
+| `spawn_actor` | level_design | アクター配置の意図 |
+
+### 使用例
+
+```python
+# 良い例: 設計判断の根拠を明記
+create_blueprint(
+    name="BP_Enemy",
+    parent_class="Character",
+    rationale="敵キャラ用。AIControllerで制御し、NavMeshで移動するためCharacterベース"
+)
+
+add_component_to_blueprint(
+    blueprint_name="BP_Enemy",
+    component_type="CapsuleComponent",
+    component_name="HitBox",
+    rationale="攻撃判定用。RootのCapsuleとは別に、武器ヒット検出専用"
+)
+
+set_physics_properties(
+    blueprint_name="BP_Ball",
+    component_name="Mesh",
+    simulate_physics=True,
+    mass=10.0,
+    rationale="物理演算ボール。質量10kgで適度な弾み具合を実現"
+)
+
+spawn_actor(
+    name="EnemySpawnPoint_01",
+    type="TargetPoint",
+    location=[1000, 500, 100],
+    rationale="第1ウェーブの敵出現地点。プレイヤー初期位置から見えない位置"
+)
+```
+
+### 書くべき内容
+
+- **なぜ**その選択をしたか
+- 他の選択肢を**なぜ却下**したか
+- 将来の**意図・拡張予定**
+
+### 書かなくていい場合
+
+- 機械的な操作（コンパイル、ノード接続など）
+- 自明な選択（プレイヤーキャラにPlayerControllerなど）
+- テスト・実験的な操作
+
+### ナレッジDBでの活用
+
+記録された rationale は、以下のように活用できます：
+
+```python
+# 過去の設計判断を検索
+search_knowledge("敵キャラ 設計", category="blueprint")
+
+# 物理設定の根拠を検索
+search_knowledge("質量 設定", category="physics")
+```
+
+---
+
 ## 更新履歴
 
+- 2024-12-14: rationale パラメータ機能を追加
 - 2024-12-14: 新しいコマンド追加手順、ビルドガイドを追加
 - 2024-12-03: 初版作成

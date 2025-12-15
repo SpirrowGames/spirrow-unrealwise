@@ -140,6 +140,54 @@
 
 ## 最新の更新履歴
 
+### 2025-12-15: ObjectProperty（アセット参照）対応
+
+**新機能**:
+- `SetObjectProperty`関数にアセット参照プロパティ対応を追加
+  - `FObjectProperty`: `TObjectPtr<T>` 型（例: `UInputAction`, `UStaticMesh`）
+  - `FSoftObjectProperty`: `TSoftObjectPtr<T>` 型（ソフト参照）
+  - `FClassProperty`: `TSubclassOf<T>` 型（クラス参照）
+
+**機能詳細**:
+- アセットパス指定でのプロパティ設定
+- 自動パス補完（`.AssetName` サフィックス自動追加）
+- 型検証（期待されるクラスとの互換性確認）
+- 空文字列またはnullで参照をクリア可能
+- 詳細なエラーメッセージ（型不一致、ロード失敗時）
+
+**対応ツール**:
+- `set_blueprint_property`
+- `set_actor_property`
+- `set_actor_component_property`
+- `set_component_property`
+
+**使用例**:
+```python
+# Input Mapping Context の設定
+set_blueprint_property(
+    blueprint_name="BP_PlayerCharacter",
+    property_name="DefaultMappingContext",
+    property_value="/Game/Input/IMC_Default.IMC_Default"
+)
+
+# Input Action の設定
+set_blueprint_property(
+    blueprint_name="BP_PlayerCharacter",
+    property_name="MoveAction",
+    property_value="/Game/Input/IA_Move.IA_Move"
+)
+
+# 参照をクリア
+set_blueprint_property(
+    blueprint_name="BP_PlayerCharacter",
+    property_name="MoveAction",
+    property_value=""  # または null
+)
+```
+
+**変更範囲**:
+- C++ SpirrowBridgeCommonUtils.cpp: SetObjectProperty関数に3つのプロパティタイプ対応を追加
+
 ### 2025-12-15: get_blueprint_graph ツール追加
 
 **新機能**:

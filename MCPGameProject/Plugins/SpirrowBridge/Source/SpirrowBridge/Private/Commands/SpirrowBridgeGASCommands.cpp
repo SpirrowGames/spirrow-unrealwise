@@ -724,10 +724,29 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(co
             // Set the tags on the component
             TargetTagsComponent->SetAndApplyTargetTagChanges(TagContainer);
 
-            // Add component to the GameplayEffect
-            EffectCDO->GEComponents.Add(TargetTagsComponent);
+            // Add component to the GameplayEffect using reflection (GEComponents is protected in UE5.7)
+            FProperty* GEComponentsProperty = EffectCDO->GetClass()->FindPropertyByName(FName("GEComponents"));
+            if (GEComponentsProperty)
+            {
+                FArrayProperty* ArrayProperty = CastField<FArrayProperty>(GEComponentsProperty);
+                if (ArrayProperty)
+                {
+                    void* ArrayPtr = ArrayProperty->ContainerPtrToValuePtr<void>(EffectCDO);
+                    FScriptArrayHelper ArrayHelper(ArrayProperty, ArrayPtr);
+                    int32 NewIndex = ArrayHelper.AddValue();
 
-            UE_LOG(LogTemp, Display, TEXT("Added TargetTagsGameplayEffectComponent with %d tags"), TagContainer.Added.Num());
+                    FObjectProperty* InnerProperty = CastField<FObjectProperty>(ArrayProperty->Inner);
+                    if (InnerProperty)
+                    {
+                        InnerProperty->SetObjectPropertyValue(ArrayHelper.GetRawPtr(NewIndex), TargetTagsComponent);
+                        UE_LOG(LogTemp, Display, TEXT("Added TargetTagsGameplayEffectComponent with %d tags using reflection"), TagContainer.Added.Num());
+                    }
+                }
+            }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("Failed to find GEComponents property via reflection"));
+            }
         }
     }
 

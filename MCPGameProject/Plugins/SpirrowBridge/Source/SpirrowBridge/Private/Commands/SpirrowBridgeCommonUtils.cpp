@@ -26,6 +26,8 @@
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Misc/Paths.h"
+#include "UObject/SoftObjectPath.h"
+#include "UObject/UObjectGlobals.h"
 
 // JSON Utilities
 TSharedPtr<FJsonObject> FSpirrowBridgeCommonUtils::CreateErrorResponse(const FString& Message)

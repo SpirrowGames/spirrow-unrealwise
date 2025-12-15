@@ -1114,6 +1114,47 @@ void FSpirrowBridgeGASCommands::SetGameplayTagContainerFromArray(FGameplayTagCon
     }
 }
 
+// Helper function to set a GameplayTagContainer property using reflection
+static void SetGameplayTagContainerPropertyByName(UObject* Object, const FName& PropertyName, const TArray<TSharedPtr<FJsonValue>>* TagsArray)
+{
+    if (!Object || !TagsArray)
+    {
+        return;
+    }
+
+    // Find the property using reflection
+    FProperty* Property = Object->GetClass()->FindPropertyByName(PropertyName);
+    if (!Property)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Property not found: %s"), *PropertyName.ToString());
+        return;
+    }
+
+    // Get pointer to the property value
+    void* PropertyValuePtr = Property->ContainerPtrToValuePtr<void>(Object);
+    if (!PropertyValuePtr)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Failed to get property value pointer: %s"), *PropertyName.ToString());
+        return;
+    }
+
+    // Cast to FGameplayTagContainer and populate it
+    FGameplayTagContainer* Container = static_cast<FGameplayTagContainer*>(PropertyValuePtr);
+    for (const TSharedPtr<FJsonValue>& TagValue : *TagsArray)
+    {
+        FString TagString = TagValue->AsString();
+        FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*TagString), false);
+        if (Tag.IsValid())
+        {
+            Container->AddTag(Tag);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Invalid gameplay tag: %s"), *TagString);
+        }
+    }
+}
+
 TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayAbility(const TSharedPtr<FJsonObject>& Params)
 {
     TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
@@ -1236,31 +1277,40 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayAbility(c
         return Response;
     }
 
-    // Set Ability Tags
-    SetGameplayTagContainerFromArray(AbilityCDO->AbilityTags, AbilityTagsArray);
+    // Set Ability Tags using reflection
+    SetGameplayTagContainerPropertyByName(AbilityCDO, FName("AbilityTags"), AbilityTagsArray);
 
-    // Set Cancel Abilities With Tags
-    SetGameplayTagContainerFromArray(AbilityCDO->CancelAbilitiesWithTag, CancelTagsArray);
+    // Set Cancel Abilities With Tags using reflection
+    SetGameplayTagContainerPropertyByName(AbilityCDO, FName("CancelAbilitiesWithTag"), CancelTagsArray);
 
-    // Set Block Abilities With Tags
-    SetGameplayTagContainerFromArray(AbilityCDO->BlockAbilitiesWithTag, BlockTagsArray);
+    // Set Block Abilities With Tags using reflection
+    SetGameplayTagContainerPropertyByName(AbilityCDO, FName("BlockAbilitiesWithTag"), BlockTagsArray);
 
-    // Set Activation Owned Tags
-    SetGameplayTagContainerFromArray(AbilityCDO->ActivationOwnedTags, ActivationOwnedTagsArray);
+    // Set Activation Owned Tags using reflection
+    SetGameplayTagContainerPropertyByName(AbilityCDO, FName("ActivationOwnedTags"), ActivationOwnedTagsArray);
 
-    // Set Activation Required Tags
-    SetGameplayTagContainerFromArray(AbilityCDO->ActivationRequiredTags, ActivationRequiredTagsArray);
+    // Set Activation Required Tags using reflection
+    SetGameplayTagContainerPropertyByName(AbilityCDO, FName("ActivationRequiredTags"), ActivationRequiredTagsArray);
 
-    // Set Activation Blocked Tags
-    SetGameplayTagContainerFromArray(AbilityCDO->ActivationBlockedTags, ActivationBlockedTagsArray);
+    // Set Activation Blocked Tags using reflection
+    SetGameplayTagContainerPropertyByName(AbilityCDO, FName("ActivationBlockedTags"), ActivationBlockedTagsArray);
 
-    // Set Cost Effect
+    // Set Cost Effect using reflection
     if (!CostEffectPath.IsEmpty())
     {
         UClass* CostEffectClass = LoadClass<UGameplayEffect>(nullptr, *CostEffectPath);
         if (CostEffectClass)
         {
-            AbilityCDO->CostGameplayEffectClass = CostEffectClass;
+            FProperty* Property = AbilityCDO->GetClass()->FindPropertyByName(FName("CostGameplayEffectClass"));
+            if (Property)
+            {
+                FClassProperty* ClassProperty = CastField<FClassProperty>(Property);
+                if (ClassProperty)
+                {
+                    void* PropertyValuePtr = Property->ContainerPtrToValuePtr<void>(AbilityCDO);
+                    ClassProperty->SetObjectPropertyValue(PropertyValuePtr, CostEffectClass);
+                }
+            }
         }
         else
         {
@@ -1268,13 +1318,22 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayAbility(c
         }
     }
 
-    // Set Cooldown Effect
+    // Set Cooldown Effect using reflection
     if (!CooldownEffectPath.IsEmpty())
     {
         UClass* CooldownEffectClass = LoadClass<UGameplayEffect>(nullptr, *CooldownEffectPath);
         if (CooldownEffectClass)
         {
-            AbilityCDO->CooldownGameplayEffectClass = CooldownEffectClass;
+            FProperty* Property = AbilityCDO->GetClass()->FindPropertyByName(FName("CooldownGameplayEffectClass"));
+            if (Property)
+            {
+                FClassProperty* ClassProperty = CastField<FClassProperty>(Property);
+                if (ClassProperty)
+                {
+                    void* PropertyValuePtr = Property->ContainerPtrToValuePtr<void>(AbilityCDO);
+                    ClassProperty->SetObjectPropertyValue(PropertyValuePtr, CooldownEffectClass);
+                }
+            }
         }
         else
         {
@@ -1282,36 +1341,46 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayAbility(c
         }
     }
 
-    // Set Instancing Policy
-    if (InstancingPolicyStr == TEXT("NonInstanced"))
+    // Set Instancing Policy using reflection
+    FProperty* InstancingProp = AbilityCDO->GetClass()->FindPropertyByName(FName("InstancingPolicy"));
+    if (InstancingProp)
     {
-        AbilityCDO->InstancingPolicy = EGameplayAbilityInstancingPolicy::NonInstanced;
-    }
-    else if (InstancingPolicyStr == TEXT("InstancedPerActor"))
-    {
-        AbilityCDO->InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-    }
-    else if (InstancingPolicyStr == TEXT("InstancedPerExecution"))
-    {
-        AbilityCDO->InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerExecution;
+        void* InstancingPropPtr = InstancingProp->ContainerPtrToValuePtr<void>(AbilityCDO);
+        if (InstancingPolicyStr == TEXT("NonInstanced"))
+        {
+            *static_cast<TEnumAsByte<EGameplayAbilityInstancingPolicy::Type>*>(InstancingPropPtr) = EGameplayAbilityInstancingPolicy::NonInstanced;
+        }
+        else if (InstancingPolicyStr == TEXT("InstancedPerActor"))
+        {
+            *static_cast<TEnumAsByte<EGameplayAbilityInstancingPolicy::Type>*>(InstancingPropPtr) = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+        }
+        else if (InstancingPolicyStr == TEXT("InstancedPerExecution"))
+        {
+            *static_cast<TEnumAsByte<EGameplayAbilityInstancingPolicy::Type>*>(InstancingPropPtr) = EGameplayAbilityInstancingPolicy::InstancedPerExecution;
+        }
     }
 
-    // Set Net Execution Policy
-    if (NetExecutionPolicyStr == TEXT("LocalPredicted"))
+    // Set Net Execution Policy using reflection
+    FProperty* NetExecProp = AbilityCDO->GetClass()->FindPropertyByName(FName("NetExecutionPolicy"));
+    if (NetExecProp)
     {
-        AbilityCDO->NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
-    }
-    else if (NetExecutionPolicyStr == TEXT("LocalOnly"))
-    {
-        AbilityCDO->NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalOnly;
-    }
-    else if (NetExecutionPolicyStr == TEXT("ServerInitiated"))
-    {
-        AbilityCDO->NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
-    }
-    else if (NetExecutionPolicyStr == TEXT("ServerOnly"))
-    {
-        AbilityCDO->NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
+        void* NetExecPropPtr = NetExecProp->ContainerPtrToValuePtr<void>(AbilityCDO);
+        if (NetExecutionPolicyStr == TEXT("LocalPredicted"))
+        {
+            *static_cast<TEnumAsByte<EGameplayAbilityNetExecutionPolicy::Type>*>(NetExecPropPtr) = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
+        }
+        else if (NetExecutionPolicyStr == TEXT("LocalOnly"))
+        {
+            *static_cast<TEnumAsByte<EGameplayAbilityNetExecutionPolicy::Type>*>(NetExecPropPtr) = EGameplayAbilityNetExecutionPolicy::LocalOnly;
+        }
+        else if (NetExecutionPolicyStr == TEXT("ServerInitiated"))
+        {
+            *static_cast<TEnumAsByte<EGameplayAbilityNetExecutionPolicy::Type>*>(NetExecPropPtr) = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
+        }
+        else if (NetExecutionPolicyStr == TEXT("ServerOnly"))
+        {
+            *static_cast<TEnumAsByte<EGameplayAbilityNetExecutionPolicy::Type>*>(NetExecPropPtr) = EGameplayAbilityNetExecutionPolicy::ServerOnly;
+        }
     }
 
     // Mark package dirty and save

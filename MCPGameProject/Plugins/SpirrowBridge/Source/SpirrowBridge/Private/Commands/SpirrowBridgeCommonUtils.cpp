@@ -25,6 +25,7 @@
 #include "BlueprintActionDatabase.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
+#include "Misc/Paths.h"
 
 // JSON Utilities
 TSharedPtr<FJsonObject> FSpirrowBridgeCommonUtils::CreateErrorResponse(const FString& Message)

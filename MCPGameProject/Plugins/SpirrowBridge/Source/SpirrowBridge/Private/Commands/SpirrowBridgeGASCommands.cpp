@@ -19,7 +19,6 @@
 #include "Engine/SCS_Node.h"
 #include "GameFramework/Character.h"
 #include "AbilitySystemComponent.h"
-#include "GameplayAbility.h"
 
 FSpirrowBridgeGASCommands::FSpirrowBridgeGASCommands()
 {

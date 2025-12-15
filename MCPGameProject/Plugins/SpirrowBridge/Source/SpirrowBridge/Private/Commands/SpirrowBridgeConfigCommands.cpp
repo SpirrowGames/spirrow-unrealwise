@@ -114,28 +114,23 @@ TSharedPtr<FJsonObject> FSpirrowBridgeConfigCommands::HandleSetConfigValue(const
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'value' parameter"));
     }
 
-    // Determine which config file to use
-    FString ConfigFilePath;
-    FString ActualFilePath;
+    // Build the actual file path in project Config folder
+    FString FileName;
     if (ConfigFile == TEXT("DefaultEngine") || ConfigFile == TEXT("Engine"))
     {
-        ConfigFilePath = GEngineIni;
-        ActualFilePath = FPaths::ProjectConfigDir() / TEXT("DefaultEngine.ini");
+        FileName = TEXT("DefaultEngine.ini");
     }
     else if (ConfigFile == TEXT("DefaultGame") || ConfigFile == TEXT("Game"))
     {
-        ConfigFilePath = GGameIni;
-        ActualFilePath = FPaths::ProjectConfigDir() / TEXT("DefaultGame.ini");
+        FileName = TEXT("DefaultGame.ini");
     }
     else if (ConfigFile == TEXT("DefaultEditor") || ConfigFile == TEXT("Editor"))
     {
-        ConfigFilePath = GEditorIni;
-        ActualFilePath = FPaths::ProjectConfigDir() / TEXT("DefaultEditor.ini");
+        FileName = TEXT("DefaultEditor.ini");
     }
     else if (ConfigFile == TEXT("DefaultInput") || ConfigFile == TEXT("Input"))
     {
-        ConfigFilePath = GInputIni;
-        ActualFilePath = FPaths::ProjectConfigDir() / TEXT("DefaultInput.ini");
+        FileName = TEXT("DefaultInput.ini");
     }
     else
     {
@@ -143,14 +138,40 @@ TSharedPtr<FJsonObject> FSpirrowBridgeConfigCommands::HandleSetConfigValue(const
             FString::Printf(TEXT("Unknown config file: %s"), *ConfigFile));
     }
 
-    // Set the value
-    GConfig->SetString(*Section, *Key, *Value, ConfigFilePath);
+    FString FilePath = FPaths::ProjectConfigDir() / FileName;
 
-    // Flush to disk
-    GConfig->Flush(false, ConfigFilePath);
+    // Use FConfigFile to load, modify, and save
+    FConfigFile ConfigFileObj;
+    ConfigFileObj.Read(FilePath);
+
+    // Set the value
+    ConfigFileObj.SetString(*Section, *Key, *Value);
+
+    // Write back to disk
+    ConfigFileObj.Write(FilePath);
+
+    // Also update in-memory GConfig cache
+    FString GConfigPath;
+    if (ConfigFile == TEXT("DefaultEngine") || ConfigFile == TEXT("Engine"))
+    {
+        GConfigPath = GEngineIni;
+    }
+    else if (ConfigFile == TEXT("DefaultGame") || ConfigFile == TEXT("Game"))
+    {
+        GConfigPath = GGameIni;
+    }
+    else if (ConfigFile == TEXT("DefaultEditor") || ConfigFile == TEXT("Editor"))
+    {
+        GConfigPath = GEditorIni;
+    }
+    else if (ConfigFile == TEXT("DefaultInput") || ConfigFile == TEXT("Input"))
+    {
+        GConfigPath = GInputIni;
+    }
+    GConfig->SetString(*Section, *Key, *Value, GConfigPath);
 
     UE_LOG(LogTemp, Display, TEXT("Set config value: [%s] %s = %s in %s"),
-           *Section, *Key, *Value, *ConfigFile);
+           *Section, *Key, *Value, *FilePath);
 
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
     ResultObj->SetBoolField(TEXT("success"), true);
@@ -158,7 +179,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeConfigCommands::HandleSetConfigValue(const
     ResultObj->SetStringField(TEXT("section"), Section);
     ResultObj->SetStringField(TEXT("key"), Key);
     ResultObj->SetStringField(TEXT("value"), Value);
-    ResultObj->SetStringField(TEXT("file_path"), ActualFilePath);
+    ResultObj->SetStringField(TEXT("file_path"), FilePath);
     return ResultObj;
 }
 

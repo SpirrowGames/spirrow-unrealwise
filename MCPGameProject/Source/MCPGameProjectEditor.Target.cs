@@ -8,10 +8,10 @@ public class MCPGameProjectEditorTarget : TargetRules
 	public MCPGameProjectEditorTarget( TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Editor;
-		DefaultBuildSettings = BuildSettingsVersion.V6;
-		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_7;
+		DefaultBuildSettings = BuildSettingsVersion.V5;
+		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_5;
 		bOverrideBuildEnvironment = true;
-		UndefinedIdentifierWarningLevel = WarningLevel.Off;
+		CppCompileWarningSettings.UndefinedIdentifierWarningLevel = WarningLevel.Off;
 		ExtraModuleNames.Add("MCPGameProject");
 	}
 }

@@ -413,6 +413,7 @@ search_knowledge("質量 設定", category="physics")
 
 ## 更新履歴
 
+- 2025-12-15: Config（ini）ファイル操作対応を追加。get_config_value, set_config_value, list_config_sections ツールを実装
 - 2025-12-15: ObjectProperty（アセット参照）対応を追加。`TObjectPtr<T>`, `TSoftObjectPtr<T>`, `TSubclassOf<T>` 型のプロパティ設定が可能に
 - 2025-12-15: set_actor_component_property ツールを追加、set_actor_property と合わせて rationale パラメータを追加
 - 2025-12-15: node_tools.py に rationale パラメータを追加（3ツール）

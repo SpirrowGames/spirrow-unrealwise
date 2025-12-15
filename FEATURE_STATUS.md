@@ -74,6 +74,14 @@
 |--------|------|------|
 | `create_input_mapping` | 🔲 未確認 | |
 
+### プロジェクト設定（Config）
+
+| ツール | 状態 | 備考 |
+|--------|------|------|
+| `get_config_value` | ✅ 実装完了 | プロジェクト設定値の取得 |
+| `set_config_value` | ✅ 実装完了 | プロジェクト設定値の変更 |
+| `list_config_sections` | ✅ 実装完了 | Config ファイルのセクション一覧取得 |
+
 ### RAG連携
 
 | ツール | 状態 | 備考 |
@@ -139,6 +147,54 @@
 ---
 
 ## 最新の更新履歴
+
+### 2025-12-15: Config（ini）ファイル操作対応
+
+**新機能**:
+- プロジェクト設定ファイル（.ini）の読み書きをMCP経由で実行可能に
+  - `get_config_value`: 設定値の取得
+  - `set_config_value`: 設定値の変更
+  - `list_config_sections`: セクション一覧取得
+
+**対応ファイル**:
+- DefaultEngine.ini
+- DefaultGame.ini
+- DefaultEditor.ini
+- DefaultInput.ini
+
+**主な用途**:
+- デフォルトGameModeの設定
+- マップ設定の変更
+- プロジェクト設定の自動化
+
+**使用例**:
+```python
+# デフォルトGameModeを設定
+set_config_value(
+    section="/Script/EngineSettings.GameMapsSettings",
+    key="GlobalDefaultGameMode",
+    value="/Game/MyGame/BP_GameMode.BP_GameMode_C"
+)
+
+# 現在の設定を取得
+get_config_value(
+    section="/Script/EngineSettings.GameMapsSettings",
+    key="GlobalDefaultGameMode"
+)
+
+# セクション一覧を取得
+list_config_sections(config_file="DefaultEngine")
+```
+
+**変更範囲**:
+- C++ SpirrowBridgeConfigCommands: 新規作成（ヘッダー・実装）
+- C++ SpirrowBridge: ルーティング追加（ExecuteCommand、メンバー変数）
+- Python config_tools.py: 新規作成
+- Python unreal_mcp_server.py: register_config_tools追加
+
+**注意事項**:
+- Blueprintクラスをパスとして設定する場合は `_C` サフィックスが必要
+- 一部設定はエディタ再起動が必要
 
 ### 2025-12-15: ObjectProperty（アセット参照）対応
 

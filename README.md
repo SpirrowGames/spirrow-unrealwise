@@ -56,6 +56,7 @@ Unreal MCP統合は、自然言語を通じてUnreal Engineを制御するため
 | **Blueprint開発** | • カスタムコンポーネントを持つ新しいBlueprintクラスの作成<br>• コンポーネントの追加と設定（メッシュ、カメラ、ライトなど）<br>• コンポーネントプロパティと物理設定の設定<br>• Blueprintプロパティ設定（基本型・Enum・アセット参照対応）<br>• アセットパス自動補完とクラス型検証機能<br>• Blueprintのコンパイルとアクターのスポーン<br>• カスタムフォルダパスでのBlueprint作成・操作（pathパラメータ対応）<br>• C++親クラスのプロパティへのアクセス対応 |
 | **Blueprint ノードグラフ** | • イベントノードの追加（BeginPlay、Tickなど）<br>• 関数呼び出しノードの作成と接続<br>• カスタム型とデフォルト値を持つ変数の追加<br>• コンポーネントと自己参照の作成<br>• グラフ内のノードの検索と管理<br>• 全ノード操作ツールでpathパラメータ対応 |
 | **入力システム** | • Enhanced Input Actionアセットの作成（Digital/Axis1D/2D/3D対応）<br>• Input Mapping Contextアセットの作成<br>• アクションマッピングの追加（トリガー、モディファイア対応）<br>• レガシー入力マッピングの作成（Action/Axis） |
+| **プロジェクト設定** | • Config（ini）ファイルの読み書き<br>• デフォルトGameModeやマップ設定の変更<br>• 対応ファイル：DefaultEngine.ini、DefaultGame.ini、DefaultEditor.ini、DefaultInput.ini<br>• セクション一覧の取得 |
 | **アセット管理** | • Content Browserからのアセット削除<br>• アセット存在確認とエラーハンドリング<br>• Blueprint複製機能（カスタムパス対応）<br>• Blueprintノードグラフ構成の取得（ノード、接続、変数、コンポーネント情報） |
 | **エディタコントロール** | • 特定のアクターまたは位置へのビューポートフォーカス<br>• ビューポートカメラの向きと距離の制御 |
 | **プロジェクト構造解析** | • C++クラスとBlueprintアセットのスキャン<br>• 親クラス・モジュール・パスによるフィルタリング<br>• Blueprintタイプフィルタ（Actor/Widget/Anim/Interface等）<br>• REINST_*クラス（Live Coding一時クラス）の自動除外<br>• プロジェクト固有のクラス階層の可視化<br>• Engineクラスの除外オプション |

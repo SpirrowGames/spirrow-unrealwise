@@ -57,6 +57,7 @@
 #include "Commands/SpirrowBridgeProjectCommands.h"
 #include "Commands/SpirrowBridgeCommonUtils.h"
 #include "Commands/SpirrowBridgeUMGCommands.h"
+#include "Commands/SpirrowBridgeConfigCommands.h"
 
 // Default settings
 #define MCP_SERVER_HOST "127.0.0.1"
@@ -69,6 +70,7 @@ USpirrowBridge::USpirrowBridge()
     BlueprintNodeCommands = MakeShared<FSpirrowBridgeBlueprintNodeCommands>();
     ProjectCommands = MakeShared<FSpirrowBridgeProjectCommands>();
     UMGCommands = MakeShared<FSpirrowBridgeUMGCommands>();
+    ConfigCommands = MakeShared<FSpirrowBridgeConfigCommands>();
 }
 
 USpirrowBridge::~USpirrowBridge()
@@ -78,6 +80,7 @@ USpirrowBridge::~USpirrowBridge()
     BlueprintNodeCommands.Reset();
     ProjectCommands.Reset();
     UMGCommands.Reset();
+    ConfigCommands.Reset();
 }
 
 // Initialize subsystem
@@ -286,6 +289,13 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("add_widget_to_viewport"))
             {
                 ResultJson = UMGCommands->HandleCommand(CommandType, Params);
+            }
+            // Config Commands
+            else if (CommandType == TEXT("get_config_value") ||
+                     CommandType == TEXT("set_config_value") ||
+                     CommandType == TEXT("list_config_sections"))
+            {
+                ResultJson = ConfigCommands->HandleCommand(CommandType, Params);
             }
             else
             {

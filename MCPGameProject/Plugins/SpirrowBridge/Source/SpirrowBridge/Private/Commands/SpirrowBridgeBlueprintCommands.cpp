@@ -30,6 +30,8 @@
 #include "UObject/UObjectIterator.h"
 #include "AssetToolsModule.h"
 #include "IAssetTools.h"
+// GAS Components
+#include "AbilitySystemComponent.h"
 
 FSpirrowBridgeBlueprintCommands::FSpirrowBridgeBlueprintCommands()
 {
@@ -300,8 +302,20 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleAddComponentToBlu
     // Create the component - dynamically find the component class by name
     UClass* ComponentClass = nullptr;
 
+    // ==================== GAS Components - Explicit Support ====================
+    // Explicit support for AbilitySystemComponent (ASC)
+    if (ComponentType == TEXT("AbilitySystemComponent") || ComponentType == TEXT("ASC"))
+    {
+        ComponentClass = UAbilitySystemComponent::StaticClass();
+        UE_LOG(LogTemp, Log, TEXT("Using AbilitySystemComponent via explicit StaticClass"));
+    }
+    // ===========================================================================
+
     // Try to find the class with exact name first
-    ComponentClass = FindObject<UClass>(nullptr, *ComponentType);
+    if (!ComponentClass)
+    {
+        ComponentClass = FindObject<UClass>(nullptr, *ComponentType);
+    }
 
     // If not found, try with "Component" suffix
     if (!ComponentClass && !ComponentType.EndsWith(TEXT("Component")))
@@ -327,7 +341,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleAddComponentToBlu
     // Verify that the class is a valid component type
     if (!ComponentClass || !ComponentClass->IsChildOf(UActorComponent::StaticClass()))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown component type: %s"), *ComponentType));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Unknown component type: %s. Common types: StaticMeshComponent, BoxComponent, SphereComponent, CapsuleComponent, SkeletalMeshComponent, CameraComponent, SpringArmComponent, PointLightComponent, SpotLightComponent, AudioComponent, ParticleSystemComponent, SceneComponent, ArrowComponent, BillboardComponent, AbilitySystemComponent (ASC)"),
+            *ComponentType));
     }
 
     // Add the component to the blueprint

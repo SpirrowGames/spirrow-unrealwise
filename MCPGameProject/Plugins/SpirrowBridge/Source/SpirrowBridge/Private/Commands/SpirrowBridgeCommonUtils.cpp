@@ -731,116 +731,11 @@ bool FSpirrowBridgeCommonUtils::SetObjectProperty(UObject* Object, const FString
             }
         }
     }
-    else if (FObjectProperty* ObjectProp = CastField<FObjectProperty>(Property))
-    {
-        // Handle object reference properties (TObjectPtr<T>)
-        if (Value->Type == EJson::String)
-        {
-            FString AssetPath = Value->AsString();
-
-            if (AssetPath.IsEmpty())
-            {
-                // Allow clearing the reference with empty string
-                ObjectProp->SetObjectPropertyValue(PropertyAddr, nullptr);
-                UE_LOG(LogTemp, Display, TEXT("Cleared object property %s"), *PropertyName);
-                return true;
-            }
-
-            // Load the asset
-            UObject* LoadedAsset = UEditorAssetLibrary::LoadAsset(AssetPath);
-
-            if (!LoadedAsset)
-            {
-                // Try alternative path formats
-                // If path doesn't contain '.', try adding asset name
-                if (!AssetPath.Contains(TEXT(".")))
-                {
-                    FString AssetName = FPaths::GetCleanFilename(AssetPath);
-                    FString AlternativePath = AssetPath + TEXT(".") + AssetName;
-                    LoadedAsset = UEditorAssetLibrary::LoadAsset(AlternativePath);
-
-                    if (LoadedAsset)
-                    {
-                        UE_LOG(LogTemp, Display, TEXT("Loaded asset using alternative path: %s"), *AlternativePath);
-                    }
-                }
-            }
-
-            if (LoadedAsset)
-            {
-                // Verify the asset is compatible with the property type
-                UClass* ExpectedClass = ObjectProp->PropertyClass;
-                if (LoadedAsset->IsA(ExpectedClass))
-                {
-                    ObjectProp->SetObjectPropertyValue(PropertyAddr, LoadedAsset);
-                    UE_LOG(LogTemp, Display, TEXT("Set object property %s to asset: %s"),
-                           *PropertyName, *AssetPath);
-                    return true;
-                }
-                else
-                {
-                    OutErrorMessage = FString::Printf(
-                        TEXT("Asset type mismatch for property %s: Expected %s, got %s"),
-                        *PropertyName,
-                        *ExpectedClass->GetName(),
-                        *LoadedAsset->GetClass()->GetName()
-                    );
-                    return false;
-                }
-            }
-            else
-            {
-                OutErrorMessage = FString::Printf(TEXT("Failed to load asset: %s"), *AssetPath);
-                return false;
-            }
-        }
-        else if (Value->Type == EJson::Null)
-        {
-            // Allow setting null reference
-            ObjectProp->SetObjectPropertyValue(PropertyAddr, nullptr);
-            UE_LOG(LogTemp, Display, TEXT("Set object property %s to null"), *PropertyName);
-            return true;
-        }
-        else
-        {
-            OutErrorMessage = FString::Printf(
-                TEXT("Object property %s requires a string (asset path) or null value"),
-                *PropertyName
-            );
-            return false;
-        }
-    }
-    else if (FSoftObjectProperty* SoftObjectProp = CastField<FSoftObjectProperty>(Property))
-    {
-        // Handle soft object reference properties (TSoftObjectPtr<T>)
-        if (Value->Type == EJson::String)
-        {
-            FString AssetPath = Value->AsString();
-            FSoftObjectPath TempPath(AssetPath);
-            FSoftObjectPtr SoftPtr(TempPath);
-            SoftObjectProp->SetPropertyValue(PropertyAddr, SoftPtr);
-            UE_LOG(LogTemp, Display, TEXT("Set soft object property %s to path: %s"),
-                   *PropertyName, *AssetPath);
-            return true;
-        }
-        else if (Value->Type == EJson::Null)
-        {
-            FSoftObjectPtr EmptyPtr;
-            SoftObjectProp->SetPropertyValue(PropertyAddr, EmptyPtr);
-            return true;
-        }
-        else
-        {
-            OutErrorMessage = FString::Printf(
-                TEXT("Soft object property %s requires a string (asset path) or null value"),
-                *PropertyName
-            );
-            return false;
-        }
-    }
+    // IMPORTANT: Check derived classes BEFORE base classes to avoid incorrect type matching
+    // FClassProperty and FSoftObjectProperty are derived from FObjectProperty
     else if (FClassProperty* ClassProp = CastField<FClassProperty>(Property))
     {
-        // Handle class reference properties (TSubclassOf<T>)
+        // Handle class reference properties (TSubclassOf<T>) - MUST CHECK BEFORE FObjectProperty
         if (Value->Type == EJson::String)
         {
             FString ClassPath = Value->AsString();
@@ -930,6 +825,112 @@ bool FSpirrowBridgeCommonUtils::SetObjectProperty(UObject* Object, const FString
         {
             OutErrorMessage = FString::Printf(
                 TEXT("Class property %s requires a string (class path) or null value"),
+                *PropertyName
+            );
+            return false;
+        }
+    }
+    else if (FSoftObjectProperty* SoftObjectProp = CastField<FSoftObjectProperty>(Property))
+    {
+        // Handle soft object reference properties (TSoftObjectPtr<T>) - CHECK BEFORE FObjectProperty
+        if (Value->Type == EJson::String)
+        {
+            FString AssetPath = Value->AsString();
+
+            // Create soft object path and set it
+            FSoftObjectPath TempPath(AssetPath);
+            FSoftObjectPtr SoftPtr(TempPath);
+            SoftObjectProp->SetPropertyValue(PropertyAddr, SoftPtr);
+
+            UE_LOG(LogTemp, Display, TEXT("Set soft object property %s to: %s"),
+                   *PropertyName, *AssetPath);
+            return true;
+        }
+        else if (Value->Type == EJson::Null)
+        {
+            FSoftObjectPtr NullPtr;
+            SoftObjectProp->SetPropertyValue(PropertyAddr, NullPtr);
+            UE_LOG(LogTemp, Display, TEXT("Set soft object property %s to null"), *PropertyName);
+            return true;
+        }
+        else
+        {
+            OutErrorMessage = FString::Printf(
+                TEXT("Soft object property %s requires a string (asset path) or null value"),
+                *PropertyName
+            );
+            return false;
+        }
+    }
+    else if (FObjectProperty* ObjectProp = CastField<FObjectProperty>(Property))
+    {
+        // Handle object reference properties (TObjectPtr<T>) - CHECK LAST (base class)
+        if (Value->Type == EJson::String)
+        {
+            FString AssetPath = Value->AsString();
+
+            // Handle empty string as null
+            if (AssetPath.IsEmpty())
+            {
+                ObjectProp->SetObjectPropertyValue(PropertyAddr, nullptr);
+                UE_LOG(LogTemp, Display, TEXT("Set object property %s to null (empty path)"), *PropertyName);
+                return true;
+            }
+
+            // Try to load the asset
+            UObject* LoadedAsset = UEditorAssetLibrary::LoadAsset(AssetPath);
+
+            // If loading failed and path doesn't contain a dot, try alternative format
+            if (!LoadedAsset && !AssetPath.Contains(TEXT(".")))
+            {
+                FString AssetName = FPaths::GetCleanFilename(AssetPath);
+                FString AlternativePath = AssetPath + TEXT(".") + AssetName;
+                LoadedAsset = UEditorAssetLibrary::LoadAsset(AlternativePath);
+
+                if (LoadedAsset)
+                {
+                    UE_LOG(LogTemp, Display, TEXT("Loaded asset via alternative path: %s"), *AlternativePath);
+                }
+            }
+
+            if (LoadedAsset)
+            {
+                // Verify the loaded asset is compatible with the property's expected class
+                UClass* ExpectedClass = ObjectProp->PropertyClass;
+                if (LoadedAsset->IsA(ExpectedClass))
+                {
+                    ObjectProp->SetObjectPropertyValue(PropertyAddr, LoadedAsset);
+                    UE_LOG(LogTemp, Display, TEXT("Set object property %s to: %s (Class: %s)"),
+                           *PropertyName, *LoadedAsset->GetName(), *ExpectedClass->GetName());
+                    return true;
+                }
+                else
+                {
+                    OutErrorMessage = FString::Printf(
+                        TEXT("Asset type mismatch for property %s: Expected %s, got %s"),
+                        *PropertyName,
+                        *ExpectedClass->GetName(),
+                        *LoadedAsset->GetClass()->GetName()
+                    );
+                    return false;
+                }
+            }
+            else
+            {
+                OutErrorMessage = FString::Printf(TEXT("Failed to load asset: %s"), *AssetPath);
+                return false;
+            }
+        }
+        else if (Value->Type == EJson::Null)
+        {
+            ObjectProp->SetObjectPropertyValue(PropertyAddr, nullptr);
+            UE_LOG(LogTemp, Display, TEXT("Set object property %s to null"), *PropertyName);
+            return true;
+        }
+        else
+        {
+            OutErrorMessage = FString::Printf(
+                TEXT("Object property %s requires a string (asset path) or null value"),
                 *PropertyName
             );
             return false;

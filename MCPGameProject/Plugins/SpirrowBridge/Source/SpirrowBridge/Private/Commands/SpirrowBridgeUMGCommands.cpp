@@ -5,6 +5,8 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/TextBlock.h"
+#include "Components/Image.h"
+#include "Engine/Texture2D.h"
 #include "WidgetBlueprint.h"
 // We'll create widgets using regular Factory classes
 #include "Factories/Factory.h"
@@ -55,6 +57,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleCommand(const FString& 
 	else if (CommandName == TEXT("set_text_block_binding"))
 	{
 		return HandleSetTextBlockBinding(Params);
+	}
+	else if (CommandName == TEXT("add_text_to_widget"))
+	{
+		return HandleAddTextToWidget(Params);
+	}
+	else if (CommandName == TEXT("add_image_to_widget"))
+	{
+		return HandleAddImageToWidget(Params);
 	}
 
 	return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown UMG command: %s"), *CommandName));
@@ -541,4 +551,347 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleSetTextBlockBinding(con
 	Response->SetBoolField(TEXT("success"), true);
 	Response->SetStringField(TEXT("binding_name"), BindingName);
 	return Response;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleAddTextToWidget(const TSharedPtr<FJsonObject>& Params)
+{
+	// Get required parameters
+	FString WidgetName;
+	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+	}
+
+	FString TextName;
+	if (!Params->TryGetStringField(TEXT("text_name"), TextName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'text_name' parameter"));
+	}
+
+	// Get optional parameters
+	FString Path = TEXT("/Game/UI");
+	Params->TryGetStringField(TEXT("path"), Path);
+
+	FString Text = TEXT("+");
+	Params->TryGetStringField(TEXT("text"), Text);
+
+	int32 FontSize = 32;
+	if (Params->HasField(TEXT("font_size")))
+	{
+		FontSize = Params->GetNumberField(TEXT("font_size"));
+	}
+
+	// Get color array [R, G, B, A]
+	FLinearColor Color(1.0f, 1.0f, 1.0f, 1.0f);
+	if (Params->HasField(TEXT("color")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* ColorArray;
+		if (Params->TryGetArrayField(TEXT("color"), ColorArray) && ColorArray->Num() >= 4)
+		{
+			Color.R = (*ColorArray)[0]->AsNumber();
+			Color.G = (*ColorArray)[1]->AsNumber();
+			Color.B = (*ColorArray)[2]->AsNumber();
+			Color.A = (*ColorArray)[3]->AsNumber();
+		}
+	}
+
+	// Get alignment [X, Y]
+	FVector2D Alignment(0.5f, 0.5f);
+	if (Params->HasField(TEXT("alignment")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* AlignmentArray;
+		if (Params->TryGetArrayField(TEXT("alignment"), AlignmentArray) && AlignmentArray->Num() >= 2)
+		{
+			Alignment.X = (*AlignmentArray)[0]->AsNumber();
+			Alignment.Y = (*AlignmentArray)[1]->AsNumber();
+		}
+	}
+
+	// Get anchor (default: Center = 0.5, 0.5, 0.5, 0.5)
+	FString AnchorStr = TEXT("Center");
+	Params->TryGetStringField(TEXT("anchor"), AnchorStr);
+	FAnchors Anchors(0.5f, 0.5f, 0.5f, 0.5f);  // Center default
+
+	// Parse anchor presets
+	if (AnchorStr == TEXT("TopLeft"))
+	{
+		Anchors = FAnchors(0.0f, 0.0f, 0.0f, 0.0f);
+	}
+	else if (AnchorStr == TEXT("TopCenter"))
+	{
+		Anchors = FAnchors(0.5f, 0.0f, 0.5f, 0.0f);
+	}
+	else if (AnchorStr == TEXT("TopRight"))
+	{
+		Anchors = FAnchors(1.0f, 0.0f, 1.0f, 0.0f);
+	}
+	else if (AnchorStr == TEXT("MiddleLeft"))
+	{
+		Anchors = FAnchors(0.0f, 0.5f, 0.0f, 0.5f);
+	}
+	else if (AnchorStr == TEXT("Center"))
+	{
+		Anchors = FAnchors(0.5f, 0.5f, 0.5f, 0.5f);
+	}
+	else if (AnchorStr == TEXT("MiddleRight"))
+	{
+		Anchors = FAnchors(1.0f, 0.5f, 1.0f, 0.5f);
+	}
+	else if (AnchorStr == TEXT("BottomLeft"))
+	{
+		Anchors = FAnchors(0.0f, 1.0f, 0.0f, 1.0f);
+	}
+	else if (AnchorStr == TEXT("BottomCenter"))
+	{
+		Anchors = FAnchors(0.5f, 1.0f, 0.5f, 1.0f);
+	}
+	else if (AnchorStr == TEXT("BottomRight"))
+	{
+		Anchors = FAnchors(1.0f, 1.0f, 1.0f, 1.0f);
+	}
+
+	// Load Widget Blueprint
+	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
+	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
+	if (!WidgetBP)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Widget Blueprint '%s' not found at path '%s'"), *WidgetName, *AssetPath));
+	}
+
+	// Get WidgetTree
+	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
+	if (!WidgetTree)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+	}
+
+	// Get or create root Canvas Panel
+	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
+	if (!RootCanvas)
+	{
+		// Create Canvas Panel if it doesn't exist
+		RootCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("RootCanvas"));
+		WidgetTree->RootWidget = RootCanvas;
+	}
+
+	// Create TextBlock
+	UTextBlock* TextBlock = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), FName(*TextName));
+	if (!TextBlock)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create TextBlock"));
+	}
+
+	// Set text
+	TextBlock->SetText(FText::FromString(Text));
+
+	// Set font size
+	FSlateFontInfo FontInfo = TextBlock->GetFont();
+	FontInfo.Size = FontSize;
+	TextBlock->SetFont(FontInfo);
+
+	// Set color
+	TextBlock->SetColorAndOpacity(FSlateColor(Color));
+
+	// Add to Canvas Panel
+	UCanvasPanelSlot* Slot = RootCanvas->AddChildToCanvas(TextBlock);
+	if (Slot)
+	{
+		Slot->SetAnchors(Anchors);
+		Slot->SetAlignment(Alignment);
+		Slot->SetPosition(FVector2D(0, 0));
+		Slot->SetAutoSize(true);
+	}
+
+	// Mark as modified and compile
+	WidgetBP->Modify();
+	WidgetBP->MarkPackageDirty();
+	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+	// Create success response
+	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetStringField(TEXT("widget"), WidgetName);
+	ResultObj->SetStringField(TEXT("text_name"), TextName);
+	ResultObj->SetStringField(TEXT("text"), Text);
+	ResultObj->SetNumberField(TEXT("font_size"), FontSize);
+	ResultObj->SetBoolField(TEXT("success"), true);
+	return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleAddImageToWidget(const TSharedPtr<FJsonObject>& Params)
+{
+	// Get required parameters
+	FString WidgetName;
+	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+	}
+
+	FString ImageName;
+	if (!Params->TryGetStringField(TEXT("image_name"), ImageName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'image_name' parameter"));
+	}
+
+	// Get optional parameters
+	FString Path = TEXT("/Game/UI");
+	Params->TryGetStringField(TEXT("path"), Path);
+
+	FString TexturePath;
+	Params->TryGetStringField(TEXT("texture_path"), TexturePath);
+
+	// Get size [Width, Height]
+	FVector2D Size(32.0f, 32.0f);
+	if (Params->HasField(TEXT("size")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* SizeArray;
+		if (Params->TryGetArrayField(TEXT("size"), SizeArray) && SizeArray->Num() >= 2)
+		{
+			Size.X = (*SizeArray)[0]->AsNumber();
+			Size.Y = (*SizeArray)[1]->AsNumber();
+		}
+	}
+
+	// Get color tint [R, G, B, A]
+	FLinearColor ColorTint(1.0f, 1.0f, 1.0f, 1.0f);
+	if (Params->HasField(TEXT("color_tint")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* ColorArray;
+		if (Params->TryGetArrayField(TEXT("color_tint"), ColorArray) && ColorArray->Num() >= 4)
+		{
+			ColorTint.R = (*ColorArray)[0]->AsNumber();
+			ColorTint.G = (*ColorArray)[1]->AsNumber();
+			ColorTint.B = (*ColorArray)[2]->AsNumber();
+			ColorTint.A = (*ColorArray)[3]->AsNumber();
+		}
+	}
+
+	// Get alignment [X, Y]
+	FVector2D Alignment(0.5f, 0.5f);
+	if (Params->HasField(TEXT("alignment")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* AlignmentArray;
+		if (Params->TryGetArrayField(TEXT("alignment"), AlignmentArray) && AlignmentArray->Num() >= 2)
+		{
+			Alignment.X = (*AlignmentArray)[0]->AsNumber();
+			Alignment.Y = (*AlignmentArray)[1]->AsNumber();
+		}
+	}
+
+	// Get anchor
+	FString AnchorStr = TEXT("Center");
+	Params->TryGetStringField(TEXT("anchor"), AnchorStr);
+	FAnchors Anchors(0.5f, 0.5f, 0.5f, 0.5f);  // Center default
+
+	// Parse anchor presets
+	if (AnchorStr == TEXT("TopLeft"))
+	{
+		Anchors = FAnchors(0.0f, 0.0f, 0.0f, 0.0f);
+	}
+	else if (AnchorStr == TEXT("TopCenter"))
+	{
+		Anchors = FAnchors(0.5f, 0.0f, 0.5f, 0.0f);
+	}
+	else if (AnchorStr == TEXT("TopRight"))
+	{
+		Anchors = FAnchors(1.0f, 0.0f, 1.0f, 0.0f);
+	}
+	else if (AnchorStr == TEXT("MiddleLeft"))
+	{
+		Anchors = FAnchors(0.0f, 0.5f, 0.0f, 0.5f);
+	}
+	else if (AnchorStr == TEXT("Center"))
+	{
+		Anchors = FAnchors(0.5f, 0.5f, 0.5f, 0.5f);
+	}
+	else if (AnchorStr == TEXT("MiddleRight"))
+	{
+		Anchors = FAnchors(1.0f, 0.5f, 1.0f, 0.5f);
+	}
+	else if (AnchorStr == TEXT("BottomLeft"))
+	{
+		Anchors = FAnchors(0.0f, 1.0f, 0.0f, 1.0f);
+	}
+	else if (AnchorStr == TEXT("BottomCenter"))
+	{
+		Anchors = FAnchors(0.5f, 1.0f, 0.5f, 1.0f);
+	}
+	else if (AnchorStr == TEXT("BottomRight"))
+	{
+		Anchors = FAnchors(1.0f, 1.0f, 1.0f, 1.0f);
+	}
+
+	// Load Widget Blueprint
+	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
+	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
+	if (!WidgetBP)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Widget Blueprint '%s' not found at path '%s'"), *WidgetName, *AssetPath));
+	}
+
+	// Get WidgetTree
+	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
+	if (!WidgetTree)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+	}
+
+	// Get or create root Canvas Panel
+	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
+	if (!RootCanvas)
+	{
+		// Create Canvas Panel if it doesn't exist
+		RootCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("RootCanvas"));
+		WidgetTree->RootWidget = RootCanvas;
+	}
+
+	// Create Image widget
+	UImage* ImageWidget = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), FName(*ImageName));
+	if (!ImageWidget)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create Image widget"));
+	}
+
+	// Load and set texture if path is provided
+	if (!TexturePath.IsEmpty())
+	{
+		UTexture2D* Texture = LoadObject<UTexture2D>(nullptr, *TexturePath);
+		if (Texture)
+		{
+			ImageWidget->SetBrushFromTexture(Texture);
+			UE_LOG(LogTemp, Log, TEXT("Set texture from path: %s"), *TexturePath);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Failed to load texture from path: %s"), *TexturePath);
+		}
+	}
+
+	// Set size
+	ImageWidget->SetDesiredSizeOverride(Size);
+
+	// Set color tint
+	ImageWidget->SetColorAndOpacity(ColorTint);
+
+	// Add to Canvas Panel
+	UCanvasPanelSlot* Slot = RootCanvas->AddChildToCanvas(ImageWidget);
+	if (Slot)
+	{
+		Slot->SetAnchors(Anchors);
+		Slot->SetAlignment(Alignment);
+		Slot->SetPosition(FVector2D(0, 0));
+		Slot->SetSize(Size);
+	}
+
+	// Mark as modified and compile
+	WidgetBP->Modify();
+	WidgetBP->MarkPackageDirty();
+	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+	// Create success response
+	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetStringField(TEXT("widget"), WidgetName);
+	ResultObj->SetStringField(TEXT("image_name"), ImageName);
+	ResultObj->SetStringField(TEXT("texture_path"), TexturePath);
+	ResultObj->SetBoolField(TEXT("success"), true);
+	return ResultObj;
 } 

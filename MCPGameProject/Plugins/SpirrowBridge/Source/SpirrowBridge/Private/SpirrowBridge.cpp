@@ -290,7 +290,9 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("add_button_to_widget") ||
                      CommandType == TEXT("bind_widget_event") ||
                      CommandType == TEXT("set_text_block_binding") ||
-                     CommandType == TEXT("add_widget_to_viewport"))
+                     CommandType == TEXT("add_widget_to_viewport") ||
+                     CommandType == TEXT("add_text_to_widget") ||
+                     CommandType == TEXT("add_image_to_widget"))
             {
                 ResultJson = UMGCommands->HandleCommand(CommandType, Params);
             }

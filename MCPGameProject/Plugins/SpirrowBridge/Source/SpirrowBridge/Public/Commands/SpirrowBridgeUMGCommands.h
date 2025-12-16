@@ -79,4 +79,34 @@ private:
      * @return JSON response with the binding details
      */
     TSharedPtr<FJsonObject> HandleSetTextBlockBinding(const TSharedPtr<FJsonObject>& Params);
+
+    /**
+     * Add a Text widget to a UMG Widget Blueprint with enhanced options
+     * @param Params - Must include:
+     *                "widget_name" - Name of the Widget Blueprint
+     *                "text_name" - Name for the new Text Block
+     *                "text" - Display text (optional, default: "+")
+     *                "font_size" - Font size (optional, default: 32)
+     *                "color" - [R, G, B, A] color (optional, default: [1, 1, 1, 1])
+     *                "anchor" - Anchor position (optional, default: "Center")
+     *                "alignment" - [X, Y] alignment (optional, default: [0.5, 0.5])
+     *                "path" - Widget path (optional, default: "/Game/UI")
+     * @return JSON response with the added widget details
+     */
+    TSharedPtr<FJsonObject> HandleAddTextToWidget(const TSharedPtr<FJsonObject>& Params);
+
+    /**
+     * Add an Image widget to a UMG Widget Blueprint
+     * @param Params - Must include:
+     *                "widget_name" - Name of the Widget Blueprint
+     *                "image_name" - Name for the new Image
+     *                "texture_path" - Path to texture asset (optional)
+     *                "size" - [Width, Height] size (optional, default: [32, 32])
+     *                "color_tint" - [R, G, B, A] tint (optional, default: [1, 1, 1, 1])
+     *                "anchor" - Anchor position (optional, default: "Center")
+     *                "alignment" - [X, Y] alignment (optional, default: [0.5, 0.5])
+     *                "path" - Widget path (optional, default: "/Game/UI")
+     * @return JSON response with the added widget details
+     */
+    TSharedPtr<FJsonObject> HandleAddImageToWidget(const TSharedPtr<FJsonObject>& Params);
 }; 

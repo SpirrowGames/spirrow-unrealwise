@@ -330,4 +330,152 @@ def register_umg_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    @mcp.tool()
+    def add_text_to_widget(
+        ctx: Context,
+        widget_name: str,
+        text_name: str,
+        text: str = "+",
+        font_size: int = 32,
+        color: List[float] = [1.0, 1.0, 1.0, 1.0],
+        anchor: str = "Center",
+        alignment: List[float] = [0.5, 0.5],
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add a Text Block to a Widget Blueprint with enhanced options.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            text_name: Name for the new Text Block
+            text: Display text (default: "+")
+            font_size: Font size in points (default: 32)
+            color: [R, G, B, A] color values 0.0-1.0 (default: white)
+            anchor: Anchor position - "Center", "TopLeft", "TopCenter", "TopRight",
+                    "MiddleLeft", "MiddleRight", "BottomLeft", "BottomCenter", "BottomRight" (default: "Center")
+            alignment: [X, Y] alignment values 0.0-1.0 (default: [0.5, 0.5])
+            path: Content browser path to the widget (default: "/Game/UI")
+
+        Returns:
+            Dict containing success status and text block properties
+
+        Example:
+            add_text_to_widget(
+                widget_name="WBP_Crosshair",
+                text_name="CrosshairText",
+                text="+",
+                font_size=32,
+                color=[1.0, 1.0, 1.0, 1.0],
+                anchor="Center",
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "text_name": text_name,
+                "text": text,
+                "font_size": font_size,
+                "color": color,
+                "anchor": anchor,
+                "alignment": alignment,
+                "path": path
+            }
+
+            logger.info(f"Adding Text to widget with params: {params}")
+            response = unreal.send_command("add_text_to_widget", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add Text to widget response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding Text to widget: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def add_image_to_widget(
+        ctx: Context,
+        widget_name: str,
+        image_name: str,
+        texture_path: str = "",
+        size: List[float] = [32.0, 32.0],
+        color_tint: List[float] = [1.0, 1.0, 1.0, 1.0],
+        anchor: str = "Center",
+        alignment: List[float] = [0.5, 0.5],
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add an Image widget to a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            image_name: Name for the new Image widget
+            texture_path: Path to texture asset (e.g., "/Engine/EngineResources/DefaultTexture")
+            size: [Width, Height] size in pixels (default: [32, 32])
+            color_tint: [R, G, B, A] tint values 0.0-1.0 (default: white)
+            anchor: Anchor position - "Center", "TopLeft", "TopCenter", "TopRight",
+                    "MiddleLeft", "MiddleRight", "BottomLeft", "BottomCenter", "BottomRight" (default: "Center")
+            alignment: [X, Y] alignment values 0.0-1.0 (default: [0.5, 0.5])
+            path: Content browser path to the widget (default: "/Game/UI")
+
+        Returns:
+            Dict containing success status and image widget properties
+
+        Example:
+            add_image_to_widget(
+                widget_name="WBP_HUD",
+                image_name="CrosshairImage",
+                texture_path="/Engine/EngineResources/Cursors/Crosshairs",
+                size=[64, 64],
+                color_tint=[1.0, 1.0, 1.0, 1.0],
+                anchor="Center",
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "image_name": image_name,
+                "texture_path": texture_path,
+                "size": size,
+                "color_tint": color_tint,
+                "anchor": anchor,
+                "alignment": alignment,
+                "path": path
+            }
+
+            logger.info(f"Adding Image to widget with params: {params}")
+            response = unreal.send_command("add_image_to_widget", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add Image to widget response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding Image to widget: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("UMG tools registered successfully") 

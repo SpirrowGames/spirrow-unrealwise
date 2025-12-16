@@ -502,13 +502,13 @@ def register_editor_tools(mcp: FastMCP):
             Dict containing the spawned actor's properties
         """
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             unreal = get_unreal_connection()
             if not unreal:
                 logger.error("Failed to connect to Unreal Engine")
                 return {"success": False, "message": "Failed to connect to Unreal Engine"}
-            
+
             # Ensure all parameters are properly formatted
             params = {
                 "blueprint_name": blueprint_name,
@@ -517,7 +517,7 @@ def register_editor_tools(mcp: FastMCP):
                 "rotation": rotation or [0.0, 0.0, 0.0],
                 "path": path
             }
-            
+
             # Validate location and rotation formats
             for param_name in ["location", "rotation"]:
                 param_value = params[param_name]
@@ -526,19 +526,80 @@ def register_editor_tools(mcp: FastMCP):
                     return {"success": False, "message": f"Invalid {param_name} format. Must be a list of 3 float values."}
                 # Ensure all values are float
                 params[param_name] = [float(val) for val in param_value]
-            
+
             logger.info(f"Spawning blueprint actor with params: {params}")
             response = unreal.send_command("spawn_blueprint_actor", params)
-            
+
             if not response:
                 logger.error("No response from Unreal Engine")
                 return {"success": False, "message": "No response from Unreal Engine"}
-            
+
             logger.info(f"Spawn blueprint actor response: {response}")
             return response
-            
+
         except Exception as e:
             error_msg = f"Error spawning blueprint actor: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def rename_asset(
+        ctx: Context,
+        old_path: str,
+        new_name: str
+    ) -> Dict[str, Any]:
+        """
+        Rename an asset in the Content Browser.
+
+        This function renames an asset and automatically updates all references to it,
+        similar to the rename functionality in the Unreal Editor.
+
+        Args:
+            ctx: The MCP context
+            old_path: Current asset path (e.g., "/Game/TrapxTrap/Input/IA_Look")
+            new_name: New name for the asset (e.g., "IA_TT_Look")
+                     Note: This is just the name, not the full path.
+                     The asset will be renamed in its current directory.
+
+        Returns:
+            Dict containing:
+            - success: Whether the operation succeeded
+            - old_path: Original asset path
+            - new_path: New asset path after rename (if successful)
+            - message: Status message
+
+        Example:
+            rename_asset(
+                old_path="/Game/TrapxTrap/Input/IA_Look",
+                new_name="IA_TT_Look"
+            )
+            # Result: Asset renamed to /Game/TrapxTrap/Input/IA_TT_Look
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "old_path": old_path,
+                "new_name": new_name
+            }
+
+            logger.info(f"Renaming asset from '{old_path}' to '{new_name}'")
+            response = unreal.send_command("rename_asset", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Rename asset response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error renaming asset: {e}"
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 

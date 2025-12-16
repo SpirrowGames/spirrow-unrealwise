@@ -58,7 +58,7 @@ Unreal MCP統合は、自然言語を通じてUnreal Engineを制御するため
 | **入力システム** | • Enhanced Input Actionアセットの作成（Digital/Axis1D/2D/3D対応）<br>• Input Mapping Contextアセットの作成<br>• アクションマッピングの追加（トリガー、モディファイア対応）<br>• レガシー入力マッピングの作成（Action/Axis） |
 | **プロジェクト設定** | • Config（ini）ファイルの読み書き<br>• デフォルトGameModeやマップ設定の変更<br>• 対応ファイル：DefaultEngine.ini、DefaultGame.ini、DefaultEditor.ini、DefaultInput.ini<br>• セクション一覧の取得 |
 | **GAS（Gameplay Ability System）** | • Gameplay Tags の管理（DefaultGameplayTags.ini 操作）<br>• タグの一括追加・削除<br>• コメント設定によるタグの説明記録<br>• プレフィックスフィルタによるタグ検索<br>• GAS関連アセット一覧取得（GameplayEffect/Ability/Cue/AttributeSet）<br>• アセットタイプ・パスフィルタリング<br>• GameplayEffect Blueprint作成（Modifiers/Tags/Duration/Stacking設定）<br>• **UE5コンポーネントベース実装**: TargetTagsGameplayEffectComponentによるタグ付与（FInheritedTagContainer.Added/CombinedTags両方に設定）<br>• GameplayAbility Blueprint作成（Tags/Cost/Cooldown/Policies設定）<br>• GAS Character作成（ASC自動設定）<br>• **UE5.7互換性**: protectedプロパティへのリフレクションベースアクセス、FindOrAddComponentによるコンポーネント管理 |
-| **アセット管理** | • Content Browserからのアセット削除<br>• アセット存在確認とエラーハンドリング<br>• Blueprint複製機能（カスタムパス対応）<br>• Blueprintノードグラフ構成の取得（ノード、接続、変数、コンポーネント情報） |
+| **アセット管理** | • Content Browserからのアセット削除<br>• アセット存在確認とエラーハンドリング<br>• Blueprint複製機能（カスタムパス対応）<br>• Blueprintノードグラフ構成の取得（ノード、接続、変数、コンポーネント情報）<br>• アセットリネーム機能（参照自動更新、Redirector作成） |
 | **エディタコントロール** | • 特定のアクターまたは位置へのビューポートフォーカス<br>• ビューポートカメラの向きと距離の制御 |
 | **プロジェクト構造解析** | • C++クラスとBlueprintアセットのスキャン<br>• 親クラス・モジュール・パスによるフィルタリング<br>• Blueprintタイプフィルタ（Actor/Widget/Anim/Interface等）<br>• REINST_*クラス（Live Coding一時クラス）の自動除外<br>• プロジェクト固有のクラス階層の可視化<br>• Engineクラスの除外オプション |
 | **ナレッジアシスタント** | • やりたいことから関連ノード/クラス/アセットを検索<br>• RAGナレッジとプロジェクトクラスを統合検索<br>• 日本語・英語キーワード自動抽出<br>• UEクラス/関数の推奨提案<br>• プロジェクト固有のクラスマッチング |

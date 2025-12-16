@@ -67,6 +67,7 @@
 | `delete_asset` | ✅ 動作OK | Content Browserからアセット削除 |
 | `duplicate_blueprint` | ✅ 実装完了 | Blueprint複製、カスタムパス対応 |
 | `get_blueprint_graph` | ✅ 実装完了 | Blueprintのノードグラフ構成取得、ノード・接続・変数・コンポーネント情報 |
+| `rename_asset` | ✅ 実装完了 | Content Browser内のアセットをリネーム、参照自動更新 |
 
 ### その他
 

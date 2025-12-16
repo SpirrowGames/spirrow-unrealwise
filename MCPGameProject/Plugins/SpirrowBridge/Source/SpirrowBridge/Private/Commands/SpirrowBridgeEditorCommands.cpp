@@ -21,6 +21,7 @@
 #include "Subsystems/EditorActorSubsystem.h"
 #include "Engine/Blueprint.h"
 #include "Engine/BlueprintGeneratedClass.h"
+#include "EditorAssetLibrary.h"
 
 FSpirrowBridgeEditorCommands::FSpirrowBridgeEditorCommands()
 {
@@ -83,7 +84,12 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleCommand(const FStrin
     {
         return HandleTakeScreenshot(Params);
     }
-    
+    // Asset management commands
+    else if (CommandType == TEXT("rename_asset"))
+    {
+        return HandleRenameAsset(Params);
+    }
+
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown editor command: %s"), *CommandType));
 }
 
@@ -781,6 +787,59 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleRenameActor(const TS
     ResultData->SetStringField(TEXT("new_name"), NewName);
     ResultData->SetStringField(TEXT("class"), FoundActor->GetClass()->GetName());
     ResultJson->SetObjectField(TEXT("result"), ResultData);
+
+    return ResultJson;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleRenameAsset(const TSharedPtr<FJsonObject>& Params)
+{
+    TSharedPtr<FJsonObject> ResultJson = MakeShareable(new FJsonObject());
+
+    // Get parameters
+    FString OldPath;
+    FString NewName;
+
+    if (!Params->TryGetStringField(TEXT("old_path"), OldPath))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'old_path' parameter"));
+    }
+
+    if (!Params->TryGetStringField(TEXT("new_name"), NewName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'new_name' parameter"));
+    }
+
+    // Check if the asset exists
+    if (!UEditorAssetLibrary::DoesAssetExist(OldPath))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Asset not found: %s"), *OldPath)
+        );
+    }
+
+    // Extract directory from old path
+    FString Directory = FPaths::GetPath(OldPath);
+    FString NewPath = Directory / NewName;
+
+    // Perform the rename operation
+    // UEditorAssetLibrary::RenameAsset automatically handles reference updates
+    bool bSuccess = UEditorAssetLibrary::RenameAsset(OldPath, NewPath);
+
+    if (bSuccess)
+    {
+        ResultJson->SetBoolField(TEXT("success"), true);
+        ResultJson->SetStringField(TEXT("old_path"), OldPath);
+        ResultJson->SetStringField(TEXT("new_path"), NewPath);
+        ResultJson->SetStringField(TEXT("message"),
+            FString::Printf(TEXT("Asset renamed successfully: %s -> %s"), *OldPath, *NewPath)
+        );
+    }
+    else
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Failed to rename asset: %s"), *OldPath)
+        );
+    }
 
     return ResultJson;
 } 

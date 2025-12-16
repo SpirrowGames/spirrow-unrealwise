@@ -1952,7 +1952,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleSetBlueprintClass
     const TArray<TSharedPtr<FJsonValue>>* ClassPathsArray = nullptr;
     if (!Params->TryGetArrayField(TEXT("class_paths"), ClassPathsArray))
     {
-        return CreateErrorResponse(TEXT("Missing required parameter: class_paths"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing required parameter: class_paths"));
     }
 
     FString Path = Params->HasField(TEXT("path")) ? Params->GetStringField(TEXT("path")) : TEXT("/Game/Blueprints");
@@ -1962,34 +1962,34 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleSetBlueprintClass
     UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *BlueprintPath);
     if (!Blueprint)
     {
-        return CreateErrorResponse(FString::Printf(TEXT("Failed to load blueprint: %s"), *BlueprintPath));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Failed to load blueprint: %s"), *BlueprintPath));
     }
 
     // Get CDO
     UClass* BPClass = Blueprint->GeneratedClass;
     if (!BPClass)
     {
-        return CreateErrorResponse(TEXT("Blueprint has no generated class"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Blueprint has no generated class"));
     }
 
     UObject* CDO = BPClass->GetDefaultObject();
     if (!CDO)
     {
-        return CreateErrorResponse(TEXT("Failed to get CDO"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get CDO"));
     }
 
     // Find property
     FArrayProperty* ArrayProp = FindFProperty<FArrayProperty>(BPClass, *PropertyName);
     if (!ArrayProp)
     {
-        return CreateErrorResponse(FString::Printf(TEXT("Property not found: %s"), *PropertyName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Property not found: %s"), *PropertyName));
     }
 
     // Check if inner property is a class property
     FClassProperty* ClassProp = CastField<FClassProperty>(ArrayProp->Inner);
     if (!ClassProp)
     {
-        return CreateErrorResponse(FString::Printf(TEXT("Property %s is not a TSubclassOf array"), *PropertyName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Property %s is not a TSubclassOf array"), *PropertyName));
     }
 
     // Get array helper

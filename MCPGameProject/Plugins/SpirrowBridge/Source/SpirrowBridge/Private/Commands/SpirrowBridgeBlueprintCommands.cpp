@@ -90,6 +90,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleCommand(const FSt
     {
         return HandleGetBlueprintGraph(Params);
     }
+    else if (CommandType == TEXT("set_blueprint_class_array"))
+    {
+        return HandleSetBlueprintClassArray(Params);
+    }
 
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown blueprint command: %s"), *CommandType));
 }
@@ -1936,6 +1940,96 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleGetBlueprintGraph
 
     ResultJson->SetStringField(TEXT("status"), TEXT("success"));
     ResultJson->SetObjectField(TEXT("result"), ResultData);
+
+    return ResultJson;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleSetBlueprintClassArray(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get parameters
+    FString BlueprintName = Params->GetStringField(TEXT("blueprint_name"));
+    FString PropertyName = Params->GetStringField(TEXT("property_name"));
+    const TArray<TSharedPtr<FJsonValue>>* ClassPathsArray = nullptr;
+    if (!Params->TryGetArrayField(TEXT("class_paths"), ClassPathsArray))
+    {
+        return CreateErrorResponse(TEXT("Missing required parameter: class_paths"));
+    }
+
+    FString Path = Params->HasField(TEXT("path")) ? Params->GetStringField(TEXT("path")) : TEXT("/Game/Blueprints");
+
+    // Load Blueprint
+    FString BlueprintPath = Path + TEXT("/") + BlueprintName + TEXT(".") + BlueprintName;
+    UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *BlueprintPath);
+    if (!Blueprint)
+    {
+        return CreateErrorResponse(FString::Printf(TEXT("Failed to load blueprint: %s"), *BlueprintPath));
+    }
+
+    // Get CDO
+    UClass* BPClass = Blueprint->GeneratedClass;
+    if (!BPClass)
+    {
+        return CreateErrorResponse(TEXT("Blueprint has no generated class"));
+    }
+
+    UObject* CDO = BPClass->GetDefaultObject();
+    if (!CDO)
+    {
+        return CreateErrorResponse(TEXT("Failed to get CDO"));
+    }
+
+    // Find property
+    FArrayProperty* ArrayProp = FindFProperty<FArrayProperty>(BPClass, *PropertyName);
+    if (!ArrayProp)
+    {
+        return CreateErrorResponse(FString::Printf(TEXT("Property not found: %s"), *PropertyName));
+    }
+
+    // Check if inner property is a class property
+    FClassProperty* ClassProp = CastField<FClassProperty>(ArrayProp->Inner);
+    if (!ClassProp)
+    {
+        return CreateErrorResponse(FString::Printf(TEXT("Property %s is not a TSubclassOf array"), *PropertyName));
+    }
+
+    // Get array helper
+    void* ArrayPtr = ArrayProp->ContainerPtrToValuePtr<void>(CDO);
+    FScriptArrayHelper ArrayHelper(ArrayProp, ArrayPtr);
+
+    // Clear existing array
+    ArrayHelper.EmptyValues();
+
+    // Add new classes
+    int32 AddedCount = 0;
+    for (const TSharedPtr<FJsonValue>& ClassPathValue : *ClassPathsArray)
+    {
+        FString ClassPath = ClassPathValue->AsString();
+
+        // Load the class
+        UClass* LoadedClass = LoadObject<UClass>(nullptr, *ClassPath);
+        if (!LoadedClass)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Failed to load class: %s"), *ClassPath);
+            continue;
+        }
+
+        // Add to array
+        int32 NewIndex = ArrayHelper.AddValue();
+        UClass** ElementPtr = reinterpret_cast<UClass**>(ArrayHelper.GetRawPtr(NewIndex));
+        *ElementPtr = LoadedClass;
+        AddedCount++;
+    }
+
+    // Mark modified and compile
+    Blueprint->Modify();
+    Blueprint->MarkPackageDirty();
+    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+
+    // Create success response
+    TSharedPtr<FJsonObject> ResultJson = MakeShareable(new FJsonObject());
+    ResultJson->SetBoolField(TEXT("success"), true);
+    ResultJson->SetStringField(TEXT("property_name"), PropertyName);
+    ResultJson->SetNumberField(TEXT("count"), AddedCount);
 
     return ResultJson;
 } 

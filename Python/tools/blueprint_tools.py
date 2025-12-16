@@ -724,4 +724,82 @@ def register_blueprint_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    @mcp.tool()
+    def set_blueprint_class_array(
+        ctx: Context,
+        blueprint_name: str,
+        property_name: str,
+        class_paths: List[str],
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Set a TSubclassOf array property on a Blueprint.
+
+        This tool allows you to configure Blueprint properties that are arrays of class references,
+        such as TrapInventory (list of trap classes) or DefaultAbilities (list of ability classes).
+
+        Args:
+            blueprint_name: Name of the target Blueprint (e.g., "BP_PlayerCharacter")
+            property_name: Name of the array property (e.g., "TrapInventory", "DefaultAbilities")
+            class_paths: List of Blueprint class paths. Each path should end with "_C" for Blueprint classes.
+                        Example: "/Game/TrapxTrap/Blueprints/Traps/BP_ExplosionTrap.BP_ExplosionTrap_C"
+            path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+
+        Returns:
+            Dict containing success status, property name, and number of classes set
+
+        Example:
+            # Set trap inventory for player character
+            set_blueprint_class_array(
+                blueprint_name="BP_PlayerCharacter",
+                property_name="TrapInventory",
+                class_paths=[
+                    "/Game/TrapxTrap/Blueprints/Traps/BP_ExplosionTrap.BP_ExplosionTrap_C",
+                    "/Game/TrapxTrap/Blueprints/Traps/BP_SpikeTrap.BP_SpikeTrap_C",
+                    "/Game/TrapxTrap/Blueprints/Traps/BP_FreezeTrap.BP_FreezeTrap_C"
+                ],
+                path="/Game/TrapxTrap/Blueprints/Characters"
+            )
+
+            # Set default abilities for a character
+            set_blueprint_class_array(
+                blueprint_name="BP_Enemy",
+                property_name="DefaultAbilities",
+                class_paths=[
+                    "/Game/Abilities/GA_BasicAttack.GA_BasicAttack_C",
+                    "/Game/Abilities/GA_Defend.GA_Defend_C"
+                ],
+                path="/Game/Characters"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "property_name": property_name,
+                "class_paths": class_paths,
+                "path": path
+            }
+
+            logger.info(f"Setting Blueprint class array '{property_name}' on '{blueprint_name}' with {len(class_paths)} classes")
+            response = unreal.send_command("set_blueprint_class_array", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Set Blueprint class array response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error setting Blueprint class array: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("Blueprint tools registered successfully") 

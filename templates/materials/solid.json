@@ -1,0 +1,10 @@
+{
+  "name": "solid",
+  "description": "Basic opaque solid color material",
+  "shading_model": "DefaultLit",
+  "blend_mode": "Opaque",
+  "two_sided": false,
+  "parameters": {
+    "base_color": [1.0, 1.0, 1.0]
+  }
+}

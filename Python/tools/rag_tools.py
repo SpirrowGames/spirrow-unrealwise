@@ -62,6 +62,101 @@ def record_rationale(
         # Log warning but don't fail the main operation
         logger.warning(f"Failed to record rationale: {e}")
 
+def search_knowledge_internal(
+    query: str,
+    category: Optional[str] = None,
+    n_results: int = 5
+) -> Optional[Dict[str, Any]]:
+    """
+    Internal synchronous version of search_knowledge.
+    Can be called from other tools without async context.
+
+    Returns:
+        Dict with 'documents', 'metadatas', 'distances' or None on error
+    """
+    try:
+        url = f"{RAG_SERVER_URL}/knowledge/search"
+        payload = {
+            "query": query,
+            "n_results": n_results
+        }
+        if category:
+            payload["category"] = category
+
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+
+        data = response.json()
+
+        # Extract ChromaDB-style format
+        results = data.get("results", [])
+        return {
+            "documents": [r.get("document", "") for r in results],
+            "metadatas": [r.get("metadata", {}) for r in results],
+            "distances": [r.get("distance", 0.0) for r in results]
+        }
+
+    except Exception as e:
+        logger.error(f"search_knowledge_internal error: {e}")
+        return None
+
+def add_knowledge_internal(
+    document: str,
+    category: str,
+    tags: Optional[str] = None,
+    doc_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Internal synchronous version of add_knowledge.
+    Can be called from other tools without async context.
+    """
+    try:
+        url = f"{RAG_SERVER_URL}/knowledge/add"
+        payload = {
+            "document": document,
+            "category": category
+        }
+        if tags:
+            payload["tags"] = tags
+        if doc_id:
+            payload["id"] = doc_id
+
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+
+        data = response.json()
+        return {
+            "success": True,
+            "status": data.get("status", "added"),
+            "id": data.get("id")
+        }
+
+    except Exception as e:
+        logger.error(f"add_knowledge_internal error: {e}")
+        return {"success": False, "error": str(e)}
+
+def delete_knowledge_internal(doc_id: str) -> Dict[str, Any]:
+    """
+    Internal synchronous version of delete_knowledge.
+    Can be called from other tools without async context.
+    """
+    try:
+        url = f"{RAG_SERVER_URL}/knowledge/{doc_id}"
+
+        response = requests.delete(url, timeout=10)
+        response.raise_for_status()
+
+        data = response.json()
+        return {
+            "success": True,
+            "status": data.get("status", "deleted"),
+            "id": data.get("id", doc_id)
+        }
+
+    except Exception as e:
+        logger.error(f"delete_knowledge_internal error: {e}")
+        return {"success": False, "error": str(e)}
+
 def register_rag_tools(mcp: FastMCP):
     """Register RAG tools with the MCP server."""
 

@@ -1,0 +1,11 @@
+{
+  "name": "translucent",
+  "description": "Translucent material with adjustable opacity",
+  "shading_model": "DefaultLit",
+  "blend_mode": "Translucent",
+  "two_sided": false,
+  "parameters": {
+    "base_color": [1.0, 1.0, 1.0],
+    "opacity": 0.5
+  }
+}

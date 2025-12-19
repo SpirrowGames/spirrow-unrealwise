@@ -1,0 +1,12 @@
+{
+  "name": "emissive",
+  "description": "Emissive material with glow effect",
+  "shading_model": "DefaultLit",
+  "blend_mode": "Opaque",
+  "two_sided": false,
+  "parameters": {
+    "base_color": [0.0, 0.0, 0.0],
+    "emissive_color": [1.0, 1.0, 1.0],
+    "emissive_strength": 1.0
+  }
+}

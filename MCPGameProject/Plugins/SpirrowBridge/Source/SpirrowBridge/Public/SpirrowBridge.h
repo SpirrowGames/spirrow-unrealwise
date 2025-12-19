@@ -15,6 +15,7 @@
 #include "Commands/SpirrowBridgeUMGCommands.h"
 #include "Commands/SpirrowBridgeConfigCommands.h"
 #include "Commands/SpirrowBridgeGASCommands.h"
+#include "Commands/SpirrowBridgeMaterialCommands.h"
 #include "SpirrowBridge.generated.h"
 
 class FMCPServerRunnable;
@@ -65,4 +66,5 @@ private:
 	TSharedPtr<FSpirrowBridgeUMGCommands> UMGCommands;
 	TSharedPtr<FSpirrowBridgeConfigCommands> ConfigCommands;
 	TSharedPtr<FSpirrowBridgeGASCommands> GASCommands;
+	TSharedPtr<FSpirrowBridgeMaterialCommands> MaterialCommands;
 }; 

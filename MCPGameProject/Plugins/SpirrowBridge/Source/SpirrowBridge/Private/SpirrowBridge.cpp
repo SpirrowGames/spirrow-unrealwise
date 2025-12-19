@@ -59,6 +59,7 @@
 #include "Commands/SpirrowBridgeUMGCommands.h"
 #include "Commands/SpirrowBridgeConfigCommands.h"
 #include "Commands/SpirrowBridgeGASCommands.h"
+#include "Commands/SpirrowBridgeMaterialCommands.h"
 
 // Default settings
 #define MCP_SERVER_HOST "127.0.0.1"
@@ -73,6 +74,7 @@ USpirrowBridge::USpirrowBridge()
     UMGCommands = MakeShared<FSpirrowBridgeUMGCommands>();
     ConfigCommands = MakeShared<FSpirrowBridgeConfigCommands>();
     GASCommands = MakeShared<FSpirrowBridgeGASCommands>();
+    MaterialCommands = MakeShared<FSpirrowBridgeMaterialCommands>();
 }
 
 USpirrowBridge::~USpirrowBridge()
@@ -84,6 +86,7 @@ USpirrowBridge::~USpirrowBridge()
     UMGCommands.Reset();
     ConfigCommands.Reset();
     GASCommands.Reset();
+    MaterialCommands.Reset();
 }
 
 // Initialize subsystem
@@ -316,6 +319,11 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("create_gameplay_ability"))
             {
                 ResultJson = GASCommands->HandleCommand(CommandType, Params);
+            }
+            // Material Commands
+            else if (CommandType == TEXT("create_simple_material"))
+            {
+                ResultJson = MaterialCommands->HandleCommand(CommandType, Params);
             }
             else
             {

@@ -1,0 +1,11 @@
+{
+  "name": "unlit_translucent",
+  "description": "Unlit translucent material - good for effects, detection spheres",
+  "shading_model": "Unlit",
+  "blend_mode": "Translucent",
+  "two_sided": true,
+  "parameters": {
+    "emissive_color": [1.0, 1.0, 1.0],
+    "opacity": 0.3
+  }
+}

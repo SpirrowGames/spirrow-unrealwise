@@ -1,0 +1,10 @@
+{
+  "name": "unlit",
+  "description": "Unlit opaque material (no lighting)",
+  "shading_model": "Unlit",
+  "blend_mode": "Opaque",
+  "two_sided": false,
+  "parameters": {
+    "emissive_color": [1.0, 1.0, 1.0]
+  }
+}

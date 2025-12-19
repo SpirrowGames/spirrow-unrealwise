@@ -53,12 +53,15 @@
 
 | ツール | 状態 | 備考 |
 |--------|------|------|
-| `create_umg_widget_blueprint` | 🔲 未確認 | |
+| `create_umg_widget_blueprint` | 🔲 未確認 | Widget Blueprint作成 |
 | `add_text_block_to_widget` | 🔲 未確認 | |
 | `add_button_to_widget` | 🔲 未確認 | |
 | `bind_widget_event` | 🔲 未確認 | |
 | `add_widget_to_viewport` | 🔲 未確認 | |
 | `set_text_block_binding` | 🔲 未確認 | |
+| `add_text_to_widget` | ✅ 実装完了 | Text要素追加、アンカー・フォントサイズ・色設定対応 |
+| `add_image_to_widget` | ✅ 実装完了 | Image要素追加、テクスチャ・サイズ・色調設定対応 |
+| `add_progressbar_to_widget` | ✅ 実装完了 | ProgressBar追加、パーセント・色・背景色設定対応 |
 
 ### アセット管理
 
@@ -100,6 +103,17 @@
 | `add_knowledge` | ✅ 動作OK | ナレッジ追加、カテゴリ・タグ対応 |
 | `list_knowledge` | ✅ 動作OK | 登録済みナレッジ一覧取得 |
 | `delete_knowledge` | ✅ 動作OK | ID指定でナレッジ削除 |
+
+### Material（マテリアル）
+
+| ツール | 状態 | 備考 |
+|--------|------|------|
+| `list_material_templates` | ✅ 実装完了 | ビルトイン＆ユーザー定義テンプレート一覧取得 |
+| `get_material_template` | ✅ 実装完了 | 指定したテンプレートの詳細取得 |
+| `save_material_template` | ✅ 実装完了 | ユーザー定義テンプレートをRAGに保存 |
+| `delete_material_template` | ✅ 実装完了 | ユーザー定義テンプレートを削除 |
+| `create_material_from_template` | ✅ 実装完了 | テンプレートベースのマテリアル作成、パラメータ上書き対応 |
+| `create_simple_material` | ✅ 実装完了 | 詳細設定によるマテリアル作成 |
 
 ### ナレッジアシスタント
 
@@ -157,6 +171,125 @@
 ---
 
 ## 最新の更新履歴
+
+### 2025-12-20: Material Tools 実装 - 2層テンプレートシステム
+
+**新機能**:
+- マテリアル作成ツールの実装（6つのMCPツール）
+  - `list_material_templates`: ビルトイン＆ユーザー定義テンプレート一覧
+  - `get_material_template`: テンプレート詳細取得
+  - `save_material_template`: ユーザー定義テンプレートをRAGに保存
+  - `delete_material_template`: ユーザー定義テンプレートを削除
+  - `create_material_from_template`: テンプレートベースでマテリアル作成
+  - `create_simple_material`: 詳細設定でマテリアル作成
+
+**2層テンプレートシステム**:
+- **Layer 1 - ビルトインテンプレート**: JSONファイルで定義（templates/materials/）
+  - `solid.json` - 基本的な不透明マテリアル
+  - `translucent.json` - 半透明マテリアル（透明度調整可能）
+  - `unlit.json` - ライティング影響を受けない不透明マテリアル
+  - `unlit_translucent.json` - ライティング影響を受けない半透明マテリアル（エフェクト、検出範囲表示用）
+  - `emissive.json` - 発光マテリアル（強度調整可能）
+- **Layer 2 - ユーザー定義テンプレート**: RAG（ChromaDB）に保存
+  - プロジェクト固有のマテリアルパターンを蓄積
+  - 意味検索による関連テンプレート検索
+  - カテゴリ・タグによる分類
+
+**RAG内部関数**:
+- 非同期ツールから同期的にRAGアクセス可能にする内部関数を追加
+  - `search_knowledge_internal`: 同期版RAG検索
+  - `add_knowledge_internal`: 同期版ナレッジ追加
+  - `delete_knowledge_internal`: 同期版ナレッジ削除
+
+**マテリアル作成機能**:
+- Shading Model: DefaultLit（標準）、Unlit（ライティングなし）
+- Blend Mode: Opaque（不透明）、Translucent（半透明）、Masked（マスク）
+- Base Color、Emissive Color、Opacity設定
+- Two Sided（両面描画）対応
+- MaterialExpressionノード自動作成
+
+**使用例**:
+```python
+# テンプレート一覧取得
+list_material_templates()
+
+# テンプレートからマテリアル作成（パラメータ上書き）
+create_material_from_template(
+    template_name="unlit_translucent",
+    name="M_DetectionSphere",
+    path="/Game/Materials",
+    overrides={
+        "base_color": [0.0, 1.0, 0.0],  # 緑色
+        "opacity": 0.3
+    }
+)
+
+# 詳細設定でマテリアル作成
+create_simple_material(
+    name="M_Glow",
+    path="/Game/Materials",
+    shading_model="Unlit",
+    blend_mode="Translucent",
+    emissive_color=[1.0, 0.5, 0.0],
+    emissive_strength=5.0,
+    opacity=0.8
+)
+
+# カスタムテンプレートをRAGに保存
+save_material_template(
+    name="glass",
+    description="透明ガラスマテリアル",
+    template_data={
+        "shading_model": "DefaultLit",
+        "blend_mode": "Translucent",
+        "base_color": [0.9, 0.95, 1.0],
+        "opacity": 0.2,
+        "two_sided": true
+    },
+    category="materials"
+)
+```
+
+**変更範囲**:
+- Python tools/material_tools.py: 新規作成（6 MCPツール、446行）
+- Python tools/rag_tools.py: RAG内部関数追加（search/add/delete_knowledge_internal）
+- Python unreal_mcp_server.py: register_material_tools追加
+- C++ SpirrowBridgeMaterialCommands.h/.cpp: 新規作成（HandleCreateSimpleMaterial実装）
+- C++ SpirrowBridge.h/.cpp: MaterialCommandsメンバー追加、ルーティング追加
+- templates/materials/*.json: 5つのビルトインテンプレート追加
+
+**技術詳細**:
+- UMaterialFactoryNew による Material 生成
+- MaterialExpressionConstant3Vector（BaseColor/EmissiveColor）
+- MaterialExpressionConstant（Opacity）
+- GetEditorOnlyData()->BaseColor/EmissiveColor/Opacity への接続
+- MSM_Unlit/MSM_DefaultLit によるシェーディングモデル設定
+- BLEND_Opaque/BLEND_Translucent/BLEND_Masked によるブレンドモード設定
+
+### 2025-12-20: UMG Widget Tools 拡張 - Text/Image/ProgressBar追加
+
+**新機能**:
+- UMG Widget操作ツールを3つ追加
+  - `add_text_to_widget`: Text要素追加（アンカー・フォントサイズ・色設定対応）
+  - `add_image_to_widget`: Image要素追加（テクスチャ・サイズ・色調設定対応）
+  - `add_progressbar_to_widget`: ProgressBar追加（パーセント・色・背景色設定対応）
+
+**9ポジションアンカーシステム**:
+- 全ツールで統一された9つのアンカープリセット対応
+  - TopLeft, TopCenter, TopRight
+  - CenterLeft, Center, CenterRight
+  - BottomLeft, BottomCenter, BottomRight
+
+**ProgressBar機能詳細**:
+- Fill Color（進捗バーの色）設定
+- Background Color（背景色）設定
+- Percent（初期値）設定
+- WidgetStyle による色設定
+
+**変更範囲**:
+- Python tools/umg_tools.py: 3ツール追加（add_text_to_widget, add_image_to_widget, add_progressbar_to_widget）
+- C++ SpirrowBridgeUMGCommands.h/.cpp: 3ハンドラ実装
+- C++ SpirrowBridge.cpp: ルーティング追加
 
 ### 2025-12-16: Widget Blueprint 対応 - create_blueprint で UUserWidget 親クラスをサポート
 

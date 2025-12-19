@@ -478,4 +478,80 @@ def register_umg_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    @mcp.tool()
+    def add_progressbar_to_widget(
+        ctx: Context,
+        widget_name: str,
+        progressbar_name: str,
+        percent: float = 0.0,
+        fill_color: List[float] = [0.0, 0.5, 1.0, 1.0],
+        background_color: List[float] = [0.1, 0.1, 0.1, 1.0],
+        size: List[float] = [200.0, 20.0],
+        anchor: str = "Center",
+        alignment: List[float] = [0.5, 0.5],
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add a ProgressBar widget to a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            progressbar_name: Name for the new ProgressBar
+            percent: Initial fill percentage 0.0-1.0 (default: 0.0)
+            fill_color: [R, G, B, A] bar color values 0.0-1.0 (default: blue)
+            background_color: [R, G, B, A] background color values 0.0-1.0 (default: dark gray)
+            size: [Width, Height] size in pixels (default: [200, 20])
+            anchor: Anchor position - "Center", "TopLeft", "TopCenter", "TopRight",
+                    "MiddleLeft", "MiddleRight", "BottomLeft", "BottomCenter", "BottomRight" (default: "Center")
+            alignment: [X, Y] alignment values 0.0-1.0 (default: [0.5, 0.5])
+            path: Content browser path to the widget (default: "/Game/UI")
+
+        Returns:
+            Dict containing success status and progressbar properties
+
+        Example:
+            add_progressbar_to_widget(
+                widget_name="WBP_DisarmProgress",
+                progressbar_name="DisarmBar",
+                percent=0.0,
+                fill_color=[0.0, 1.0, 0.0, 1.0],
+                size=[150, 15],
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "progressbar_name": progressbar_name,
+                "percent": percent,
+                "fill_color": fill_color,
+                "background_color": background_color,
+                "size": size,
+                "anchor": anchor,
+                "alignment": alignment,
+                "path": path
+            }
+
+            logger.info(f"Adding ProgressBar to widget with params: {params}")
+            response = unreal.send_command("add_progressbar_to_widget", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add ProgressBar to widget response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding ProgressBar to widget: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("UMG tools registered successfully") 

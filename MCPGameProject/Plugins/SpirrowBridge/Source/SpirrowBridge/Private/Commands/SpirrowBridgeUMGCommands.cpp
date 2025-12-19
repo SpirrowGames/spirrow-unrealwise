@@ -6,6 +6,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Components/TextBlock.h"
 #include "Components/Image.h"
+#include "Components/ProgressBar.h"
 #include "Engine/Texture2D.h"
 #include "WidgetBlueprint.h"
 // We'll create widgets using regular Factory classes
@@ -65,6 +66,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleCommand(const FString& 
 	else if (CommandName == TEXT("add_image_to_widget"))
 	{
 		return HandleAddImageToWidget(Params);
+	}
+	else if (CommandName == TEXT("add_progressbar_to_widget"))
+	{
+		return HandleAddProgressBarToWidget(Params);
 	}
 
 	return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown UMG command: %s"), *CommandName));
@@ -892,6 +897,192 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleAddImageToWidget(const 
 	ResultObj->SetStringField(TEXT("widget"), WidgetName);
 	ResultObj->SetStringField(TEXT("image_name"), ImageName);
 	ResultObj->SetStringField(TEXT("texture_path"), TexturePath);
+	ResultObj->SetBoolField(TEXT("success"), true);
+	return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleAddProgressBarToWidget(const TSharedPtr<FJsonObject>& Params)
+{
+	// Get required parameters
+	FString WidgetName;
+	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+	}
+
+	FString ProgressBarName;
+	if (!Params->TryGetStringField(TEXT("progressbar_name"), ProgressBarName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'progressbar_name' parameter"));
+	}
+
+	// Get optional parameters
+	FString Path = TEXT("/Game/UI");
+	Params->TryGetStringField(TEXT("path"), Path);
+
+	float Percent = 0.0f;
+	if (Params->HasField(TEXT("percent")))
+	{
+		Percent = Params->GetNumberField(TEXT("percent"));
+	}
+
+	// Get size [Width, Height]
+	FVector2D Size(200.0f, 20.0f);
+	if (Params->HasField(TEXT("size")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* SizeArray;
+		if (Params->TryGetArrayField(TEXT("size"), SizeArray) && SizeArray->Num() >= 2)
+		{
+			Size.X = (*SizeArray)[0]->AsNumber();
+			Size.Y = (*SizeArray)[1]->AsNumber();
+		}
+	}
+
+	// Get fill color [R, G, B, A]
+	FLinearColor FillColor(0.0f, 0.5f, 1.0f, 1.0f);  // Default blue
+	if (Params->HasField(TEXT("fill_color")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* ColorArray;
+		if (Params->TryGetArrayField(TEXT("fill_color"), ColorArray) && ColorArray->Num() >= 4)
+		{
+			FillColor.R = (*ColorArray)[0]->AsNumber();
+			FillColor.G = (*ColorArray)[1]->AsNumber();
+			FillColor.B = (*ColorArray)[2]->AsNumber();
+			FillColor.A = (*ColorArray)[3]->AsNumber();
+		}
+	}
+
+	// Get background color [R, G, B, A]
+	FLinearColor BackgroundColor(0.1f, 0.1f, 0.1f, 1.0f);  // Default dark gray
+	if (Params->HasField(TEXT("background_color")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* ColorArray;
+		if (Params->TryGetArrayField(TEXT("background_color"), ColorArray) && ColorArray->Num() >= 4)
+		{
+			BackgroundColor.R = (*ColorArray)[0]->AsNumber();
+			BackgroundColor.G = (*ColorArray)[1]->AsNumber();
+			BackgroundColor.B = (*ColorArray)[2]->AsNumber();
+			BackgroundColor.A = (*ColorArray)[3]->AsNumber();
+		}
+	}
+
+	// Get alignment [X, Y]
+	FVector2D Alignment(0.5f, 0.5f);
+	if (Params->HasField(TEXT("alignment")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* AlignmentArray;
+		if (Params->TryGetArrayField(TEXT("alignment"), AlignmentArray) && AlignmentArray->Num() >= 2)
+		{
+			Alignment.X = (*AlignmentArray)[0]->AsNumber();
+			Alignment.Y = (*AlignmentArray)[1]->AsNumber();
+		}
+	}
+
+	// Get anchor
+	FString AnchorStr = TEXT("Center");
+	Params->TryGetStringField(TEXT("anchor"), AnchorStr);
+	FAnchors Anchors(0.5f, 0.5f, 0.5f, 0.5f);  // Center default
+
+	// Parse anchor presets
+	if (AnchorStr == TEXT("TopLeft"))
+	{
+		Anchors = FAnchors(0.0f, 0.0f, 0.0f, 0.0f);
+	}
+	else if (AnchorStr == TEXT("TopCenter"))
+	{
+		Anchors = FAnchors(0.5f, 0.0f, 0.5f, 0.0f);
+	}
+	else if (AnchorStr == TEXT("TopRight"))
+	{
+		Anchors = FAnchors(1.0f, 0.0f, 1.0f, 0.0f);
+	}
+	else if (AnchorStr == TEXT("MiddleLeft"))
+	{
+		Anchors = FAnchors(0.0f, 0.5f, 0.0f, 0.5f);
+	}
+	else if (AnchorStr == TEXT("Center"))
+	{
+		Anchors = FAnchors(0.5f, 0.5f, 0.5f, 0.5f);
+	}
+	else if (AnchorStr == TEXT("MiddleRight"))
+	{
+		Anchors = FAnchors(1.0f, 0.5f, 1.0f, 0.5f);
+	}
+	else if (AnchorStr == TEXT("BottomLeft"))
+	{
+		Anchors = FAnchors(0.0f, 1.0f, 0.0f, 1.0f);
+	}
+	else if (AnchorStr == TEXT("BottomCenter"))
+	{
+		Anchors = FAnchors(0.5f, 1.0f, 0.5f, 1.0f);
+	}
+	else if (AnchorStr == TEXT("BottomRight"))
+	{
+		Anchors = FAnchors(1.0f, 1.0f, 1.0f, 1.0f);
+	}
+
+	// Load Widget Blueprint
+	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
+	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
+	if (!WidgetBP)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Widget Blueprint '%s' not found at path '%s'"), *WidgetName, *AssetPath));
+	}
+
+	// Get WidgetTree
+	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
+	if (!WidgetTree)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+	}
+
+	// Get or create root Canvas Panel
+	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
+	if (!RootCanvas)
+	{
+		// Create Canvas Panel if it doesn't exist
+		RootCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("RootCanvas"));
+		WidgetTree->RootWidget = RootCanvas;
+	}
+
+	// Create ProgressBar widget
+	UProgressBar* ProgressBarWidget = WidgetTree->ConstructWidget<UProgressBar>(UProgressBar::StaticClass(), FName(*ProgressBarName));
+	if (!ProgressBarWidget)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create ProgressBar widget"));
+	}
+
+	// Set percent
+	ProgressBarWidget->SetPercent(Percent);
+
+	// Set fill color
+	ProgressBarWidget->SetFillColorAndOpacity(FillColor);
+
+	// Set background color via WidgetStyle
+	FProgressBarStyle Style = ProgressBarWidget->GetWidgetStyle();
+	Style.BackgroundImage.TintColor = FSlateColor(BackgroundColor);
+	ProgressBarWidget->SetWidgetStyle(Style);
+
+	// Add to Canvas Panel
+	UCanvasPanelSlot* Slot = RootCanvas->AddChildToCanvas(ProgressBarWidget);
+	if (Slot)
+	{
+		Slot->SetAnchors(Anchors);
+		Slot->SetAlignment(Alignment);
+		Slot->SetPosition(FVector2D(0, 0));
+		Slot->SetSize(Size);
+	}
+
+	// Mark as modified and compile
+	WidgetBP->Modify();
+	WidgetBP->MarkPackageDirty();
+	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+	// Create success response
+	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetStringField(TEXT("widget"), WidgetName);
+	ResultObj->SetStringField(TEXT("progressbar_name"), ProgressBarName);
+	ResultObj->SetNumberField(TEXT("percent"), Percent);
 	ResultObj->SetBoolField(TEXT("success"), true);
 	return ResultObj;
 } 

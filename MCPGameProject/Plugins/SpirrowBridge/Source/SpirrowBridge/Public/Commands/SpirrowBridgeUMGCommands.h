@@ -109,4 +109,20 @@ private:
      * @return JSON response with the added widget details
      */
     TSharedPtr<FJsonObject> HandleAddImageToWidget(const TSharedPtr<FJsonObject>& Params);
+
+    /**
+     * Add a ProgressBar widget to a UMG Widget Blueprint
+     * @param Params - Must include:
+     *                "widget_name" - Name of the Widget Blueprint
+     *                "progressbar_name" - Name for the new ProgressBar
+     *                "percent" - Initial fill percentage 0.0-1.0 (optional, default: 0.0)
+     *                "fill_color" - [R, G, B, A] bar color (optional, default: blue)
+     *                "background_color" - [R, G, B, A] background color (optional)
+     *                "size" - [Width, Height] size (optional, default: [200, 20])
+     *                "anchor" - Anchor position (optional, default: "Center")
+     *                "alignment" - [X, Y] alignment (optional, default: [0.5, 0.5])
+     *                "path" - Widget path (optional, default: "/Game/UI")
+     * @return JSON response with the added widget details
+     */
+    TSharedPtr<FJsonObject> HandleAddProgressBarToWidget(const TSharedPtr<FJsonObject>& Params);
 }; 

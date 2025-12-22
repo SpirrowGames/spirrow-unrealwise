@@ -2034,25 +2034,48 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleRemoveWidgetElement(con
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Cannot remove root widget"));
 	}
 
-	// Remove from parent
+	// Mark blueprint as modified BEFORE making changes
+	WidgetBP->Modify();
+
+	// Get parent for removal
 	UPanelWidget* Parent = Element->GetParent();
+	FString ParentName = Parent ? Parent->GetName() : TEXT("None");
+
+	// Remove from parent first
 	if (Parent)
 	{
 		Parent->RemoveChild(Element);
 	}
 
-	// Remove from widget tree
-	WidgetTree->RemoveWidget(Element);
+	// Remove from widget tree and check result
+	bool bRemoved = WidgetTree->RemoveWidget(Element);
 
-	// Mark as modified and compile
-	WidgetBP->Modify();
+	if (!bRemoved)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("RemoveWidget returned false for '%s'"), *ElementName);
+	}
+
+	// Force garbage collection hint
+	Element->Rename(nullptr, GetTransientPackage(), REN_DoNotDirty | REN_DontCreateRedirectors | REN_ForceNoResetLoaders);
+	Element->MarkAsGarbage();
+
+	// Mark package dirty and recompile
 	WidgetBP->MarkPackageDirty();
 	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+	// Verify removal
+	UWidget* VerifyWidget = WidgetTree->FindWidget(FName(*ElementName));
+	if (VerifyWidget)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Failed to completely remove widget '%s' from WidgetTree"), *ElementName));
+	}
 
 	// Create success response
 	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
 	ResultObj->SetBoolField(TEXT("success"), true);
 	ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
 	ResultObj->SetStringField(TEXT("removed_element"), ElementName);
+	ResultObj->SetStringField(TEXT("former_parent"), ParentName);
 	return ResultObj;
 }

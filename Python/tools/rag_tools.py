@@ -8,7 +8,8 @@ to store and retrieve project knowledge.
 import logging
 import os
 import json
-from typing import Dict, Any, Optional
+from datetime import datetime
+from typing import Dict, Any, Optional, List
 import requests
 from mcp.server.fastmcp import FastMCP, Context
 
@@ -156,6 +157,77 @@ def delete_knowledge_internal(doc_id: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"delete_knowledge_internal error: {e}")
         return {"success": False, "error": str(e)}
+
+
+def get_project_context_internal(project_name: str) -> Optional[Dict[str, Any]]:
+    """
+    プロジェクトコンテキストを取得する内部関数。
+    カテゴリ `project-context:{project_name}` で検索し、最新1件を返す。
+    """
+    category = f"project-context:{project_name}"
+    try:
+        url = f"{RAG_SERVER_URL}/knowledge/search"
+        payload = {
+            "query": project_name,
+            "n_results": 1,
+            "category": category
+        }
+        
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        results = data.get("results", [])
+        
+        if results:
+            doc = results[0].get("document", "")
+            try:
+                return json.loads(doc)
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse project context as JSON: {doc}")
+                return {"raw_content": doc}
+        return None
+        
+    except Exception as e:
+        logger.error(f"get_project_context_internal error: {e}")
+        return None
+
+
+def delete_project_context_internal(project_name: str) -> bool:
+    """
+    既存のプロジェクトコンテキストを削除する内部関数。
+    list_knowledge APIを使用してカテゴリでフィルタリングし、該当IDを削除。
+    """
+    target_category = f"project-context:{project_name}"
+    try:
+        # list_knowledge で全エントリを取得
+        url = f"{RAG_SERVER_URL}/knowledge/list"
+        response = requests.get(url, timeout=10)
+        if not response.ok:
+            return False
+            
+        data = response.json()
+        items = data.get("items", [])
+        
+        # カテゴリが一致するエントリを削除
+        deleted_count = 0
+        for item in items:
+            item_category = item.get("metadata", {}).get("category", "")
+            if item_category == target_category:
+                doc_id = item.get("id")
+                if doc_id:
+                    delete_url = f"{RAG_SERVER_URL}/knowledge/{doc_id}"
+                    requests.delete(delete_url, timeout=5)
+                    logger.info(f"Deleted old context: {doc_id}")
+                    deleted_count += 1
+        
+        logger.info(f"Deleted {deleted_count} old context entries for {project_name}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"delete_project_context_internal error: {e}")
+        return False
+
 
 def register_rag_tools(mcp: FastMCP):
     """Register RAG tools with the MCP server."""
@@ -402,6 +474,125 @@ def register_rag_tools(mcp: FastMCP):
             return {"success": False, "message": error_msg}
         except Exception as e:
             error_msg = f"Error deleting knowledge: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def get_project_context(
+        ctx: Context,
+        project_name: str
+    ) -> Dict[str, Any]:
+        """
+        プロジェクトの現状サマリを取得。
+        会話開始時に呼び出して文脈を復元する。
+        
+        Args:
+            project_name: プロジェクト名（例: "TrapxTrapCpp"）
+        
+        Returns:
+            プロジェクトコンテキスト（存在しない場合はnot_foundを返す）
+        
+        Example:
+            get_project_context("TrapxTrapCpp")
+        """
+        try:
+            context = get_project_context_internal(project_name)
+            
+            if context:
+                logger.info(f"Project context retrieved for {project_name}")
+                return {
+                    "success": True,
+                    "found": True,
+                    "context": context
+                }
+            else:
+                logger.info(f"No project context found for {project_name}")
+                return {
+                    "success": True,
+                    "found": False,
+                    "message": f"No context found for project '{project_name}'. Use update_project_context to create one."
+                }
+                
+        except Exception as e:
+            error_msg = f"Failed to get project context: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def update_project_context(
+        ctx: Context,
+        project_name: str,
+        current_phase: str,
+        recent_changes: List[str],
+        known_issues: Optional[List[str]] = None,
+        next_tasks: Optional[List[str]] = None,
+        notes: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        プロジェクトコンテキストを上書き更新。
+        古いコンテキストを削除し、新しいものを保存する。
+        
+        Args:
+            project_name: プロジェクト名（例: "TrapxTrapCpp"）
+            current_phase: 現在のフェーズ（例: "Phase 3 - トラップ解除システム"）
+            recent_changes: 最近の変更点のリスト
+            known_issues: 既知の問題のリスト（オプション）
+            next_tasks: 次のタスクのリスト（オプション）
+            notes: 補足メモ（オプション）
+        
+        Returns:
+            更新結果
+        
+        Example:
+            update_project_context(
+                project_name="TrapxTrapCpp",
+                current_phase="Phase 3 - トラップ解除システム",
+                recent_changes=["DisarmProgressWidget実装完了"],
+                next_tasks=["解除キャンセル処理"]
+            )
+        """
+        category = f"project-context:{project_name}"
+        
+        try:
+            # 1. 既存のコンテキストを削除
+            delete_project_context_internal(project_name)
+            
+            # 2. 新しいコンテキストを作成
+            context_data = {
+                "project_name": project_name,
+                "current_phase": current_phase,
+                "recent_changes": recent_changes,
+                "known_issues": known_issues or [],
+                "next_tasks": next_tasks or [],
+                "notes": notes or "",
+                "updated_at": datetime.now().isoformat()
+            }
+            
+            # 3. RAGに保存
+            document = json.dumps(context_data, ensure_ascii=False, indent=2)
+            
+            url = f"{RAG_SERVER_URL}/knowledge/add"
+            payload = {
+                "document": document,
+                "category": category,
+                "tags": f"project,context,{project_name}"
+            }
+            
+            response = requests.post(url, json=payload, timeout=10)
+            response.raise_for_status()
+            
+            logger.info(f"Project context updated for {project_name}")
+            
+            return {
+                "success": True,
+                "project_name": project_name,
+                "current_phase": current_phase,
+                "updated_at": context_data["updated_at"],
+                "message": f"Project context for '{project_name}' updated successfully"
+            }
+            
+        except Exception as e:
+            error_msg = f"Failed to update project context: {e}"
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 

@@ -94,6 +94,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleCommand(const FSt
     {
         return HandleSetBlueprintClassArray(Params);
     }
+    else if (CommandType == TEXT("set_struct_array_property"))
+    {
+        return HandleSetStructArrayProperty(Params);
+    }
 
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown blueprint command: %s"), *CommandType));
 }
@@ -2030,6 +2034,188 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleSetBlueprintClass
     ResultJson->SetBoolField(TEXT("success"), true);
     ResultJson->SetStringField(TEXT("property_name"), PropertyName);
     ResultJson->SetNumberField(TEXT("count"), AddedCount);
+
+    return ResultJson;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleSetStructArrayProperty(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get parameters
+    FString BlueprintName = Params->GetStringField(TEXT("blueprint_name"));
+    FString PropertyName = Params->GetStringField(TEXT("property_name"));
+
+    const TArray<TSharedPtr<FJsonValue>>* ValuesArray = nullptr;
+    if (!Params->TryGetArrayField(TEXT("values"), ValuesArray))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing required parameter: values"));
+    }
+
+    FString Path = Params->HasField(TEXT("path")) ? Params->GetStringField(TEXT("path")) : TEXT("/Game/Blueprints");
+
+    // Load Blueprint
+    FString BlueprintPath = Path + TEXT("/") + BlueprintName + TEXT(".") + BlueprintName;
+    UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *BlueprintPath);
+    if (!Blueprint)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Failed to load blueprint: %s"), *BlueprintPath));
+    }
+
+    // Get CDO
+    UClass* BPClass = Blueprint->GeneratedClass;
+    if (!BPClass)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Blueprint has no generated class"));
+    }
+
+    UObject* CDO = BPClass->GetDefaultObject();
+    if (!CDO)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get CDO"));
+    }
+
+    // Find array property
+    FArrayProperty* ArrayProp = FindFProperty<FArrayProperty>(BPClass, *PropertyName);
+    if (!ArrayProp)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Property not found: %s"), *PropertyName));
+    }
+
+    // Verify inner property is a struct
+    FStructProperty* StructProp = CastField<FStructProperty>(ArrayProp->Inner);
+    if (!StructProp)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Property %s is not a struct array"), *PropertyName));
+    }
+
+    UScriptStruct* StructType = StructProp->Struct;
+    UE_LOG(LogTemp, Log, TEXT("Setting struct array property %s of type %s"), *PropertyName, *StructType->GetName());
+
+    // Get array helper
+    void* ArrayPtr = ArrayProp->ContainerPtrToValuePtr<void>(CDO);
+    FScriptArrayHelper ArrayHelper(ArrayProp, ArrayPtr);
+
+    // Clear existing array and resize
+    ArrayHelper.EmptyValues();
+    ArrayHelper.Resize(ValuesArray->Num());
+
+    int32 SetCount = 0;
+    TArray<FString> Errors;
+
+    // Set each element
+    for (int32 i = 0; i < ValuesArray->Num(); ++i)
+    {
+        const TSharedPtr<FJsonValue>& ElementValue = (*ValuesArray)[i];
+        if (ElementValue->Type != EJson::Object)
+        {
+            Errors.Add(FString::Printf(TEXT("Element %d is not an object"), i));
+            continue;
+        }
+
+        const TSharedPtr<FJsonObject>& ElementObj = ElementValue->AsObject();
+        void* ElementPtr = ArrayHelper.GetRawPtr(i);
+
+        // Set each field of the struct
+        for (TFieldIterator<FProperty> PropIt(StructType); PropIt; ++PropIt)
+        {
+            FProperty* FieldProp = *PropIt;
+            FString FieldName = FieldProp->GetName();
+
+            if (!ElementObj->HasField(FieldName))
+            {
+                continue; // Skip fields not provided in JSON
+            }
+
+            TSharedPtr<FJsonValue> FieldValue = ElementObj->TryGetField(FieldName);
+            if (!FieldValue.IsValid())
+            {
+                continue;
+            }
+
+            void* FieldPtr = FieldProp->ContainerPtrToValuePtr<void>(ElementPtr);
+
+            // Handle different field types
+            if (FClassProperty* ClassFieldProp = CastField<FClassProperty>(FieldProp))
+            {
+                // TSubclassOf field
+                FString ClassPath = FieldValue->AsString();
+                UClass* LoadedClass = LoadObject<UClass>(nullptr, *ClassPath);
+                if (LoadedClass)
+                {
+                    ClassFieldProp->SetObjectPropertyValue(FieldPtr, LoadedClass);
+                    UE_LOG(LogTemp, Log, TEXT("  [%d] Set %s = %s"), i, *FieldName, *LoadedClass->GetName());
+                }
+                else
+                {
+                    Errors.Add(FString::Printf(TEXT("Element %d: Failed to load class for %s: %s"), i, *FieldName, *ClassPath));
+                }
+            }
+            else if (FIntProperty* IntFieldProp = CastField<FIntProperty>(FieldProp))
+            {
+                int32 IntValue = static_cast<int32>(FieldValue->AsNumber());
+                IntFieldProp->SetPropertyValue(FieldPtr, IntValue);
+                UE_LOG(LogTemp, Log, TEXT("  [%d] Set %s = %d"), i, *FieldName, IntValue);
+            }
+            else if (FFloatProperty* FloatFieldProp = CastField<FFloatProperty>(FieldProp))
+            {
+                float FloatValue = static_cast<float>(FieldValue->AsNumber());
+                FloatFieldProp->SetPropertyValue(FieldPtr, FloatValue);
+                UE_LOG(LogTemp, Log, TEXT("  [%d] Set %s = %f"), i, *FieldName, FloatValue);
+            }
+            else if (FDoubleProperty* DoubleFieldProp = CastField<FDoubleProperty>(FieldProp))
+            {
+                double DoubleValue = FieldValue->AsNumber();
+                DoubleFieldProp->SetPropertyValue(FieldPtr, DoubleValue);
+                UE_LOG(LogTemp, Log, TEXT("  [%d] Set %s = %f"), i, *FieldName, DoubleValue);
+            }
+            else if (FBoolProperty* BoolFieldProp = CastField<FBoolProperty>(FieldProp))
+            {
+                bool BoolValue = FieldValue->AsBool();
+                BoolFieldProp->SetPropertyValue(FieldPtr, BoolValue);
+                UE_LOG(LogTemp, Log, TEXT("  [%d] Set %s = %s"), i, *FieldName, BoolValue ? TEXT("true") : TEXT("false"));
+            }
+            else if (FStrProperty* StrFieldProp = CastField<FStrProperty>(FieldProp))
+            {
+                FString StrValue = FieldValue->AsString();
+                StrFieldProp->SetPropertyValue(FieldPtr, StrValue);
+                UE_LOG(LogTemp, Log, TEXT("  [%d] Set %s = %s"), i, *FieldName, *StrValue);
+            }
+            else if (FNameProperty* NameFieldProp = CastField<FNameProperty>(FieldProp))
+            {
+                FName NameValue = FName(*FieldValue->AsString());
+                NameFieldProp->SetPropertyValue(FieldPtr, NameValue);
+                UE_LOG(LogTemp, Log, TEXT("  [%d] Set %s = %s"), i, *FieldName, *NameValue.ToString());
+            }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("  [%d] Unsupported field type for %s: %s"),
+                    i, *FieldName, *FieldProp->GetClass()->GetName());
+            }
+        }
+
+        SetCount++;
+    }
+
+    // Mark modified and compile
+    Blueprint->Modify();
+    Blueprint->MarkPackageDirty();
+    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+
+    // Create response
+    TSharedPtr<FJsonObject> ResultJson = MakeShareable(new FJsonObject());
+    ResultJson->SetBoolField(TEXT("success"), Errors.Num() == 0);
+    ResultJson->SetStringField(TEXT("property_name"), PropertyName);
+    ResultJson->SetStringField(TEXT("struct_type"), StructType->GetName());
+    ResultJson->SetNumberField(TEXT("count"), SetCount);
+
+    if (Errors.Num() > 0)
+    {
+        TArray<TSharedPtr<FJsonValue>> ErrorsArray;
+        for (const FString& Error : Errors)
+        {
+            ErrorsArray.Add(MakeShareable(new FJsonValueString(Error)));
+        }
+        ResultJson->SetArrayField(TEXT("errors"), ErrorsArray);
+    }
 
     return ResultJson;
 } 

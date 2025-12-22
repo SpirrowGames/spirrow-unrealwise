@@ -802,4 +802,79 @@ def register_blueprint_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    @mcp.tool()
+    def set_struct_array_property(
+        ctx: Context,
+        blueprint_name: str,
+        property_name: str,
+        values: List[Dict[str, Any]],
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Set a struct array property on a Blueprint.
+
+        This tool allows you to configure Blueprint properties that are arrays of structs,
+        such as TrapInventory (list of FTrapInventoryEntry) or custom struct arrays.
+
+        Args:
+            blueprint_name: Name of the target Blueprint (e.g., "BP_PlayerCharacter")
+            property_name: Name of the array property (e.g., "TrapInventory")
+            values: List of dictionaries, where each dictionary represents a struct.
+                    Keys are field names, values are the field values.
+                    - TSubclassOf fields: Use full class path ending with "_C"
+                    - Numeric fields: Use numbers
+                    - Boolean fields: Use true/false
+                    - String fields: Use strings
+            path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+
+        Returns:
+            Dict containing success status, property name, and number of elements set
+
+        Example:
+            # Set trap inventory for player character
+            set_struct_array_property(
+                blueprint_name="BP_PlayerCharacter",
+                property_name="TrapInventory",
+                values=[
+                    {
+                        "TrapClass": "/Game/TrapxTrap/Blueprints/Traps/BP_ExplosionTrap.BP_ExplosionTrap_C",
+                        "InitialCount": 3,
+                        "MaxCount": 5,
+                        "CurrentCount": 0
+                    }
+                ],
+                path="/Game/TrapxTrap/Blueprints/Characters"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+        import json
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "property_name": property_name,
+                "values": values,  # JSON serializable list of dicts
+                "path": path
+            }
+
+            logger.info(f"Setting struct array property '{property_name}' on '{blueprint_name}' with {len(values)} elements")
+            response = unreal.send_command("set_struct_array_property", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Set struct array property response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error setting struct array property: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("Blueprint tools registered successfully") 

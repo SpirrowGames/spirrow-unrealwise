@@ -262,7 +262,8 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("scan_project_classes") ||
                      CommandType == TEXT("duplicate_blueprint") ||
                      CommandType == TEXT("get_blueprint_graph") ||
-                     CommandType == TEXT("set_blueprint_class_array"))
+                     CommandType == TEXT("set_blueprint_class_array") ||
+                     CommandType == TEXT("set_struct_array_property"))
             {
                 ResultJson = BlueprintCommands->HandleCommand(CommandType, Params);
             }

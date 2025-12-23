@@ -148,6 +148,9 @@ private:
     TSharedPtr<FJsonObject> HandleAddAnimationKeyframe(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleGetWidgetAnimations(const TSharedPtr<FJsonObject>& Params);
 
+    // Phase 3: Array Variable Operations
+    TSharedPtr<FJsonObject> HandleAddWidgetArrayVariable(const TSharedPtr<FJsonObject>& Params);
+
     // Helper function for setting up pin types
     bool SetupPinType(const FString& TypeName, FEdGraphPinType& OutPinType);
 }; 

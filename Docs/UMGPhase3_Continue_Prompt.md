@@ -19,29 +19,31 @@
 - `create_widget_animation` - アニメーション作成
 - `add_animation_track` - Opacity/ColorAndOpacity トラック追加
 - `add_animation_keyframe` - キーフレーム追加（Linear/Cubic/Constant）
-- `get_widget_animations` - アニメーション一覧取得 ← NEW
+- `get_widget_animations` - アニメーション一覧取得
 
-**合計: 20ツール実装完了**
+**Phase 3 (Array Variables)**: 1ツール ✅ NEW
+- `add_widget_array_variable` - 配列型変数追加（TArray<T>）
+
+**合計: 21ツール実装完了**
 
 ### Phase 3 残り機能（未実装）
 
 | 優先度 | ツール | 説明 | プロンプト |
 |--------|--------|------|-----------|
-| 1️⃣ | `add_widget_array_variable` | 配列型変数追加 | ✅ 作成済み |
-| 2️⃣ | RenderTransform トラック | Translation/Scale/Angle 対応 | 未作成 |
-| 3️⃣ | `set_widget_array_default` | 配列デフォルト値設定 | 未作成 |
+| 1️⃣ | RenderTransform トラック | Translation/Scale/Angle 対応 | 未作成 |
+| 2️⃣ | `set_widget_array_default` | 配列デフォルト値設定 | 未作成 |
 
 ---
 
 ## 設計ドキュメント
 
-| ドキュメント | 内容 |
-|-------------|------|
-| `Docs/UMGPhase3_Animation_Prompt.md` | Phase 3 全体設計 |
-| `Docs/UMGPhase3_AnimationTrack_Prompt.md` | Animation Track 詳細 |
-| `Docs/UMGPhase3_GetWidgetAnimations_Prompt.md` | アニメーション一覧取得 |
-| `Docs/UMGPhase3_ArrayVariable_Prompt.md` | 配列型変数追加 ← 次の実装 |
-| `Docs/UMGPhase3_Handover_Prompt.md` | 引き継ぎドキュメント |
+| ドキュメント | 内容 | 状態 |
+|-------------|------|------|
+| `Docs/UMGPhase3_Animation_Prompt.md` | Phase 3 全体設計 | ✅ |
+| `Docs/UMGPhase3_AnimationTrack_Prompt.md` | Animation Track 詳細 | ✅ |
+| `Docs/UMGPhase3_GetWidgetAnimations_Prompt.md` | アニメーション一覧取得 | ✅ 実装完了 |
+| `Docs/UMGPhase3_ArrayVariable_Prompt.md` | 配列型変数追加 | ✅ 実装完了 |
+| `Docs/UMGPhase3_Handover_Prompt.md` | 引き継ぎドキュメント | ✅ |
 
 ---
 
@@ -52,42 +54,30 @@
 get_project_context("SpirrowUnrealWise")
 ```
 
-2. 次の実装プロンプト確認:
-```
-Docs/UMGPhase3_ArrayVariable_Prompt.md を参照
-```
+2. 残り機能から実装を選択
 
 ---
 
-## 次に実装: add_widget_array_variable
+## 次に実装推奨
 
-### 概要
+### オプション A: RenderTransform トラック対応
 
-Widget Blueprint に配列型変数（TArray<T>）を追加するツール。
+`add_animation_track` を拡張して以下をサポート:
+- `RenderTransform.Translation` - [X, Y] 移動
+- `RenderTransform.Scale` - [X, Y] 拡大縮小
+- `RenderTransform.Angle` - float (度) 回転
 
-### パラメータ
+### オプション B: set_widget_array_default
 
-| パラメータ | 型 | 必須 | 説明 |
-|-----------|-----|------|------|
-| widget_name | str | ✅ | Widget Blueprint名 |
-| variable_name | str | ✅ | 変数名 |
-| element_type | str | ✅ | 要素型（String, Integer, Float等） |
-| is_exposed | bool | | エディタ公開フラグ |
-| category | str | | 変数カテゴリ |
-| path | str | | Content Browser パス |
-
-### 実装ポイント
-
-- 既存の `SetupPinType` 関数を再利用
-- `ContainerType = EPinContainerType::Array` を設定
-- Blueprint コンパイル必須
-
-### 更新ファイル
-
-1. `SpirrowBridgeUMGCommands.h` - 関数宣言
-2. `SpirrowBridgeUMGCommands.cpp` - 実装 + ルーティング
-3. `SpirrowBridge.cpp` - ExecuteCommand ルーティング
-4. `Python/tools/umg_tools.py` - ツール定義
+配列変数のデフォルト値を設定するツール:
+```python
+set_widget_array_default(
+    widget_name="WBP_TT_TrapSelector",
+    variable_name="TrapNames",
+    default_values=["Explosion", "Spike", "Freeze"],
+    path="/Game/TrapxTrap/UI"
+)
+```
 
 ---
 
@@ -96,6 +86,7 @@ Widget Blueprint に配列型変数（TArray<T>）を追加するツール。
 - Build.cs に `"MovieScene"`, `"MovieSceneTracks"` 追加済み
 - UE 5.7 では `TArray64<uint8>` が必要な箇所あり
 - 非推奨 API は `PRAGMA_DISABLE_DEPRECATION_WARNINGS` で抑制済み
+- 配列変数は `ContainerType = EPinContainerType::Array` で設定
 
 ---
 

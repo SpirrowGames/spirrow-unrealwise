@@ -1666,4 +1666,86 @@ def register_umg_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    @mcp.tool()
+    def add_widget_array_variable(
+        ctx: Context,
+        widget_name: str,
+        variable_name: str,
+        element_type: str,
+        is_exposed: bool = False,
+        category: str = None,
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add an array variable to a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            variable_name: Name for the new array variable (e.g., "TrapNames")
+            element_type: Type of array elements - "Boolean", "Integer", "Float", "String",
+                          "Text", "Vector", "Vector2D", "LinearColor", "Texture2D", "Object"
+            is_exposed: Whether to expose the variable in the editor
+            category: Category name for the variable in the editor
+            path: Content browser path to the widget
+
+        Returns:
+            Dict containing success status and variable details
+
+        Supported Element Types:
+            - Primitives: Boolean, Integer, Float, String, Text
+            - Math: Vector, Vector2D
+            - Visuals: LinearColor, Texture2D
+            - System: Object
+
+        Example:
+            # String array for trap names
+            add_widget_array_variable(
+                widget_name="WBP_TT_TrapSelector",
+                variable_name="TrapNames",
+                element_type="String",
+                path="/Game/TrapxTrap/UI"
+            )
+
+            # Texture2D array for trap icons
+            add_widget_array_variable(
+                widget_name="WBP_TT_TrapSelector",
+                variable_name="TrapIcons",
+                element_type="Texture2D",
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "variable_name": variable_name,
+                "element_type": element_type,
+                "is_exposed": is_exposed,
+                "path": path
+            }
+
+            if category is not None:
+                params["category"] = category
+
+            logger.info(f"Adding widget array variable with params: {params}")
+            response = unreal.send_command("add_widget_array_variable", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add widget array variable response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding widget array variable: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("UMG tools registered successfully") 

@@ -317,7 +317,9 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("create_widget_animation") ||
                      CommandType == TEXT("add_animation_track") ||
                      CommandType == TEXT("add_animation_keyframe") ||
-                     CommandType == TEXT("get_widget_animations"))
+                     CommandType == TEXT("get_widget_animations") ||
+                     // Phase 3: Array Variable Operations
+                     CommandType == TEXT("add_widget_array_variable"))
             {
                 ResultJson = UMGCommands->HandleCommand(CommandType, Params);
             }

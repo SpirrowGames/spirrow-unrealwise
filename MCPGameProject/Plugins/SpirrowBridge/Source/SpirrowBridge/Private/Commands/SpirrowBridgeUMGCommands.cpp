@@ -39,6 +39,11 @@
 // Phase 3: Animation support
 #include "Animation/WidgetAnimation.h"
 #include "MovieScene.h"
+#include "Tracks/MovieSceneFloatTrack.h"
+#include "Tracks/MovieSceneColorTrack.h"
+#include "Sections/MovieSceneFloatSection.h"
+#include "Sections/MovieSceneColorSection.h"
+#include "Channels/MovieSceneFloatChannel.h"
 
 FSpirrowBridgeUMGCommands::FSpirrowBridgeUMGCommands()
 {
@@ -136,6 +141,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleCommand(const FString& 
 	else if (CommandName == TEXT("create_widget_animation"))
 	{
 		return HandleCreateWidgetAnimation(Params);
+	}
+	else if (CommandName == TEXT("add_animation_track"))
+	{
+		return HandleAddAnimationTrack(Params);
+	}
+	else if (CommandName == TEXT("add_animation_keyframe"))
+	{
+		return HandleAddAnimationKeyframe(Params);
 	}
 
 	return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown UMG command: %s"), *CommandName));
@@ -2844,4 +2857,339 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleCreateWidgetAnimation(c
 	ResultObj->SetBoolField(TEXT("loop"), bLoop);
 
 	return ResultObj;
+}
+
+// Phase 3: Add Animation Track
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleAddAnimationTrack(const TSharedPtr<FJsonObject>& Params)
+{
+	// Get parameters
+	FString WidgetName = Params->GetStringField(TEXT("widget_name"));
+	FString AnimationName = Params->GetStringField(TEXT("animation_name"));
+	FString TargetWidgetName = Params->GetStringField(TEXT("target_widget"));
+	FString PropertyName = Params->GetStringField(TEXT("property_name"));
+	FString Path = Params->HasField(TEXT("path")) ? Params->GetStringField(TEXT("path")) : TEXT("/Game/UI");
+
+	// Load Widget Blueprint
+	FString AssetPath = FString::Printf(TEXT("%s/%s.%s"), *Path, *WidgetName, *WidgetName);
+	UWidgetBlueprint* WidgetBP = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
+	if (!WidgetBP)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Widget Blueprint not found: %s"), *AssetPath));
+	}
+
+	// Find the animation
+	UWidgetAnimation* Animation = nullptr;
+	for (UWidgetAnimation* Anim : WidgetBP->Animations)
+	{
+		if (Anim && Anim->GetName() == AnimationName)
+		{
+			Animation = Anim;
+			break;
+		}
+	}
+
+	if (!Animation)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Animation not found: %s"), *AnimationName));
+	}
+
+	UMovieScene* MovieScene = Animation->GetMovieScene();
+	if (!MovieScene)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("MovieScene not found in animation"));
+	}
+
+	// Find target widget
+	UWidget* TargetWidget = nullptr;
+	if (WidgetBP->WidgetTree)
+	{
+		TargetWidget = WidgetBP->WidgetTree->FindWidget(FName(*TargetWidgetName));
+	}
+
+	if (!TargetWidget)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Target widget not found: %s"), *TargetWidgetName));
+	}
+
+	// Find or create Possessable (binding target)
+	FGuid BindingGuid;
+	bool bFoundBinding = false;
+
+	for (int32 i = 0; i < MovieScene->GetPossessableCount(); ++i)
+	{
+		const FMovieScenePossessable& Possessable = MovieScene->GetPossessable(i);
+		if (Possessable.GetName() == TargetWidgetName)
+		{
+			BindingGuid = Possessable.GetGuid();
+			bFoundBinding = true;
+			break;
+		}
+	}
+
+	if (!bFoundBinding)
+	{
+		// Create new Possessable
+		BindingGuid = MovieScene->AddPossessable(TargetWidgetName, TargetWidget->GetClass());
+
+		// Add binding to Animation's AnimationBindings
+		FWidgetAnimationBinding Binding;
+		Binding.WidgetName = FName(*TargetWidgetName);
+		Binding.SlotWidgetName = NAME_None;
+		Binding.AnimationGuid = BindingGuid;
+		Binding.bIsRootWidget = false;
+		Animation->AnimationBindings.Add(Binding);
+	}
+
+	// Create track based on property
+	FString TrackDisplayName;
+
+	if (PropertyName == TEXT("Opacity") || PropertyName == TEXT("RenderOpacity"))
+	{
+		// Float track (Opacity)
+		UMovieSceneFloatTrack* Track = MovieScene->AddTrack<UMovieSceneFloatTrack>(BindingGuid);
+		if (Track)
+		{
+			Track->SetPropertyNameAndPath(FName("RenderOpacity"), "RenderOpacity");
+
+			// Add section
+			UMovieSceneFloatSection* Section = Cast<UMovieSceneFloatSection>(Track->CreateNewSection());
+			if (Section)
+			{
+				Section->SetRange(TRange<FFrameNumber>::All());
+				Track->AddSection(*Section);
+			}
+
+			TrackDisplayName = TEXT("RenderOpacity");
+		}
+	}
+	else if (PropertyName == TEXT("ColorAndOpacity"))
+	{
+		// Color track
+		UMovieSceneColorTrack* Track = MovieScene->AddTrack<UMovieSceneColorTrack>(BindingGuid);
+		if (Track)
+		{
+			Track->SetPropertyNameAndPath(FName("ColorAndOpacity"), "ColorAndOpacity");
+
+			UMovieSceneColorSection* Section = Cast<UMovieSceneColorSection>(Track->CreateNewSection());
+			if (Section)
+			{
+				Section->SetRange(TRange<FFrameNumber>::All());
+				Track->AddSection(*Section);
+			}
+
+			TrackDisplayName = TEXT("ColorAndOpacity");
+		}
+	}
+	else
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Unsupported property: %s. Supported: Opacity, RenderOpacity, ColorAndOpacity"), *PropertyName));
+	}
+
+	// Save
+	WidgetBP->MarkPackageDirty();
+	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+	// Create response
+	TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject());
+	Response->SetBoolField(TEXT("success"), true);
+	Response->SetStringField(TEXT("widget_name"), WidgetName);
+	Response->SetStringField(TEXT("animation_name"), AnimationName);
+	Response->SetStringField(TEXT("target_widget"), TargetWidgetName);
+	Response->SetStringField(TEXT("property_name"), TrackDisplayName);
+	Response->SetStringField(TEXT("binding_guid"), BindingGuid.ToString());
+
+	return Response;
+}
+
+// Phase 3: Add Animation Keyframe
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleAddAnimationKeyframe(const TSharedPtr<FJsonObject>& Params)
+{
+	// Get parameters
+	FString WidgetName = Params->GetStringField(TEXT("widget_name"));
+	FString AnimationName = Params->GetStringField(TEXT("animation_name"));
+	FString TargetWidgetName = Params->GetStringField(TEXT("target_widget"));
+	FString PropertyName = Params->GetStringField(TEXT("property_name"));
+	double Time = Params->GetNumberField(TEXT("time"));
+	FString Interpolation = Params->HasField(TEXT("interpolation")) ?
+		Params->GetStringField(TEXT("interpolation")) : TEXT("Linear");
+	FString Path = Params->HasField(TEXT("path")) ?
+		Params->GetStringField(TEXT("path")) : TEXT("/Game/UI");
+
+	// Load Widget Blueprint
+	FString AssetPath = FString::Printf(TEXT("%s/%s.%s"), *Path, *WidgetName, *WidgetName);
+	UWidgetBlueprint* WidgetBP = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
+	if (!WidgetBP)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Widget Blueprint not found: %s"), *AssetPath));
+	}
+
+	// Find the animation
+	UWidgetAnimation* Animation = nullptr;
+	for (UWidgetAnimation* Anim : WidgetBP->Animations)
+	{
+		if (Anim && Anim->GetName() == AnimationName)
+		{
+			Animation = Anim;
+			break;
+		}
+	}
+
+	if (!Animation)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Animation not found: %s"), *AnimationName));
+	}
+
+	UMovieScene* MovieScene = Animation->GetMovieScene();
+	if (!MovieScene)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("MovieScene not found"));
+	}
+
+	// Find Possessable binding GUID
+	FGuid BindingGuid;
+	bool bFoundBinding = false;
+
+	for (int32 i = 0; i < MovieScene->GetPossessableCount(); ++i)
+	{
+		const FMovieScenePossessable& Possessable = MovieScene->GetPossessable(i);
+		if (Possessable.GetName() == TargetWidgetName)
+		{
+			BindingGuid = Possessable.GetGuid();
+			bFoundBinding = true;
+			break;
+		}
+	}
+
+	if (!bFoundBinding)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("No binding found for widget: %s. Add a track first."), *TargetWidgetName));
+	}
+
+	// Calculate frame number
+	FFrameRate TickResolution = MovieScene->GetTickResolution();
+	FFrameNumber FrameNumber = (Time * TickResolution).FloorToFrame();
+
+	// Determine interpolation type
+	ERichCurveInterpMode InterpMode = RCIM_Linear;
+	if (Interpolation == TEXT("Cubic"))
+	{
+		InterpMode = RCIM_Cubic;
+	}
+	else if (Interpolation == TEXT("Constant"))
+	{
+		InterpMode = RCIM_Constant;
+	}
+
+	// Add keyframe based on property
+	if (PropertyName == TEXT("Opacity") || PropertyName == TEXT("RenderOpacity"))
+	{
+		// Get Float value
+		double Value = Params->GetNumberField(TEXT("value"));
+
+		// Find Float track
+		UMovieSceneFloatTrack* Track = MovieScene->FindTrack<UMovieSceneFloatTrack>(BindingGuid);
+		if (!Track)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				TEXT("Float track not found. Add a track first using add_animation_track."));
+		}
+
+		// Get section
+		if (Track->GetAllSections().Num() == 0)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("No section found in track"));
+		}
+
+		UMovieSceneFloatSection* Section = Cast<UMovieSceneFloatSection>(Track->GetAllSections()[0]);
+		if (!Section)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Invalid section"));
+		}
+
+		// Get channel and add keyframe
+		FMovieSceneFloatChannel* Channel = Section->GetChannelProxy().GetChannel<FMovieSceneFloatChannel>(0);
+		if (Channel)
+		{
+			FMovieSceneFloatValue KeyValue(Value);
+			KeyValue.InterpMode = InterpMode;
+			Channel->AddKeys({FrameNumber}, {KeyValue});
+		}
+	}
+	else if (PropertyName == TEXT("ColorAndOpacity"))
+	{
+		// Get Color value [R, G, B, A]
+		const TArray<TSharedPtr<FJsonValue>>* ColorArray;
+		if (!Params->TryGetArrayField(TEXT("value"), ColorArray) || ColorArray->Num() < 4)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				TEXT("ColorAndOpacity requires [R, G, B, A] array"));
+		}
+
+		float R = (*ColorArray)[0]->AsNumber();
+		float G = (*ColorArray)[1]->AsNumber();
+		float B = (*ColorArray)[2]->AsNumber();
+		float A = (*ColorArray)[3]->AsNumber();
+
+		// Find Color track
+		UMovieSceneColorTrack* Track = MovieScene->FindTrack<UMovieSceneColorTrack>(BindingGuid);
+		if (!Track)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				TEXT("Color track not found. Add a track first."));
+		}
+
+		if (Track->GetAllSections().Num() == 0)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("No section found in color track"));
+		}
+
+		UMovieSceneColorSection* Section = Cast<UMovieSceneColorSection>(Track->GetAllSections()[0]);
+		if (!Section)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Invalid color section"));
+		}
+
+		// Add keyframe to each channel (R, G, B, A)
+		TArrayView<FMovieSceneFloatChannel*> Channels = Section->GetChannelProxy().GetChannels<FMovieSceneFloatChannel>();
+		if (Channels.Num() >= 4)
+		{
+			FMovieSceneFloatValue RValue(R); RValue.InterpMode = InterpMode;
+			FMovieSceneFloatValue GValue(G); GValue.InterpMode = InterpMode;
+			FMovieSceneFloatValue BValue(B); BValue.InterpMode = InterpMode;
+			FMovieSceneFloatValue AValue(A); AValue.InterpMode = InterpMode;
+
+			Channels[0]->AddKeys({FrameNumber}, {RValue});
+			Channels[1]->AddKeys({FrameNumber}, {GValue});
+			Channels[2]->AddKeys({FrameNumber}, {BValue});
+			Channels[3]->AddKeys({FrameNumber}, {AValue});
+		}
+	}
+	else
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Unsupported property for keyframe: %s"), *PropertyName));
+	}
+
+	// Save
+	WidgetBP->MarkPackageDirty();
+
+	// Response
+	TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject());
+	Response->SetBoolField(TEXT("success"), true);
+	Response->SetStringField(TEXT("widget_name"), WidgetName);
+	Response->SetStringField(TEXT("animation_name"), AnimationName);
+	Response->SetStringField(TEXT("target_widget"), TargetWidgetName);
+	Response->SetStringField(TEXT("property_name"), PropertyName);
+	Response->SetNumberField(TEXT("time"), Time);
+	Response->SetNumberField(TEXT("frame"), FrameNumber.Value);
+	Response->SetStringField(TEXT("interpolation"), Interpolation);
+
+	return Response;
 }

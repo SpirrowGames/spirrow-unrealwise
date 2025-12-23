@@ -1462,4 +1462,153 @@ def register_umg_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    @mcp.tool()
+    def add_animation_track(
+        ctx: Context,
+        widget_name: str,
+        animation_name: str,
+        target_widget: str,
+        property_name: str,
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add an animation track to a Widget Animation.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            animation_name: Name of the animation to add track to
+            target_widget: Name of the widget element to animate (e.g., "MainContainer")
+            property_name: Property to animate:
+                - "Opacity" or "RenderOpacity": Float track for opacity
+                - "ColorAndOpacity": Color track for tint color
+            path: Content browser path to the widget (default: "/Game/UI")
+
+        Returns:
+            Dict containing success status and track details
+
+        Example:
+            add_animation_track(
+                widget_name="WBP_TT_TrapSelector",
+                animation_name="FadeIn",
+                target_widget="MainContainer",
+                property_name="Opacity",
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "animation_name": animation_name,
+                "target_widget": target_widget,
+                "property_name": property_name,
+                "path": path
+            }
+
+            logger.info(f"Adding animation track with params: {params}")
+            response = unreal.send_command("add_animation_track", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add animation track response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding animation track: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def add_animation_keyframe(
+        ctx: Context,
+        widget_name: str,
+        animation_name: str,
+        target_widget: str,
+        property_name: str,
+        time: float,
+        value: Any,
+        interpolation: str = "Linear",
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add a keyframe to an animation track.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            animation_name: Name of the animation
+            target_widget: Name of the widget element being animated
+            property_name: Property being animated (must match existing track)
+            time: Time in seconds for the keyframe
+            value: Value for the keyframe:
+                - Opacity: float (0.0 - 1.0)
+                - ColorAndOpacity: [R, G, B, A] array (each 0.0 - 1.0)
+            interpolation: Interpolation mode - "Linear", "Cubic", or "Constant"
+            path: Content browser path to the widget
+
+        Returns:
+            Dict containing success status and keyframe details
+
+        Example:
+            # Fade from transparent to opaque
+            add_animation_keyframe(
+                widget_name="WBP_TT_TrapSelector",
+                animation_name="FadeIn",
+                target_widget="MainContainer",
+                property_name="Opacity",
+                time=0.0,
+                value=0.0,
+                path="/Game/TrapxTrap/UI"
+            )
+            add_animation_keyframe(
+                widget_name="WBP_TT_TrapSelector",
+                animation_name="FadeIn",
+                target_widget="MainContainer",
+                property_name="Opacity",
+                time=0.5,
+                value=1.0,
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "animation_name": animation_name,
+                "target_widget": target_widget,
+                "property_name": property_name,
+                "time": time,
+                "value": value,
+                "interpolation": interpolation,
+                "path": path
+            }
+
+            logger.info(f"Adding animation keyframe with params: {params}")
+            response = unreal.send_command("add_animation_keyframe", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add animation keyframe response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding animation keyframe: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("UMG tools registered successfully") 

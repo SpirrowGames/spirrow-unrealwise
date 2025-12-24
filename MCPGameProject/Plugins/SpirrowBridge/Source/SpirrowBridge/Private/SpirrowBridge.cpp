@@ -318,8 +318,12 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("add_animation_track") ||
                      CommandType == TEXT("add_animation_keyframe") ||
                      CommandType == TEXT("get_widget_animations") ||
-                     // Phase 3: Array Variable Operations
-                     CommandType == TEXT("add_widget_array_variable"))
+                     CommandType == TEXT("add_widget_array_variable") ||
+                     // Phase 4-A: Interactive Widgets
+                     CommandType == TEXT("add_button_to_widget_v2") ||
+                     CommandType == TEXT("bind_widget_component_event") ||
+                     CommandType == TEXT("add_slider_to_widget") ||
+                     CommandType == TEXT("add_checkbox_to_widget"))
             {
                 ResultJson = UMGCommands->HandleCommand(CommandType, Params);
             }

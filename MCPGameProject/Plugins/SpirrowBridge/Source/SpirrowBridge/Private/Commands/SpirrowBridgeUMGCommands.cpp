@@ -3919,18 +3919,41 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleBindWidgetComponentEven
 		}
 	}
 
+	// Ensure widget is bound as a variable first
+	FObjectProperty* WidgetProperty = FindFProperty<FObjectProperty>(WidgetBP->SkeletonGeneratedClass, FName(*ComponentName));
+	if (!WidgetProperty)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Widget '%s' must be bound as a variable first. Use bind_widget_to_variable tool."), *ComponentName));
+	}
+
 	// Create component bound event using FKismetEditorUtilities
-	FName EventName = FName(*(ComponentName + TEXT("_") + EventType.ToString()));
-	UEdGraphNode* EventNode = FKismetEditorUtilities::CreateNewBoundEventForComponent(
+	FKismetEditorUtilities::CreateNewBoundEventForComponent(
 		WidgetComponent,
 		EventPropertyName,
 		WidgetBP,
-		EventName
+		WidgetProperty
 	);
+
+	// Find the created event node in the EventGraph
+	UEdGraphNode* EventNode = nullptr;
+	FString ExpectedNodeName = ComponentName + TEXT("_") + EventType;
+	for (UEdGraphNode* Node : EventGraph->Nodes)
+	{
+		if (UK2Node_ComponentBoundEvent* BoundEventNode = Cast<UK2Node_ComponentBoundEvent>(Node))
+		{
+			if (BoundEventNode->DelegatePropertyName == EventPropertyName &&
+				BoundEventNode->ComponentPropertyName == FName(*ComponentName))
+			{
+				EventNode = BoundEventNode;
+				break;
+			}
+		}
+	}
 
 	if (!EventNode)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create event binding"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to find created event node"));
 	}
 
 	// If we have a function, connect the event to call it

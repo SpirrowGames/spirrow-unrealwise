@@ -121,68 +121,6 @@ def register_umg_tools(mcp: FastMCP):
             return {"success": False, "message": error_msg}
 
     @mcp.tool()
-    def add_button_to_widget(
-        ctx: Context,
-        widget_name: str,
-        button_name: str,
-        text: str = "",
-        position: List[float] = [0.0, 0.0],
-        size: List[float] = [200.0, 50.0],
-        font_size: int = 12,
-        color: List[float] = [1.0, 1.0, 1.0, 1.0],
-        background_color: List[float] = [0.1, 0.1, 0.1, 1.0]
-    ) -> Dict[str, Any]:
-        """
-        Add a Button widget to a UMG Widget Blueprint.
-        
-        Args:
-            widget_name: Name of the target Widget Blueprint
-            button_name: Name to give the new Button
-            text: Text to display on the button
-            position: [X, Y] position in the canvas panel
-            size: [Width, Height] of the button
-            font_size: Font size for button text
-            color: [R, G, B, A] text color values (0.0 to 1.0)
-            background_color: [R, G, B, A] button background color values (0.0 to 1.0)
-            
-        Returns:
-            Dict containing success status and button properties
-        """
-        from unreal_mcp_server import get_unreal_connection
-        
-        try:
-            unreal = get_unreal_connection()
-            if not unreal:
-                logger.error("Failed to connect to Unreal Engine")
-                return {"success": False, "message": "Failed to connect to Unreal Engine"}
-            
-            params = {
-                "widget_name": widget_name,
-                "button_name": button_name,
-                "text": text,
-                "position": position,
-                "size": size,
-                "font_size": font_size,
-                "color": color,
-                "background_color": background_color
-            }
-            
-            logger.info(f"Adding Button to widget with params: {params}")
-            response = unreal.send_command("add_button_to_widget", params)
-            
-            if not response:
-                logger.error("No response from Unreal Engine")
-                return {"success": False, "message": "No response from Unreal Engine"}
-            
-            logger.info(f"Add Button response: {response}")
-            return response
-            
-        except Exception as e:
-            error_msg = f"Error adding Button to widget: {e}"
-            logger.error(error_msg)
-            return {"success": False, "message": error_msg}
-
-    @mcp.tool()
     def bind_widget_event(
         ctx: Context,
         widget_name: str,

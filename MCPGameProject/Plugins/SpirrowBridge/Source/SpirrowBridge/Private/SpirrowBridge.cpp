@@ -288,6 +288,7 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("add_sequence_node") ||
                      CommandType == TEXT("add_delay_node") ||
                      CommandType == TEXT("add_foreach_loop_node") ||
+                     CommandType == TEXT("add_forloop_with_break_node") ||
                      // Debug & utility nodes
                      CommandType == TEXT("add_print_string_node") ||
                      // Math & comparison nodes

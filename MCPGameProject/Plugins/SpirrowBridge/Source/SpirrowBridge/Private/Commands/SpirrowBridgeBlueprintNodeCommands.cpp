@@ -1855,58 +1855,48 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddMathNode(c
     }
 
     // Map operation to function name
-    FName FunctionName;
-    bool bIsIntType = ValueType.Equals(TEXT("Int"), ESearchCase::IgnoreCase);
-
-    if (Operation.Equals(TEXT("Add"), ESearchCase::IgnoreCase))
+    FName FunctionName = NAME_None;
+    if (ValueType == TEXT("Float"))
     {
-        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Add_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Add_FloatFloat);
+        if (Operation == TEXT("Add")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Add_FloatFloat);
+        else if (Operation == TEXT("Subtract")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Subtract_FloatFloat);
+        else if (Operation == TEXT("Multiply")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Multiply_FloatFloat);
+        else if (Operation == TEXT("Divide")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Divide_FloatFloat);
     }
-    else if (Operation.Equals(TEXT("Subtract"), ESearchCase::IgnoreCase))
+    else if (ValueType == TEXT("Int"))
     {
-        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Subtract_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Subtract_FloatFloat);
-    }
-    else if (Operation.Equals(TEXT("Multiply"), ESearchCase::IgnoreCase))
-    {
-        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Multiply_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Multiply_FloatFloat);
-    }
-    else if (Operation.Equals(TEXT("Divide"), ESearchCase::IgnoreCase))
-    {
-        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Divide_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Divide_FloatFloat);
-    }
-    else
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown operation: %s. Use Add, Subtract, Multiply, or Divide"), *Operation));
+        if (Operation == TEXT("Add")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Add_IntInt);
+        else if (Operation == TEXT("Subtract")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Subtract_IntInt);
+        else if (Operation == TEXT("Multiply")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Multiply_IntInt);
+        else if (Operation == TEXT("Divide")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Divide_IntInt);
     }
 
-    // Create the function call node using SetExternalMember
+    if (FunctionName == NAME_None)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Unsupported operation/type: %s/%s"), *Operation, *ValueType));
+    }
+
+    // UK2Node_CallFunction を作成
     UK2Node_CallFunction* MathNode = NewObject<UK2Node_CallFunction>(EventGraph);
-    if (!MathNode)
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create math node"));
-    }
-
-    // Set up function reference
     MathNode->FunctionReference.SetExternalMember(FunctionName, UKismetMathLibrary::StaticClass());
     MathNode->NodePosX = NodePosition.X;
     MathNode->NodePosY = NodePosition.Y;
-
-    // Add to graph
-    EventGraph->AddNode(MathNode, false, false);
-    MathNode->CreateNewGuid();
-    MathNode->PostPlacedNewNode();
     MathNode->AllocateDefaultPins();
+    EventGraph->AddNode(MathNode, false, false);
 
-    // Mark the blueprint as modified
+    // Blueprintをマーク
     FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
 
     UE_LOG(LogTemp, Log, TEXT("Created math node: %s (%s)"), *Operation, *ValueType);
 
-    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
-    ResultObj->SetStringField(TEXT("node_id"), MathNode->NodeGuid.ToString());
-    ResultObj->SetStringField(TEXT("operation"), Operation);
-    ResultObj->SetStringField(TEXT("value_type"), ValueType);
-    return ResultObj;
+    // 結果を返す
+    TSharedPtr<FJsonObject> ResultJson = MakeShareable(new FJsonObject());
+    ResultJson->SetStringField(TEXT("node_id"), MathNode->NodeGuid.ToString());
+    ResultJson->SetStringField(TEXT("operation"), Operation);
+    ResultJson->SetStringField(TEXT("value_type"), ValueType);
+
+    return FSpirrowBridgeCommonUtils::CreateSuccessResponse(ResultJson);
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddComparisonNode(const TSharedPtr<FJsonObject>& Params)
@@ -1957,64 +1947,50 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddComparison
     }
 
     // Map operation to function name
-    FName FunctionName;
-    bool bIsIntType = ValueType.Equals(TEXT("Int"), ESearchCase::IgnoreCase);
-
-    if (Operation.Equals(TEXT("Greater"), ESearchCase::IgnoreCase))
+    FName FunctionName = NAME_None;
+    if (ValueType == TEXT("Float"))
     {
-        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Greater_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Greater_FloatFloat);
+        if (Operation == TEXT("Greater")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Greater_FloatFloat);
+        else if (Operation == TEXT("GreaterEqual")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, GreaterEqual_FloatFloat);
+        else if (Operation == TEXT("Less")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Less_FloatFloat);
+        else if (Operation == TEXT("LessEqual")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, LessEqual_FloatFloat);
+        else if (Operation == TEXT("Equal")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, EqualEqual_FloatFloat);
+        else if (Operation == TEXT("NotEqual")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, NotEqual_FloatFloat);
     }
-    else if (Operation.Equals(TEXT("GreaterEqual"), ESearchCase::IgnoreCase))
+    else if (ValueType == TEXT("Int"))
     {
-        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, GreaterEqual_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, GreaterEqual_FloatFloat);
-    }
-    else if (Operation.Equals(TEXT("Less"), ESearchCase::IgnoreCase))
-    {
-        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Less_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Less_FloatFloat);
-    }
-    else if (Operation.Equals(TEXT("LessEqual"), ESearchCase::IgnoreCase))
-    {
-        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, LessEqual_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, LessEqual_FloatFloat);
-    }
-    else if (Operation.Equals(TEXT("Equal"), ESearchCase::IgnoreCase))
-    {
-        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, EqualEqual_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, EqualEqual_FloatFloat);
-    }
-    else if (Operation.Equals(TEXT("NotEqual"), ESearchCase::IgnoreCase))
-    {
-        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, NotEqual_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, NotEqual_FloatFloat);
-    }
-    else
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown operation: %s. Use Greater, GreaterEqual, Less, LessEqual, Equal, or NotEqual"), *Operation));
+        if (Operation == TEXT("Greater")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Greater_IntInt);
+        else if (Operation == TEXT("GreaterEqual")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, GreaterEqual_IntInt);
+        else if (Operation == TEXT("Less")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Less_IntInt);
+        else if (Operation == TEXT("LessEqual")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, LessEqual_IntInt);
+        else if (Operation == TEXT("Equal")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, EqualEqual_IntInt);
+        else if (Operation == TEXT("NotEqual")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, NotEqual_IntInt);
     }
 
-    // Create the function call node using SetExternalMember
-    UK2Node_CallFunction* ComparisonNode = NewObject<UK2Node_CallFunction>(EventGraph);
-    if (!ComparisonNode)
+    if (FunctionName == NAME_None)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create comparison node"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Unsupported comparison/type: %s/%s"), *Operation, *ValueType));
     }
 
-    // Set up function reference
-    ComparisonNode->FunctionReference.SetExternalMember(FunctionName, UKismetMathLibrary::StaticClass());
-    ComparisonNode->NodePosX = NodePosition.X;
-    ComparisonNode->NodePosY = NodePosition.Y;
+    // UK2Node_CallFunction を作成
+    UK2Node_CallFunction* CompareNode = NewObject<UK2Node_CallFunction>(EventGraph);
+    CompareNode->FunctionReference.SetExternalMember(FunctionName, UKismetMathLibrary::StaticClass());
+    CompareNode->NodePosX = NodePosition.X;
+    CompareNode->NodePosY = NodePosition.Y;
+    CompareNode->AllocateDefaultPins();
+    EventGraph->AddNode(CompareNode, false, false);
 
-    // Add to graph
-    EventGraph->AddNode(ComparisonNode, false, false);
-    ComparisonNode->CreateNewGuid();
-    ComparisonNode->PostPlacedNewNode();
-    ComparisonNode->AllocateDefaultPins();
-
-    // Mark the blueprint as modified
+    // Blueprintをマーク
     FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
 
     UE_LOG(LogTemp, Log, TEXT("Created comparison node: %s (%s)"), *Operation, *ValueType);
 
-    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
-    ResultObj->SetStringField(TEXT("node_id"), ComparisonNode->NodeGuid.ToString());
-    ResultObj->SetStringField(TEXT("operation"), Operation);
-    ResultObj->SetStringField(TEXT("value_type"), ValueType);
-    return ResultObj;
+    // 結果を返す
+    TSharedPtr<FJsonObject> ResultJson = MakeShareable(new FJsonObject());
+    ResultJson->SetStringField(TEXT("node_id"), CompareNode->NodeGuid.ToString());
+    ResultJson->SetStringField(TEXT("operation"), Operation);
+    ResultJson->SetStringField(TEXT("value_type"), ValueType);
+
+    return FSpirrowBridgeCommonUtils::CreateSuccessResponse(ResultJson);
 } 

@@ -60,16 +60,17 @@
 | `delete_blueprint_node` | ✅ 動作OK | ノード削除 |
 | `move_blueprint_node` | ✅ 動作OK | ノード位置移動 |
 
-### ノード操作（制御フロー・ユーティリティ）🆕
+### ノード操作（制御フロー・ユーティリティ）
 
 | ツール | 状態 | 備考 |
 |--------|------|------|
 | `add_sequence_node` | ✅ 動作OK | Sequenceノード追加（2-10出力対応）|
 | `add_delay_node` | ✅ 動作OK | Delayノード追加（秒指定）|
 | `add_print_string_node` | ✅ 動作OK | PrintStringノード追加（デバッグ用）|
-| `add_foreach_loop_node` | ⚠️ 未対応 | マクロ実装のため別アプローチが必要 |
-| `add_math_node` | ⚠️ 未対応 | UK2Node_CommutativeAssociativeBinaryOperator実装が必要 |
-| `add_comparison_node` | ⚠️ 未対応 | 同上 |
+| `add_foreach_loop_node` | 🚫 非推奨 | Blueprintマクロのため実装不可。`add_forloop_with_break_node`使用 |
+| `add_forloop_with_break_node` | ✅ 実装済み | ForLoopWithBreakマクロノード追加（UE 5.7対応）|
+| `add_math_node` | ✅ 実装済み | Math演算ノード追加（UE 5.7 DoubleDouble対応）|
+| `add_comparison_node` | ✅ 実装済み | 比較ノード追加（UE 5.7 DoubleDouble対応）|
 
 ### UMG Widget操作
 
@@ -250,7 +251,66 @@
 
 ## 最新の更新履歴
 
-### 2025-12-25: 制御フロー・ユーティリティノードツール追加 🆕
+### 2025-01-26: Math/Comparison & ForLoopWithBreak 実装完了 🆕
+
+**完了機能**:
+- Math/Comparisonノードの完全実装（UE 5.7対応）
+- ForLoopWithBreakノードの実装
+- ForEachLoopノードの非推奨化
+- ノードツール合計21個（実装済み20個 + 非推奨1個）
+
+**新規実装ツール**:
+- `add_forloop_with_break_node` - 指定回数イテレーション用マクロノード
+  - UK2Node_MacroInstanceを使用してStandardMacrosからロード
+  - ノードGUID生成の修正（CreateNewGuid + PostPlacedNewNode）
+  - UE 5.7で完全テスト済み
+
+- `add_math_node` - Math演算ノード（Add, Subtract, Multiply, Divide）
+  - UE 5.7のdouble型対応（FloatFloat→DoubleDouble）
+  - Float演算: Add_DoubleDouble, Subtract_DoubleDouble, Multiply_DoubleDouble, Divide_DoubleDouble
+  - Integer演算: Add_IntInt, Subtract_IntInt, Multiply_IntInt, Divide_IntInt
+  - FindFunctionByNameによる実行時関数検索を使用
+
+- `add_comparison_node` - 比較ノード（Greater, Less, Equal, NotEqual, GreaterEqual, LessEqual）
+  - UE 5.7のdouble型対応
+  - Float比較: Greater_DoubleDouble, Less_DoubleDouble, Equal_DoubleDouble, など
+  - Integer比較: Greater_IntInt, Less_IntInt, Equal_IntInt, など
+
+**非推奨化**:
+- `add_foreach_loop_node` - Blueprintマクロのため実装不可
+  - 代替手段: `add_forloop_with_break_node`を使用
+
+**技術的な改善**:
+- UE 5.5とUE 5.7間のAPI互換性対応（float→double型変更）
+- ノード初期化シーケンスの確立: AddNode → CreateNewGuid → PostPlacedNewNode → AllocateDefaultPins
+- コマンドルーティングの完全性確保（SpirrowBridge.cpp）
+- RAGサーバーのProject Context機能を固定doc_id方式に変更
+
+**修正されたバグ**:
+- ノードIDが00000000000000000000000000000000になる問題
+- Math/Comparisonノードでコンパイルエラー（FloatFloat→DoubleDouble）
+- add_forloop_with_break_nodeがコマンドリストに未登録
+
+**ドキュメント**:
+- `Docs/Tools/node_tools.md` - 日本語で完全更新、全修正内容反映
+- `Docs/Tools/README.md` - v0.7.0更新、日本語化
+- `Docs/NodeTools_MathComparison_Fix_Prompt.md` - Math/Comparison実装プロンプト
+- `Docs/NodeTools_ForLoopWithBreak_Prompt.md` - ForLoopWithBreak実装プロンプト
+- `Docs/ProjectContext_Fix_Prompt.md` - Project Context修正プロンプト
+
+**コミット履歴**:
+- `e84ff31` Update documentation: Add implementation prompts and tool references
+- `c0fde88` Add Blueprint Node Manipulation Tools (6 new tools)
+- `b645627` Implement UMG Phase 4-B: Additional Interactive Widgets
+- `690c707` Fix: UMG Phase 4-A command routing and remove duplicate API
+- `e42c196` Implement UMG Phase 4-A: Interactive Widgets (Button, Slider, CheckBox)
+- `128cceb` Fix: Generate valid node_id for ForLoopWithBreak nodes
+- `e391ef3` Fix: Register add_forloop_with_break_node in command routing
+- `a0e916a` Fix: Use FindFunctionByName for UE 5.7 compatibility
+
+---
+
+### 2025-12-25: 制御フロー・ユーティリティノードツール追加
 
 **完了機能**:
 - Sequenceノード、Delayノード、PrintStringノードの追加
@@ -260,11 +320,6 @@
 - `add_sequence_node` - 複数実行ブランチの順次実行（2-10出力対応）
 - `add_delay_node` - 遅延実行（秒指定）
 - `add_print_string_node` - デバッグ出力（メッセージ指定）
-
-**未実装（別アプローチが必要）**:
-- `add_foreach_loop_node` - Blueprintマクロとして実装されているため
-- `add_math_node` - UK2Node_CommutativeAssociativeBinaryOperator使用が必要
-- `add_comparison_node` - 同上
 
 **Sequenceノードのピン名**:
 - 入力: `execute`
@@ -460,7 +515,7 @@ create_material_from_template(
 - **トランスポート**: stdio（デフォルト）/ SSE（開発用）
 - **起動スクリプト**: start_mcp_server.ps1 / start_mcp_server.bat
 - **設定管理**: config.local.ps1 / config.local.bat（環境固有設定）
-- **最終確認日**: 2025-12-25
+- **最終確認日**: 2025-01-26
 
 ---
 

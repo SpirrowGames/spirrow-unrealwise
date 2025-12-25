@@ -987,10 +987,40 @@ def register_blueprint_node_tools(mcp: FastMCP):
         path: str = "/Game/Blueprints"
     ) -> Dict[str, Any]:
         """
-        Add a ForEach Loop node for iterating over arrays.
+        [DEPRECATED] ForEachLoop is a macro and cannot be added programmatically.
+        Use add_forloop_with_break_node instead.
 
         Args:
             blueprint_name: Name of the target Blueprint
+            node_position: Optional [X, Y] position in the graph
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Error message with alternative suggestion
+        """
+        return {
+            "success": False,
+            "message": "ForEachLoop is a Blueprint macro and cannot be added programmatically. "
+                       "Use add_forloop_with_break_node instead for iteration logic.",
+            "alternative": "add_forloop_with_break_node"
+        }
+
+    @mcp.tool()
+    def add_forloop_with_break_node(
+        ctx: Context,
+        blueprint_name: str,
+        first_index: int = 0,
+        last_index: int = 10,
+        node_position = None,
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Add a ForLoopWithBreak node for iterating a specified number of times.
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            first_index: Starting index (default: 0)
+            last_index: Ending index (default: 10)
             node_position: Optional [X, Y] position in the graph
             path: Content browser path where the blueprint is located
 
@@ -1000,12 +1030,21 @@ def register_blueprint_node_tools(mcp: FastMCP):
         Pins:
             Input:
                 - execute: Execution input
-                - Array: Array to iterate over
+                - FirstIndex: Starting index
+                - LastIndex: Ending index
             Output:
-                - Loop Body: Fires for each element
-                - Array Element: Current element
-                - Array Index: Current index
+                - LoopBody: Fires for each iteration
+                - Index: Current loop index
                 - Completed: Fires when loop finishes
+                - Break: Connect to break out of the loop
+
+        Example:
+            add_forloop_with_break_node(
+                blueprint_name="BP_Test",
+                first_index=0,
+                last_index=5,
+                node_position=[200, 0]
+            )
         """
         from unreal_mcp_server import get_unreal_connection
 
@@ -1015,27 +1054,29 @@ def register_blueprint_node_tools(mcp: FastMCP):
 
             params = {
                 "blueprint_name": blueprint_name,
+                "first_index": first_index,
+                "last_index": last_index,
                 "node_position": node_position,
                 "path": path
             }
-            
+
             unreal = get_unreal_connection()
             if not unreal:
                 logger.error("Failed to connect to Unreal Engine")
                 return {"success": False, "message": "Failed to connect to Unreal Engine"}
-            
-            logger.info(f"Adding ForEach loop node to blueprint '{blueprint_name}'")
-            response = unreal.send_command("add_foreach_loop_node", params)
+
+            logger.info(f"Adding ForLoopWithBreak node to blueprint '{blueprint_name}'")
+            response = unreal.send_command("add_forloop_with_break_node", params)
             
             if not response:
                 logger.error("No response from Unreal Engine")
                 return {"success": False, "message": "No response from Unreal Engine"}
-            
-            logger.info(f"ForEach loop node creation response: {response}")
+
+            logger.info(f"ForLoopWithBreak node creation response: {response}")
             return response
-            
+
         except Exception as e:
-            error_msg = f"Error adding ForEach loop node: {e}"
+            error_msg = f"Error adding ForLoopWithBreak node: {e}"
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
     

@@ -13,6 +13,7 @@
 #include "K2Node_IfThenElse.h"
 #include "K2Node_Self.h"
 #include "K2Node_ExecutionSequence.h"
+#include "K2Node_MacroInstance.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Kismet2/BlueprintEditorUtils.h"
@@ -114,7 +115,12 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleCommand(const
     {
         return HandleAddComparisonNode(Params);
     }
-    
+    // Control flow nodes
+    else if (CommandType == TEXT("add_forloop_with_break_node"))
+    {
+        return HandleAddForLoopWithBreakNode(Params);
+    }
+
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown blueprint node command: %s"), *CommandType));
 }
 
@@ -2009,4 +2015,115 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddComparison
     ResultJson->SetStringField(TEXT("value_type"), ValueType);
 
     return FSpirrowBridgeCommonUtils::CreateSuccessResponse(ResultJson);
-} 
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddForLoopWithBreakNode(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get required parameters
+    FString BlueprintName;
+    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+    }
+
+    // Get optional parameters
+    int32 FirstIndex = 0;
+    int32 LastIndex = 10;
+    if (Params->HasField(TEXT("first_index")))
+    {
+        FirstIndex = static_cast<int32>(Params->GetNumberField(TEXT("first_index")));
+    }
+    if (Params->HasField(TEXT("last_index")))
+    {
+        LastIndex = static_cast<int32>(Params->GetNumberField(TEXT("last_index")));
+    }
+
+    // Get position parameters (optional)
+    FVector2D NodePosition(0.0f, 0.0f);
+    if (Params->HasField(TEXT("node_position")))
+    {
+        NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
+    }
+
+    // Get path parameter (default: /Game/Blueprints)
+    FString Path;
+    if (!Params->TryGetStringField(TEXT("path"), Path))
+    {
+        Path = TEXT("/Game/Blueprints");
+    }
+
+    // Find the blueprint
+    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
+    if (!Blueprint)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+    }
+
+    // Get the event graph
+    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
+    if (!EventGraph)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get event graph"));
+    }
+
+    // ForLoopWithBreakマクロを取得
+    // エンジンのマクロライブラリから取得
+    UBlueprint* MacroLibrary = LoadObject<UBlueprint>(nullptr,
+        TEXT("/Engine/EditorBlueprintResources/StandardMacros.StandardMacros"));
+    if (!MacroLibrary)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            TEXT("Failed to load StandardMacros library"));
+    }
+
+    // ForLoopWithBreakマクロを検索
+    UEdGraph* MacroGraph = nullptr;
+    for (UEdGraph* Graph : MacroLibrary->MacroGraphs)
+    {
+        if (Graph && Graph->GetFName() == FName(TEXT("ForLoopWithBreak")))
+        {
+            MacroGraph = Graph;
+            break;
+        }
+    }
+
+    if (!MacroGraph)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            TEXT("Failed to find ForLoopWithBreak macro"));
+    }
+
+    // UK2Node_MacroInstance を作成
+    UK2Node_MacroInstance* MacroNode = NewObject<UK2Node_MacroInstance>(EventGraph);
+    MacroNode->SetMacroGraph(MacroGraph);
+    MacroNode->NodePosX = NodePosition.X;
+    MacroNode->NodePosY = NodePosition.Y;
+    MacroNode->AllocateDefaultPins();
+    EventGraph->AddNode(MacroNode, false, false);
+
+    // FirstIndex と LastIndex のデフォルト値を設定
+    UEdGraphPin* FirstIndexPin = MacroNode->FindPin(TEXT("FirstIndex"));
+    if (FirstIndexPin)
+    {
+        FirstIndexPin->DefaultValue = FString::FromInt(FirstIndex);
+    }
+
+    UEdGraphPin* LastIndexPin = MacroNode->FindPin(TEXT("LastIndex"));
+    if (LastIndexPin)
+    {
+        LastIndexPin->DefaultValue = FString::FromInt(LastIndex);
+    }
+
+    // Blueprintをマーク
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+    UE_LOG(LogTemp, Log, TEXT("Created ForLoopWithBreak node: FirstIndex=%d, LastIndex=%d"), FirstIndex, LastIndex);
+
+    // 結果を返す
+    TSharedPtr<FJsonObject> ResultJson = MakeShareable(new FJsonObject());
+    ResultJson->SetStringField(TEXT("node_id"), MacroNode->NodeGuid.ToString());
+    ResultJson->SetNumberField(TEXT("first_index"), FirstIndex);
+    ResultJson->SetNumberField(TEXT("last_index"), LastIndex);
+
+    return FSpirrowBridgeCommonUtils::CreateSuccessResponse(ResultJson);
+}

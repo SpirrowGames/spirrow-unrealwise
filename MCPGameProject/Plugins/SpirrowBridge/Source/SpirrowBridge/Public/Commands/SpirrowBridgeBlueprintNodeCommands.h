@@ -44,4 +44,7 @@ private:
     // Math & comparison nodes
     TSharedPtr<FJsonObject> HandleAddMathNode(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleAddComparisonNode(const TSharedPtr<FJsonObject>& Params);
-}; 
+
+    // Control flow nodes
+    TSharedPtr<FJsonObject> HandleAddForLoopWithBreakNode(const TSharedPtr<FJsonObject>& Params);
+};

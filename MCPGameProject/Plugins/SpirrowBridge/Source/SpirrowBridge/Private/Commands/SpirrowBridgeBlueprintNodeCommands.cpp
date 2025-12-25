@@ -8,8 +8,11 @@
 #include "K2Node_Event.h"
 #include "K2Node_CallFunction.h"
 #include "K2Node_VariableGet.h"
+#include "K2Node_VariableSet.h"
 #include "K2Node_InputAction.h"
+#include "K2Node_IfThenElse.h"
 #include "K2Node_Self.h"
+#include "Kismet/KismetMathLibrary.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "GameFramework/InputSettings.h"
@@ -57,6 +60,30 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleCommand(const
     else if (CommandType == TEXT("find_blueprint_nodes"))
     {
         return HandleFindBlueprintNodes(Params);
+    }
+    else if (CommandType == TEXT("set_node_pin_value"))
+    {
+        return HandleSetNodePinValue(Params);
+    }
+    else if (CommandType == TEXT("add_variable_get_node"))
+    {
+        return HandleAddVariableGetNode(Params);
+    }
+    else if (CommandType == TEXT("add_variable_set_node"))
+    {
+        return HandleAddVariableSetNode(Params);
+    }
+    else if (CommandType == TEXT("add_branch_node"))
+    {
+        return HandleAddBranchNode(Params);
+    }
+    else if (CommandType == TEXT("delete_node"))
+    {
+        return HandleDeleteNode(Params);
+    }
+    else if (CommandType == TEXT("move_node"))
+    {
+        return HandleMoveNode(Params);
     }
     
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown blueprint node command: %s"), *CommandType));
@@ -976,5 +1003,534 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleFindBlueprint
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
     ResultObj->SetArrayField(TEXT("node_guids"), NodeGuidArray);
     
+    return ResultObj;
+}
+
+// ==================== NEW NODE MANIPULATION COMMANDS ====================
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleSetNodePinValue(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get required parameters
+    FString BlueprintName;
+    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+    }
+
+    FString NodeId;
+    if (!Params->TryGetStringField(TEXT("node_id"), NodeId))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'node_id' parameter"));
+    }
+
+    FString PinName;
+    if (!Params->TryGetStringField(TEXT("pin_name"), PinName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'pin_name' parameter"));
+    }
+
+    FString PinValue;
+    if (!Params->TryGetStringField(TEXT("pin_value"), PinValue))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'pin_value' parameter"));
+    }
+
+    // Get path parameter (default: /Game/Blueprints)
+    FString Path;
+    if (!Params->TryGetStringField(TEXT("path"), Path))
+    {
+        Path = TEXT("/Game/Blueprints");
+    }
+
+    // Find the blueprint
+    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
+    if (!Blueprint)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+    }
+
+    // Get the event graph
+    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
+    if (!EventGraph)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get event graph"));
+    }
+
+    // Find the node by GUID
+    UEdGraphNode* TargetNode = nullptr;
+    for (UEdGraphNode* Node : EventGraph->Nodes)
+    {
+        if (Node->NodeGuid.ToString() == NodeId)
+        {
+            TargetNode = Node;
+            break;
+        }
+    }
+
+    if (!TargetNode)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Node not found: %s"), *NodeId));
+    }
+
+    // Find the pin
+    UEdGraphPin* TargetPin = FSpirrowBridgeCommonUtils::FindPin(TargetNode, PinName, EGPD_Input);
+    if (!TargetPin)
+    {
+        // Try output pin as fallback
+        TargetPin = FSpirrowBridgeCommonUtils::FindPin(TargetNode, PinName, EGPD_Output);
+    }
+
+    if (!TargetPin)
+    {
+        // List available pins for debugging
+        FString AvailablePins;
+        for (UEdGraphPin* Pin : TargetNode->Pins)
+        {
+            AvailablePins += FString::Printf(TEXT("%s (%s), "), *Pin->PinName.ToString(), 
+                Pin->Direction == EGPD_Input ? TEXT("In") : TEXT("Out"));
+        }
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Pin not found: %s. Available pins: %s"), *PinName, *AvailablePins));
+    }
+
+    // Set the pin value based on pin type
+    const UEdGraphSchema_K2* K2Schema = Cast<const UEdGraphSchema_K2>(EventGraph->GetSchema());
+    
+    if (TargetPin->PinType.PinCategory == UEdGraphSchema_K2::PC_String || 
+        TargetPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Text)
+    {
+        TargetPin->DefaultValue = PinValue;
+    }
+    else if (TargetPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Int)
+    {
+        TargetPin->DefaultValue = FString::FromInt(FCString::Atoi(*PinValue));
+    }
+    else if (TargetPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Float ||
+             TargetPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Real)
+    {
+        TargetPin->DefaultValue = FString::SanitizeFloat(FCString::Atof(*PinValue));
+    }
+    else if (TargetPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Boolean)
+    {
+        TargetPin->DefaultValue = PinValue.ToBool() ? TEXT("true") : TEXT("false");
+    }
+    else if (TargetPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Name)
+    {
+        TargetPin->DefaultValue = PinValue;
+    }
+    else
+    {
+        // For other types, try setting directly
+        TargetPin->DefaultValue = PinValue;
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("Set pin '%s' on node '%s' to value '%s'"), *PinName, *NodeId, *PinValue);
+
+    // Mark the blueprint as modified
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetStringField(TEXT("node_id"), NodeId);
+    ResultObj->SetStringField(TEXT("pin_name"), PinName);
+    ResultObj->SetStringField(TEXT("pin_value"), PinValue);
+    ResultObj->SetBoolField(TEXT("success"), true);
+    return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddVariableGetNode(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get required parameters
+    FString BlueprintName;
+    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+    }
+
+    FString VariableName;
+    if (!Params->TryGetStringField(TEXT("variable_name"), VariableName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'variable_name' parameter"));
+    }
+
+    // Get position parameters (optional)
+    FVector2D NodePosition(0.0f, 0.0f);
+    if (Params->HasField(TEXT("node_position")))
+    {
+        NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
+    }
+
+    // Get path parameter (default: /Game/Blueprints)
+    FString Path;
+    if (!Params->TryGetStringField(TEXT("path"), Path))
+    {
+        Path = TEXT("/Game/Blueprints");
+    }
+
+    // Find the blueprint
+    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
+    if (!Blueprint)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+    }
+
+    // Verify variable exists
+    bool bVariableExists = false;
+    for (const FBPVariableDescription& Var : Blueprint->NewVariables)
+    {
+        if (Var.VarName.ToString() == VariableName)
+        {
+            bVariableExists = true;
+            break;
+        }
+    }
+
+    if (!bVariableExists)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Variable not found in blueprint: %s"), *VariableName));
+    }
+
+    // Get the event graph
+    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
+    if (!EventGraph)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get event graph"));
+    }
+
+    // Create the variable get node
+    UK2Node_VariableGet* GetNode = NewObject<UK2Node_VariableGet>(EventGraph);
+    if (!GetNode)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create variable get node"));
+    }
+
+    // Set up the variable reference
+    GetNode->VariableReference.SetSelfMember(FName(*VariableName));
+
+    // Set node position
+    GetNode->NodePosX = NodePosition.X;
+    GetNode->NodePosY = NodePosition.Y;
+
+    // Add to graph
+    EventGraph->AddNode(GetNode);
+    GetNode->CreateNewGuid();
+    GetNode->PostPlacedNewNode();
+    GetNode->AllocateDefaultPins();
+    GetNode->ReconstructNode();
+
+    // Mark the blueprint as modified
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+    UE_LOG(LogTemp, Log, TEXT("Created variable get node for '%s'"), *VariableName);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetStringField(TEXT("node_id"), GetNode->NodeGuid.ToString());
+    ResultObj->SetStringField(TEXT("variable_name"), VariableName);
+    return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddVariableSetNode(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get required parameters
+    FString BlueprintName;
+    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+    }
+
+    FString VariableName;
+    if (!Params->TryGetStringField(TEXT("variable_name"), VariableName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'variable_name' parameter"));
+    }
+
+    // Get position parameters (optional)
+    FVector2D NodePosition(0.0f, 0.0f);
+    if (Params->HasField(TEXT("node_position")))
+    {
+        NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
+    }
+
+    // Get path parameter (default: /Game/Blueprints)
+    FString Path;
+    if (!Params->TryGetStringField(TEXT("path"), Path))
+    {
+        Path = TEXT("/Game/Blueprints");
+    }
+
+    // Find the blueprint
+    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
+    if (!Blueprint)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+    }
+
+    // Verify variable exists
+    bool bVariableExists = false;
+    for (const FBPVariableDescription& Var : Blueprint->NewVariables)
+    {
+        if (Var.VarName.ToString() == VariableName)
+        {
+            bVariableExists = true;
+            break;
+        }
+    }
+
+    if (!bVariableExists)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Variable not found in blueprint: %s"), *VariableName));
+    }
+
+    // Get the event graph
+    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
+    if (!EventGraph)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get event graph"));
+    }
+
+    // Create the variable set node
+    UK2Node_VariableSet* SetNode = NewObject<UK2Node_VariableSet>(EventGraph);
+    if (!SetNode)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create variable set node"));
+    }
+
+    // Set up the variable reference
+    SetNode->VariableReference.SetSelfMember(FName(*VariableName));
+
+    // Set node position
+    SetNode->NodePosX = NodePosition.X;
+    SetNode->NodePosY = NodePosition.Y;
+
+    // Add to graph
+    EventGraph->AddNode(SetNode);
+    SetNode->CreateNewGuid();
+    SetNode->PostPlacedNewNode();
+    SetNode->AllocateDefaultPins();
+    SetNode->ReconstructNode();
+
+    // Mark the blueprint as modified
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+    UE_LOG(LogTemp, Log, TEXT("Created variable set node for '%s'"), *VariableName);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetStringField(TEXT("node_id"), SetNode->NodeGuid.ToString());
+    ResultObj->SetStringField(TEXT("variable_name"), VariableName);
+    return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddBranchNode(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get required parameters
+    FString BlueprintName;
+    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+    }
+
+    // Get position parameters (optional)
+    FVector2D NodePosition(0.0f, 0.0f);
+    if (Params->HasField(TEXT("node_position")))
+    {
+        NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
+    }
+
+    // Get path parameter (default: /Game/Blueprints)
+    FString Path;
+    if (!Params->TryGetStringField(TEXT("path"), Path))
+    {
+        Path = TEXT("/Game/Blueprints");
+    }
+
+    // Find the blueprint
+    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
+    if (!Blueprint)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+    }
+
+    // Get the event graph
+    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
+    if (!EventGraph)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get event graph"));
+    }
+
+    // Find the Branch function (IfThenElse is the internal name)
+    UFunction* BranchFunction = UKismetMathLibrary::StaticClass()->FindFunctionByName(TEXT("Conv_BoolToInt"));
+    
+    // Create a Branch node using UK2Node_IfThenElse
+    UK2Node_IfThenElse* BranchNode = NewObject<UK2Node_IfThenElse>(EventGraph);
+    if (!BranchNode)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create branch node"));
+    }
+
+    // Set node position
+    BranchNode->NodePosX = NodePosition.X;
+    BranchNode->NodePosY = NodePosition.Y;
+
+    // Add to graph
+    EventGraph->AddNode(BranchNode);
+    BranchNode->CreateNewGuid();
+    BranchNode->PostPlacedNewNode();
+    BranchNode->AllocateDefaultPins();
+
+    // Mark the blueprint as modified
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+    UE_LOG(LogTemp, Log, TEXT("Created branch node"));
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetStringField(TEXT("node_id"), BranchNode->NodeGuid.ToString());
+    return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleDeleteNode(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get required parameters
+    FString BlueprintName;
+    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+    }
+
+    FString NodeId;
+    if (!Params->TryGetStringField(TEXT("node_id"), NodeId))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'node_id' parameter"));
+    }
+
+    // Get path parameter (default: /Game/Blueprints)
+    FString Path;
+    if (!Params->TryGetStringField(TEXT("path"), Path))
+    {
+        Path = TEXT("/Game/Blueprints");
+    }
+
+    // Find the blueprint
+    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
+    if (!Blueprint)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+    }
+
+    // Get the event graph
+    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
+    if (!EventGraph)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get event graph"));
+    }
+
+    // Find the node by GUID
+    UEdGraphNode* TargetNode = nullptr;
+    for (UEdGraphNode* Node : EventGraph->Nodes)
+    {
+        if (Node->NodeGuid.ToString() == NodeId)
+        {
+            TargetNode = Node;
+            break;
+        }
+    }
+
+    if (!TargetNode)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Node not found: %s"), *NodeId));
+    }
+
+    // Break all pin connections first
+    for (UEdGraphPin* Pin : TargetNode->Pins)
+    {
+        Pin->BreakAllPinLinks();
+    }
+
+    // Remove the node from the graph
+    EventGraph->RemoveNode(TargetNode);
+
+    // Mark the blueprint as modified
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+    UE_LOG(LogTemp, Log, TEXT("Deleted node: %s"), *NodeId);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetStringField(TEXT("node_id"), NodeId);
+    ResultObj->SetBoolField(TEXT("deleted"), true);
+    return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleMoveNode(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get required parameters
+    FString BlueprintName;
+    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+    }
+
+    FString NodeId;
+    if (!Params->TryGetStringField(TEXT("node_id"), NodeId))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'node_id' parameter"));
+    }
+
+    // Get new position
+    if (!Params->HasField(TEXT("position")))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'position' parameter"));
+    }
+    FVector2D NewPosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("position"));
+
+    // Get path parameter (default: /Game/Blueprints)
+    FString Path;
+    if (!Params->TryGetStringField(TEXT("path"), Path))
+    {
+        Path = TEXT("/Game/Blueprints");
+    }
+
+    // Find the blueprint
+    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
+    if (!Blueprint)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+    }
+
+    // Get the event graph
+    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
+    if (!EventGraph)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get event graph"));
+    }
+
+    // Find the node by GUID
+    UEdGraphNode* TargetNode = nullptr;
+    for (UEdGraphNode* Node : EventGraph->Nodes)
+    {
+        if (Node->NodeGuid.ToString() == NodeId)
+        {
+            TargetNode = Node;
+            break;
+        }
+    }
+
+    if (!TargetNode)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Node not found: %s"), *NodeId));
+    }
+
+    // Set the new position
+    TargetNode->NodePosX = NewPosition.X;
+    TargetNode->NodePosY = NewPosition.Y;
+
+    // Mark the blueprint as modified
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+    UE_LOG(LogTemp, Log, TEXT("Moved node %s to position (%f, %f)"), *NodeId, NewPosition.X, NewPosition.Y);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetStringField(TEXT("node_id"), NodeId);
+    ResultObj->SetNumberField(TEXT("pos_x"), NewPosition.X);
+    ResultObj->SetNumberField(TEXT("pos_y"), NewPosition.Y);
     return ResultObj;
 } 

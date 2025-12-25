@@ -372,39 +372,103 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleAddComponentToBlu
     // Create the component - dynamically find the component class by name
     UClass* ComponentClass = nullptr;
 
-    // ==================== GAS Components - Explicit Support ====================
-    // Explicit support for AbilitySystemComponent (ASC)
-    if (ComponentType == TEXT("AbilitySystemComponent") || ComponentType == TEXT("ASC"))
+    UE_LOG(LogTemp, Log, TEXT("HandleAddComponentToBlueprint - Looking for component type: %s"), *ComponentType);
+
+    // ==================== Common Components - Explicit Support ====================
+    // Direct StaticClass lookup for common engine components
+    if (ComponentType == TEXT("StaticMeshComponent") || ComponentType == TEXT("StaticMesh"))
+    {
+        ComponentClass = UStaticMeshComponent::StaticClass();
+        UE_LOG(LogTemp, Log, TEXT("Using StaticMeshComponent via explicit StaticClass"));
+    }
+    else if (ComponentType == TEXT("BoxComponent") || ComponentType == TEXT("Box"))
+    {
+        ComponentClass = UBoxComponent::StaticClass();
+        UE_LOG(LogTemp, Log, TEXT("Using BoxComponent via explicit StaticClass"));
+    }
+    else if (ComponentType == TEXT("SphereComponent") || ComponentType == TEXT("Sphere"))
+    {
+        ComponentClass = USphereComponent::StaticClass();
+        UE_LOG(LogTemp, Log, TEXT("Using SphereComponent via explicit StaticClass"));
+    }
+    else if (ComponentType == TEXT("AbilitySystemComponent") || ComponentType == TEXT("ASC"))
     {
         ComponentClass = UAbilitySystemComponent::StaticClass();
         UE_LOG(LogTemp, Log, TEXT("Using AbilitySystemComponent via explicit StaticClass"));
     }
     // ===========================================================================
 
-    // Try to find the class with exact name first
+    // Method 1: Try TObjectIterator to search all loaded classes
     if (!ComponentClass)
     {
-        ComponentClass = FindObject<UClass>(nullptr, *ComponentType);
-    }
-
-    // If not found, try with "Component" suffix
-    if (!ComponentClass && !ComponentType.EndsWith(TEXT("Component")))
-    {
-        FString ComponentTypeWithSuffix = ComponentType + TEXT("Component");
-        ComponentClass = FindObject<UClass>(nullptr, *ComponentTypeWithSuffix);
-    }
-
-    // If still not found, try with "U" prefix
-    if (!ComponentClass && !ComponentType.StartsWith(TEXT("U")))
-    {
-        FString ComponentTypeWithPrefix = TEXT("U") + ComponentType;
-        ComponentClass = FindObject<UClass>(nullptr, *ComponentTypeWithPrefix);
-
-        // Try with both prefix and suffix
-        if (!ComponentClass && !ComponentType.EndsWith(TEXT("Component")))
+        UE_LOG(LogTemp, Log, TEXT("Searching for component class using TObjectIterator..."));
+        
+        // Try variations of the class name
+        TArray<FString> ClassNamesToTry;
+        ClassNamesToTry.Add(ComponentType);
+        
+        if (!ComponentType.StartsWith(TEXT("U")))
         {
-            FString ComponentTypeWithBoth = TEXT("U") + ComponentType + TEXT("Component");
-            ComponentClass = FindObject<UClass>(nullptr, *ComponentTypeWithBoth);
+            ClassNamesToTry.Add(TEXT("U") + ComponentType);
+        }
+        if (!ComponentType.EndsWith(TEXT("Component")))
+        {
+            ClassNamesToTry.Add(ComponentType + TEXT("Component"));
+            if (!ComponentType.StartsWith(TEXT("U")))
+            {
+                ClassNamesToTry.Add(TEXT("U") + ComponentType + TEXT("Component"));
+            }
+        }
+
+        for (const FString& ClassName : ClassNamesToTry)
+        {
+            for (TObjectIterator<UClass> It; It; ++It)
+            {
+                UClass* Class = *It;
+                if (Class->GetName() == ClassName && Class->IsChildOf(UActorComponent::StaticClass()))
+                {
+                    ComponentClass = Class;
+                    UE_LOG(LogTemp, Log, TEXT("Found component class via TObjectIterator: %s (Path: %s)"),
+                        *ClassName, *Class->GetPathName());
+                    break;
+                }
+            }
+            if (ComponentClass) break;
+        }
+    }
+
+    // Method 2: Try LoadObject with common module paths
+    if (!ComponentClass)
+    {
+        UE_LOG(LogTemp, Log, TEXT("Trying LoadObject for component class..."));
+        
+        TArray<FString> ModulePaths;
+        
+        // Build class name with U prefix if needed
+        FString FullClassName = ComponentType;
+        if (!FullClassName.StartsWith(TEXT("U")))
+        {
+            FullClassName = TEXT("U") + FullClassName;
+        }
+        if (!FullClassName.EndsWith(TEXT("Component")))
+        {
+            FullClassName = FullClassName + TEXT("Component");
+        }
+        
+        ModulePaths.Add(FString::Printf(TEXT("/Script/Engine.%s"), *FullClassName));
+        ModulePaths.Add(FString::Printf(TEXT("/Script/Engine.%s"), *ComponentType));
+        ModulePaths.Add(FString::Printf(TEXT("/Script/GameplayAbilities.%s"), *FullClassName));
+        
+        for (const FString& ModulePath : ModulePaths)
+        {
+            UE_LOG(LogTemp, Log, TEXT("Trying LoadObject: %s"), *ModulePath);
+            ComponentClass = LoadObject<UClass>(nullptr, *ModulePath);
+            if (ComponentClass && ComponentClass->IsChildOf(UActorComponent::StaticClass()))
+            {
+                UE_LOG(LogTemp, Log, TEXT("SUCCESS: Loaded component class from '%s'"), *ModulePath);
+                break;
+            }
+            ComponentClass = nullptr;
         }
     }
     

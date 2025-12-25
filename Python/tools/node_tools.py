@@ -498,4 +498,364 @@ def register_blueprint_node_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
     
+    # ==================== NEW NODE MANIPULATION TOOLS ====================
+    
+    @mcp.tool()
+    def set_node_pin_value(
+        ctx: Context,
+        blueprint_name: str,
+        node_id: str,
+        pin_name: str,
+        pin_value: Any,  # Accept any type, will convert to string
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Set a default value on a node's pin.
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            node_id: GUID of the node (from find_blueprint_nodes or node creation)
+            pin_name: Name of the pin to set (e.g., "InString" for PrintString)
+            pin_value: Value to set on the pin (string, number, or boolean - will be converted to string)
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Response indicating success or failure
+
+        Example:
+            # Set the message for a PrintString node
+            set_node_pin_value(
+                blueprint_name="BP_Test",
+                node_id="ABC123...",
+                pin_name="InString",
+                pin_value="Hello World!"
+            )
+            
+            # Set a float value
+            set_node_pin_value(
+                blueprint_name="BP_Test",
+                node_id="DEF456...",
+                pin_name="Health",
+                pin_value=100.0
+            )
+            
+            # Set a boolean value
+            set_node_pin_value(
+                blueprint_name="BP_Test",
+                node_id="GHI789...",
+                pin_name="IsAlive",
+                pin_value=True
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            # Convert pin_value to string (handles int, float, bool, etc.)
+            if isinstance(pin_value, bool):
+                pin_value_str = "true" if pin_value else "false"
+            else:
+                pin_value_str = str(pin_value)
+            
+            params = {
+                "blueprint_name": blueprint_name,
+                "node_id": node_id,
+                "pin_name": pin_name,
+                "pin_value": pin_value_str,
+                "path": path
+            }
+            
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+            
+            logger.info(f"Setting pin '{pin_name}' on node '{node_id}' to '{pin_value}'")
+            response = unreal.send_command("set_node_pin_value", params)
+            
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+            
+            logger.info(f"Set pin value response: {response}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error setting pin value: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+    
+    @mcp.tool()
+    def add_variable_get_node(
+        ctx: Context,
+        blueprint_name: str,
+        variable_name: str,
+        node_position = None,
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Add a Variable Get node to retrieve a variable's value.
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            variable_name: Name of the variable to get (must exist in blueprint)
+            node_position: Optional [X, Y] position in the graph
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Response containing the node ID and success status
+
+        Example:
+            # First create a variable, then add a get node
+            add_blueprint_variable(blueprint_name="BP_Test", variable_name="Health", variable_type="Float")
+            add_variable_get_node(blueprint_name="BP_Test", variable_name="Health")
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            if node_position is None:
+                node_position = [0, 0]
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "variable_name": variable_name,
+                "node_position": node_position,
+                "path": path
+            }
+            
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+            
+            logger.info(f"Adding variable get node for '{variable_name}' to blueprint '{blueprint_name}'")
+            response = unreal.send_command("add_variable_get_node", params)
+            
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+            
+            logger.info(f"Variable get node creation response: {response}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error adding variable get node: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+    
+    @mcp.tool()
+    def add_variable_set_node(
+        ctx: Context,
+        blueprint_name: str,
+        variable_name: str,
+        node_position = None,
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Add a Variable Set node to assign a value to a variable.
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            variable_name: Name of the variable to set (must exist in blueprint)
+            node_position: Optional [X, Y] position in the graph
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Response containing the node ID and success status
+
+        Example:
+            # First create a variable, then add a set node
+            add_blueprint_variable(blueprint_name="BP_Test", variable_name="Health", variable_type="Float")
+            add_variable_set_node(blueprint_name="BP_Test", variable_name="Health")
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            if node_position is None:
+                node_position = [0, 0]
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "variable_name": variable_name,
+                "node_position": node_position,
+                "path": path
+            }
+            
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+            
+            logger.info(f"Adding variable set node for '{variable_name}' to blueprint '{blueprint_name}'")
+            response = unreal.send_command("add_variable_set_node", params)
+            
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+            
+            logger.info(f"Variable set node creation response: {response}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error adding variable set node: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+    
+    @mcp.tool()
+    def add_branch_node(
+        ctx: Context,
+        blueprint_name: str,
+        node_position = None,
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Add a Branch (if/else) node for conditional logic.
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            node_position: Optional [X, Y] position in the graph
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Response containing the node ID and success status
+
+        Pins:
+            Input:
+                - execute: Execution input
+                - Condition: Boolean condition to evaluate
+            Output:
+                - True: Execution continues here if condition is true
+                - False: Execution continues here if condition is false
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            if node_position is None:
+                node_position = [0, 0]
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "node_position": node_position,
+                "path": path
+            }
+            
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+            
+            logger.info(f"Adding branch node to blueprint '{blueprint_name}'")
+            response = unreal.send_command("add_branch_node", params)
+            
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+            
+            logger.info(f"Branch node creation response: {response}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error adding branch node: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+    
+    @mcp.tool()
+    def delete_blueprint_node(
+        ctx: Context,
+        blueprint_name: str,
+        node_id: str,
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Delete a node from a Blueprint's event graph.
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            node_id: GUID of the node to delete
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Response indicating success or failure
+
+        Note:
+            All connections to/from the node will be broken before deletion.
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            params = {
+                "blueprint_name": blueprint_name,
+                "node_id": node_id,
+                "path": path
+            }
+            
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+            
+            logger.info(f"Deleting node '{node_id}' from blueprint '{blueprint_name}'")
+            response = unreal.send_command("delete_node", params)
+            
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+            
+            logger.info(f"Node deletion response: {response}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error deleting node: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+    
+    @mcp.tool()
+    def move_blueprint_node(
+        ctx: Context,
+        blueprint_name: str,
+        node_id: str,
+        position: list,
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Move a node to a new position in the Blueprint graph.
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            node_id: GUID of the node to move
+            position: [X, Y] new position for the node
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Response containing the new position and success status
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            params = {
+                "blueprint_name": blueprint_name,
+                "node_id": node_id,
+                "position": position,
+                "path": path
+            }
+            
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+            
+            logger.info(f"Moving node '{node_id}' to position {position}")
+            response = unreal.send_command("move_node", params)
+            
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+            
+            logger.info(f"Node move response: {response}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error moving node: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+    
     logger.info("Blueprint node tools registered successfully")

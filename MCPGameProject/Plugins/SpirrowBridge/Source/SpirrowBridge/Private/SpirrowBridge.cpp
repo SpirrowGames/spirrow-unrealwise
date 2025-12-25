@@ -276,7 +276,14 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("add_blueprint_input_action_node") ||
                      CommandType == TEXT("add_blueprint_function_node") ||
                      CommandType == TEXT("add_blueprint_get_component_node") ||
-                     CommandType == TEXT("add_blueprint_variable"))
+                     CommandType == TEXT("add_blueprint_variable") ||
+                     // New node manipulation commands
+                     CommandType == TEXT("set_node_pin_value") ||
+                     CommandType == TEXT("add_variable_get_node") ||
+                     CommandType == TEXT("add_variable_set_node") ||
+                     CommandType == TEXT("add_branch_node") ||
+                     CommandType == TEXT("delete_node") ||
+                     CommandType == TEXT("move_node"))
             {
                 ResultJson = BlueprintNodeCommands->HandleCommand(CommandType, Params);
             }

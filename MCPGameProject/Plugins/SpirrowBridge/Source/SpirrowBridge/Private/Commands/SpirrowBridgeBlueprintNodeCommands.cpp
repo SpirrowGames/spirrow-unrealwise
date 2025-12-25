@@ -12,7 +12,9 @@
 #include "K2Node_InputAction.h"
 #include "K2Node_IfThenElse.h"
 #include "K2Node_Self.h"
+#include "K2Node_ExecutionSequence.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Kismet/KismetSystemLibrary.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "GameFramework/InputSettings.h"
@@ -84,6 +86,33 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleCommand(const
     else if (CommandType == TEXT("move_node"))
     {
         return HandleMoveNode(Params);
+    }
+    // Control flow nodes
+    else if (CommandType == TEXT("add_sequence_node"))
+    {
+        return HandleAddSequenceNode(Params);
+    }
+    else if (CommandType == TEXT("add_delay_node"))
+    {
+        return HandleAddDelayNode(Params);
+    }
+    else if (CommandType == TEXT("add_foreach_loop_node"))
+    {
+        return HandleAddForEachLoopNode(Params);
+    }
+    // Debug & utility nodes
+    else if (CommandType == TEXT("add_print_string_node"))
+    {
+        return HandleAddPrintStringNode(Params);
+    }
+    // Math & comparison nodes
+    else if (CommandType == TEXT("add_math_node"))
+    {
+        return HandleAddMathNode(Params);
+    }
+    else if (CommandType == TEXT("add_comparison_node"))
+    {
+        return HandleAddComparisonNode(Params);
     }
     
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown blueprint node command: %s"), *CommandType));
@@ -1532,5 +1561,460 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleMoveNode(cons
     ResultObj->SetStringField(TEXT("node_id"), NodeId);
     ResultObj->SetNumberField(TEXT("pos_x"), NewPosition.X);
     ResultObj->SetNumberField(TEXT("pos_y"), NewPosition.Y);
+    return ResultObj;
+}
+
+// ==================== CONTROL FLOW NODES ====================
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddSequenceNode(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get required parameters
+    FString BlueprintName;
+    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+    }
+
+    // Get optional num_outputs parameter (default: 2)
+    int32 NumOutputs = 2;
+    if (Params->HasField(TEXT("num_outputs")))
+    {
+        NumOutputs = Params->GetIntegerField(TEXT("num_outputs"));
+        if (NumOutputs < 2) NumOutputs = 2;
+        if (NumOutputs > 10) NumOutputs = 10; // Reasonable limit
+    }
+
+    // Get position parameters (optional)
+    FVector2D NodePosition(0.0f, 0.0f);
+    if (Params->HasField(TEXT("node_position")))
+    {
+        NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
+    }
+
+    // Get path parameter (default: /Game/Blueprints)
+    FString Path;
+    if (!Params->TryGetStringField(TEXT("path"), Path))
+    {
+        Path = TEXT("/Game/Blueprints");
+    }
+
+    // Find the blueprint
+    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
+    if (!Blueprint)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+    }
+
+    // Get the event graph
+    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
+    if (!EventGraph)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get event graph"));
+    }
+
+    // Create the sequence node
+    UK2Node_ExecutionSequence* SequenceNode = NewObject<UK2Node_ExecutionSequence>(EventGraph);
+    if (!SequenceNode)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create sequence node"));
+    }
+
+    // Set node position
+    SequenceNode->NodePosX = NodePosition.X;
+    SequenceNode->NodePosY = NodePosition.Y;
+
+    // Add to graph
+    EventGraph->AddNode(SequenceNode);
+    SequenceNode->CreateNewGuid();
+    SequenceNode->PostPlacedNewNode();
+    SequenceNode->AllocateDefaultPins();
+
+    // Add additional output pins if needed
+    for (int32 i = 2; i < NumOutputs; ++i)
+    {
+        SequenceNode->AddInputPin();
+    }
+
+    // Mark the blueprint as modified
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+    UE_LOG(LogTemp, Log, TEXT("Created sequence node with %d outputs"), NumOutputs);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetStringField(TEXT("node_id"), SequenceNode->NodeGuid.ToString());
+    ResultObj->SetNumberField(TEXT("num_outputs"), NumOutputs);
+    return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddDelayNode(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get required parameters
+    FString BlueprintName;
+    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+    }
+
+    // Get optional duration parameter (default: 1.0)
+    float Duration = 1.0f;
+    if (Params->HasField(TEXT("duration")))
+    {
+        Duration = Params->GetNumberField(TEXT("duration"));
+    }
+
+    // Get position parameters (optional)
+    FVector2D NodePosition(0.0f, 0.0f);
+    if (Params->HasField(TEXT("node_position")))
+    {
+        NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
+    }
+
+    // Get path parameter (default: /Game/Blueprints)
+    FString Path;
+    if (!Params->TryGetStringField(TEXT("path"), Path))
+    {
+        Path = TEXT("/Game/Blueprints");
+    }
+
+    // Find the blueprint
+    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
+    if (!Blueprint)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+    }
+
+    // Get the event graph
+    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
+    if (!EventGraph)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get event graph"));
+    }
+
+    // Find the Delay function
+    UFunction* DelayFunction = UKismetSystemLibrary::StaticClass()->FindFunctionByName(TEXT("Delay"));
+    if (!DelayFunction)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to find Delay function"));
+    }
+
+    // Create the function call node
+    UK2Node_CallFunction* DelayNode = FSpirrowBridgeCommonUtils::CreateFunctionCallNode(EventGraph, DelayFunction, NodePosition);
+    if (!DelayNode)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create delay node"));
+    }
+
+    // Set the duration
+    UEdGraphPin* DurationPin = FSpirrowBridgeCommonUtils::FindPin(DelayNode, TEXT("Duration"), EGPD_Input);
+    if (DurationPin)
+    {
+        DurationPin->DefaultValue = FString::SanitizeFloat(Duration);
+    }
+
+    // Mark the blueprint as modified
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+    UE_LOG(LogTemp, Log, TEXT("Created delay node with duration %f"), Duration);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetStringField(TEXT("node_id"), DelayNode->NodeGuid.ToString());
+    ResultObj->SetNumberField(TEXT("duration"), Duration);
+    return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddForEachLoopNode(const TSharedPtr<FJsonObject>& Params)
+{
+    // ForEachLoop is implemented as a Blueprint macro, not a K2Node
+    // This requires a different approach using UK2Node_MacroInstance
+    // For now, return an error message
+    return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("ForEach loop node is not yet supported. Use ForLoop macro in Blueprint editor instead."));
+}
+
+// ==================== DEBUG & UTILITY NODES ====================
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddPrintStringNode(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get required parameters
+    FString BlueprintName;
+    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+    }
+
+    // Get optional message parameter
+    FString Message = TEXT("Hello");
+    Params->TryGetStringField(TEXT("message"), Message);
+
+    // Get position parameters (optional)
+    FVector2D NodePosition(0.0f, 0.0f);
+    if (Params->HasField(TEXT("node_position")))
+    {
+        NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
+    }
+
+    // Get path parameter (default: /Game/Blueprints)
+    FString Path;
+    if (!Params->TryGetStringField(TEXT("path"), Path))
+    {
+        Path = TEXT("/Game/Blueprints");
+    }
+
+    // Find the blueprint
+    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
+    if (!Blueprint)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+    }
+
+    // Get the event graph
+    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
+    if (!EventGraph)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get event graph"));
+    }
+
+    // Find the PrintString function
+    UFunction* PrintStringFunction = UKismetSystemLibrary::StaticClass()->FindFunctionByName(TEXT("PrintString"));
+    if (!PrintStringFunction)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to find PrintString function"));
+    }
+
+    // Create the function call node
+    UK2Node_CallFunction* PrintStringNode = FSpirrowBridgeCommonUtils::CreateFunctionCallNode(EventGraph, PrintStringFunction, NodePosition);
+    if (!PrintStringNode)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create PrintString node"));
+    }
+
+    // Set the message
+    UEdGraphPin* InStringPin = FSpirrowBridgeCommonUtils::FindPin(PrintStringNode, TEXT("InString"), EGPD_Input);
+    if (InStringPin)
+    {
+        InStringPin->DefaultValue = Message;
+    }
+
+    // Mark the blueprint as modified
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+    UE_LOG(LogTemp, Log, TEXT("Created PrintString node with message: %s"), *Message);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetStringField(TEXT("node_id"), PrintStringNode->NodeGuid.ToString());
+    ResultObj->SetStringField(TEXT("message"), Message);
+    return ResultObj;
+}
+
+// ==================== MATH & COMPARISON NODES ====================
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddMathNode(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get required parameters
+    FString BlueprintName;
+    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+    }
+
+    FString Operation;
+    if (!Params->TryGetStringField(TEXT("operation"), Operation))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'operation' parameter (Add, Subtract, Multiply, Divide)"));
+    }
+
+    // Get optional value_type parameter (default: Float)
+    FString ValueType = TEXT("Float");
+    Params->TryGetStringField(TEXT("value_type"), ValueType);
+
+    // Get position parameters (optional)
+    FVector2D NodePosition(0.0f, 0.0f);
+    if (Params->HasField(TEXT("node_position")))
+    {
+        NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
+    }
+
+    // Get path parameter (default: /Game/Blueprints)
+    FString Path;
+    if (!Params->TryGetStringField(TEXT("path"), Path))
+    {
+        Path = TEXT("/Game/Blueprints");
+    }
+
+    // Find the blueprint
+    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
+    if (!Blueprint)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+    }
+
+    // Get the event graph
+    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
+    if (!EventGraph)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get event graph"));
+    }
+
+    // Map operation to function name
+    FName FunctionName;
+    bool bIsIntType = ValueType.Equals(TEXT("Int"), ESearchCase::IgnoreCase);
+
+    if (Operation.Equals(TEXT("Add"), ESearchCase::IgnoreCase))
+    {
+        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Add_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Add_FloatFloat);
+    }
+    else if (Operation.Equals(TEXT("Subtract"), ESearchCase::IgnoreCase))
+    {
+        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Subtract_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Subtract_FloatFloat);
+    }
+    else if (Operation.Equals(TEXT("Multiply"), ESearchCase::IgnoreCase))
+    {
+        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Multiply_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Multiply_FloatFloat);
+    }
+    else if (Operation.Equals(TEXT("Divide"), ESearchCase::IgnoreCase))
+    {
+        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Divide_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Divide_FloatFloat);
+    }
+    else
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown operation: %s. Use Add, Subtract, Multiply, or Divide"), *Operation));
+    }
+
+    // Create the function call node using SetExternalMember
+    UK2Node_CallFunction* MathNode = NewObject<UK2Node_CallFunction>(EventGraph);
+    if (!MathNode)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create math node"));
+    }
+
+    // Set up function reference
+    MathNode->FunctionReference.SetExternalMember(FunctionName, UKismetMathLibrary::StaticClass());
+    MathNode->NodePosX = NodePosition.X;
+    MathNode->NodePosY = NodePosition.Y;
+
+    // Add to graph
+    EventGraph->AddNode(MathNode, false, false);
+    MathNode->CreateNewGuid();
+    MathNode->PostPlacedNewNode();
+    MathNode->AllocateDefaultPins();
+
+    // Mark the blueprint as modified
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+    UE_LOG(LogTemp, Log, TEXT("Created math node: %s (%s)"), *Operation, *ValueType);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetStringField(TEXT("node_id"), MathNode->NodeGuid.ToString());
+    ResultObj->SetStringField(TEXT("operation"), Operation);
+    ResultObj->SetStringField(TEXT("value_type"), ValueType);
+    return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddComparisonNode(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get required parameters
+    FString BlueprintName;
+    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+    }
+
+    FString Operation;
+    if (!Params->TryGetStringField(TEXT("operation"), Operation))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'operation' parameter (Greater, GreaterEqual, Less, LessEqual, Equal, NotEqual)"));
+    }
+
+    // Get optional value_type parameter (default: Float)
+    FString ValueType = TEXT("Float");
+    Params->TryGetStringField(TEXT("value_type"), ValueType);
+
+    // Get position parameters (optional)
+    FVector2D NodePosition(0.0f, 0.0f);
+    if (Params->HasField(TEXT("node_position")))
+    {
+        NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
+    }
+
+    // Get path parameter (default: /Game/Blueprints)
+    FString Path;
+    if (!Params->TryGetStringField(TEXT("path"), Path))
+    {
+        Path = TEXT("/Game/Blueprints");
+    }
+
+    // Find the blueprint
+    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
+    if (!Blueprint)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+    }
+
+    // Get the event graph
+    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
+    if (!EventGraph)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get event graph"));
+    }
+
+    // Map operation to function name
+    FName FunctionName;
+    bool bIsIntType = ValueType.Equals(TEXT("Int"), ESearchCase::IgnoreCase);
+
+    if (Operation.Equals(TEXT("Greater"), ESearchCase::IgnoreCase))
+    {
+        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Greater_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Greater_FloatFloat);
+    }
+    else if (Operation.Equals(TEXT("GreaterEqual"), ESearchCase::IgnoreCase))
+    {
+        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, GreaterEqual_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, GreaterEqual_FloatFloat);
+    }
+    else if (Operation.Equals(TEXT("Less"), ESearchCase::IgnoreCase))
+    {
+        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Less_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Less_FloatFloat);
+    }
+    else if (Operation.Equals(TEXT("LessEqual"), ESearchCase::IgnoreCase))
+    {
+        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, LessEqual_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, LessEqual_FloatFloat);
+    }
+    else if (Operation.Equals(TEXT("Equal"), ESearchCase::IgnoreCase))
+    {
+        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, EqualEqual_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, EqualEqual_FloatFloat);
+    }
+    else if (Operation.Equals(TEXT("NotEqual"), ESearchCase::IgnoreCase))
+    {
+        FunctionName = bIsIntType ? GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, NotEqual_IntInt) : GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, NotEqual_FloatFloat);
+    }
+    else
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown operation: %s. Use Greater, GreaterEqual, Less, LessEqual, Equal, or NotEqual"), *Operation));
+    }
+
+    // Create the function call node using SetExternalMember
+    UK2Node_CallFunction* ComparisonNode = NewObject<UK2Node_CallFunction>(EventGraph);
+    if (!ComparisonNode)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create comparison node"));
+    }
+
+    // Set up function reference
+    ComparisonNode->FunctionReference.SetExternalMember(FunctionName, UKismetMathLibrary::StaticClass());
+    ComparisonNode->NodePosX = NodePosition.X;
+    ComparisonNode->NodePosY = NodePosition.Y;
+
+    // Add to graph
+    EventGraph->AddNode(ComparisonNode, false, false);
+    ComparisonNode->CreateNewGuid();
+    ComparisonNode->PostPlacedNewNode();
+    ComparisonNode->AllocateDefaultPins();
+
+    // Mark the blueprint as modified
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+    UE_LOG(LogTemp, Log, TEXT("Created comparison node: %s (%s)"), *Operation, *ValueType);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetStringField(TEXT("node_id"), ComparisonNode->NodeGuid.ToString());
+    ResultObj->SetStringField(TEXT("operation"), Operation);
+    ResultObj->SetStringField(TEXT("value_type"), ValueType);
     return ResultObj;
 } 

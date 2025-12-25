@@ -477,6 +477,7 @@ search_knowledge("質量 設定", category="physics")
 
 ## 更新履歴
 
+- 2025-12-25: 制御フロー・ユーティリティノードツール追加（add_sequence_node, add_delay_node, add_print_string_node）。Math/Comparison ノードは別実装が必要なため保留
 - 2025-12-16: create_blueprint で UUserWidget を親クラスとして指定可能に。Widget Blueprint の自動生成に対応
 - 2025-12-15: GAS Phase 1-B 実装。GAS アセット一覧取得機能（list_gas_assets）を追加
 - 2025-12-15: GAS Phase 1-A 実装。Gameplay Tags 管理機能（add_gameplay_tags, list_gameplay_tags, remove_gameplay_tag）を追加

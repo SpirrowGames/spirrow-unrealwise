@@ -1,119 +1,102 @@
-# SpirrowUnrealWise セッション開始プロンプト
+# SpirrowUnrealWise - 新規チャット開始プロンプト
+
+## 概要
+
+SpirrowUnrealWise は Unreal Engine 5 と MCP（Model Context Protocol）を接続し、LLM から UE エディタを操作するためのツール群です。
 
 ## プロジェクト情報
 
-- **MCP プロジェクト**: `C:\Users\takahito ito\Documents\Unreal Projects\spirrow-unrealwise`
-- **ゲームプロジェクト**: `C:\Users\takahito ito\Documents\Unreal Projects\TrapxTrapCpp 5.7`
-- **プラグイン**: `Plugins/SpirrowBridge`
+- **プロジェクトルート**: `C:\Users\takahito ito\Documents\Unreal Projects\spirrow-unrealwise`
+- **ドキュメント**: `.claude/claude.md`、`AGENTS.md`、`FEATURE_STATUS.md`
+- **現在のフェーズ**: Phase 0.6.0 - 制御フロー・ユーティリティノードツール追加完了
 
----
+## 会話開始時の手順
 
-## 現在の状況
+1. プロジェクトコンテキストを取得:
+```
+get_project_context("SpirrowUnrealWise")
+```
 
-### UMG Phase 4-A 完了 ✅
+2. 必要に応じてドキュメントを確認:
+- `AGENTS.md` - 全体ガイドライン、ノード配置ルール、コマンド追加手順
+- `FEATURE_STATUS.md` - 機能一覧、テスト状況、更新履歴
+- `.claude/claude.md` - Claude.ai と Claude Code の役割分担
 
-**Phase 1-4A 合計: 25ツール実装完了**
+## 現在の状況（2025-12-25）
 
-| Phase | ツール数 | 状態 |
-|-------|---------|------|
-| Phase 1: Designer操作 | 11 | ✅ |
-| Phase 2: 変数・関数 | 5 | ✅ |
-| Phase 3: Animation | 4 | ✅ |
-| Phase 3: Array Variables | 1 | ✅ |
-| **Phase 4-A: Interactive Widgets** | **4** | **✅ NEW** |
+### 最新の実装
 
-### Phase 4-A 完了ツール
+**Node Tools v0.6.0**（20ツール）:
+- ✅ 基本ノード操作（8ツール）
+- ✅ 変数・分岐（6ツール）
+- ✅ 制御フロー: add_sequence_node, add_delay_node, add_print_string_node
+- ⚠️ 未対応: add_math_node, add_comparison_node, add_foreach_loop_node
 
-| ツール | 説明 | 状態 |
-|--------|------|------|
-| `add_button_to_widget` | 新API準拠 Button 追加（anchor/alignment/path対応） | ✅ 完了 |
-| `bind_widget_component_event` | イベントバインディング（OnClicked等） | ✅ 完了 |
-| `add_slider_to_widget` | Slider 追加（value/min/max/orientation対応） | ✅ 完了 |
-| `add_checkbox_to_widget` | CheckBox 追加（label_text対応） | ✅ 完了 |
+### 既知の問題
 
----
+1. **Math/Comparison ノード**
+   - 問題: "Failed to find math function" エラー
+   - 原因: `UK2Node_CommutativeAssociativeBinaryOperator` を使う必要がある
+   - 修正プロンプト: `Docs/NodeTools_MathComparison_Fix_Prompt.md`
 
-## セッション開始手順
+2. **ForEach Loop ノード**
+   - 問題: Blueprint マクロとして実装されているため K2Node では作成不可
+   - ワークアラウンド: UE エディタで手動追加
+
+### Sequence ノードのピン名
+
+重要: ピン名はアンダースコア区切りの小文字
+- 入力: `execute`
+- 出力: `then_0`, `then_1`, `then_2`, ...
+
+## 次のタスク候補
+
+1. Math/Comparison ノードの修正（優先度: 中）
+2. ForEach Loop の代替実装検討
+3. 既存ノードツールの統合テスト
+4. 新機能の追加（ユーザー要望に応じて）
+
+## ファイル構成
+
+```
+spirrow-unrealwise/
+├── .claude/claude.md          # Claude.ai/Code 役割分担
+├── AGENTS.md                  # AIエージェント向けガイドライン
+├── FEATURE_STATUS.md          # 機能ステータス一覧
+├── Docs/
+│   ├── Tools/
+│   │   ├── README.md          # ツール一覧
+│   │   └── node_tools.md      # ノードツール詳細ドキュメント
+│   └── NodeTools_MathComparison_Fix_Prompt.md  # 修正プロンプト
+├── Python/
+│   └── tools/
+│       └── node_tools.py      # Python MCP ツール定義
+└── Plugins/SpirrowBridge/
+    └── Source/SpirrowBridge/
+        ├── Public/Commands/
+        │   └── SpirrowBridgeBlueprintNodeCommands.h
+        └── Private/Commands/
+            └── SpirrowBridgeBlueprintNodeCommands.cpp
+```
+
+## 作業フロー
+
+1. Claude.ai で機能設計・仕様策定
+2. 仕様確定後、実装プロンプトを作成（`Docs/{FeatureName}_Prompt.md`）
+3. Claude Code で実装（C++ / Python）
+4. ビルド・再起動
+5. MCP ツールでテスト
+6. ドキュメント更新
+
+## 会話終了時
 
 ```python
-# 1. プロジェクトコンテキスト確認
-get_project_context("SpirrowUnrealWise")
-
-# 2. 詳細確認（必要に応じて）
-# 各フェーズのドキュメントを参照
+update_project_context(
+    project_name="SpirrowUnrealWise",
+    current_phase="現在のフェーズ",
+    recent_changes=["変更点1", "変更点2"],
+    next_tasks=["次のタスク1", "次のタスク2"],
+    known_issues=["既知の問題"],
+    notes="補足メモ"
+)
 ```
-
----
-
-## ドキュメント一覧
-
-| ドキュメント | 内容 |
-|-------------|------|
-| `Docs/UMGPhase4A_Prompt.md` | Phase 4-A 実装プロンプト |
-| `Docs/UMGPhase4A_Fix_Prompt.md` | Phase 4-A 修正プロンプト |
-| `Docs/UMGPhase3_Handover_Prompt.md` | Phase 3 完了報告・引き継ぎ |
-| `Docs/UMGPhase3_Continue_Prompt.md` | 継続用プロンプト |
-| `Docs/UMGPhase3_RenderTransform_Prompt.md` | RenderTransform 実装詳細 |
-| `Docs/UMGPhase3_ArrayVariable_Prompt.md` | 配列変数 実装詳細 |
-| `FEATURE_STATUS.md` | 全機能ステータス |
-| `AGENTS.md` | MCP 使用ガイドライン |
-
----
-
-## 次のステップ
-
-### Phase 4-B 計画（候補）
-
-以下のウィジェットの追加を検討：
-
-| ウィジェット | 優先度 | 説明 |
-|-------------|--------|------|
-| ComboBox | 高 | ドロップダウン選択 |
-| EditableText | 高 | テキスト入力フィールド |
-| SpinBox | 中 | 数値入力 |
-| ListView | 中 | リスト表示 |
-| ScrollBox | 中 | スクロール可能コンテナ |
-
-### その他の選択肢
-
-- **オプション A**: Phase 4-B UMG 拡張
-- **オプション B**: TrapxTrapCpp Phase 4 開発
-- **オプション C**: 他の MCP 機能拡張
-
----
-
-## 技術メモ
-
-### 追加済みインクルード
-
-```cpp
-// Phase 3
-#include "Animation/WidgetAnimation.h"
-#include "MovieScene.h"
-#include "Tracks/MovieSceneFloatTrack.h"
-// ...
-
-// Phase 4-A
-#include "Components/Slider.h"
-#include "Components/CheckBox.h"
-#include "K2Node_ComponentBoundEvent.h"
-```
-
-### Build.cs 依存関係
-
-```csharp
-"MovieScene", "MovieSceneTracks", "UMGEditor"
-```
-
-### コマンドルーティング
-
-SpirrowBridge.cpp に Phase 4-A コマンド追加済み:
-- `add_button_to_widget_v2`
-- `bind_widget_component_event`
-- `add_slider_to_widget`
-- `add_checkbox_to_widget`
-
----
-
-**最終更新**: 2025-12-25
-**フェーズ**: UMG Phase 4-A 完了

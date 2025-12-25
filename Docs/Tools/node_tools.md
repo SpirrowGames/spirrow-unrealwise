@@ -377,6 +377,231 @@ move_blueprint_node(
 
 ---
 
+## Control Flow & Utility Tools (New)
+
+These tools provide control flow nodes and utility functions for Blueprint graphs.
+
+### add_sequence_node
+
+Add a Sequence node for executing multiple branches in order.
+
+**Parameters:**
+- `blueprint_name` (string) - Name of the target Blueprint
+- `num_outputs` (integer, optional) - Number of output execution pins (2-10, default: 2)
+- `node_position` (array, optional) - [X, Y] position in the graph (default: [0, 0])
+- `path` (string, optional) - Content browser path (default: "/Game/Blueprints")
+
+**Returns:**
+- Response containing the node ID and number of outputs
+
+**Pins:**
+- **Input:**
+  - `execute` - Execution input
+- **Output:**
+  - `then_0`, `then_1`, `then_2`, ... - Sequential execution outputs
+
+**Example:**
+```python
+add_sequence_node(
+    blueprint_name="BP_Test",
+    num_outputs=3,
+    node_position=[200, 0]
+)
+```
+
+### add_delay_node
+
+Add a Delay node for timed execution.
+
+**Parameters:**
+- `blueprint_name` (string) - Name of the target Blueprint
+- `duration` (float, optional) - Delay duration in seconds (default: 1.0)
+- `node_position` (array, optional) - [X, Y] position in the graph (default: [0, 0])
+- `path` (string, optional) - Content browser path (default: "/Game/Blueprints")
+
+**Returns:**
+- Response containing the node ID and duration
+
+**Pins:**
+- **Input:**
+  - `execute` - Execution input
+  - `Duration` - Float delay time in seconds
+- **Output:**
+  - `then` - Fires after the delay (labeled "Completed" in editor)
+
+**Example:**
+```python
+add_delay_node(
+    blueprint_name="BP_Test",
+    duration=2.5,
+    node_position=[400, 0]
+)
+```
+
+### add_foreach_loop_node
+
+Add a ForEach Loop node for iterating over arrays.
+
+**Status:** ⚠️ **Not yet supported** - ForEach loop is implemented as a Blueprint macro, requires different implementation approach.
+
+**Workaround:** Use the ForEach Loop macro manually in the Blueprint editor.
+
+### add_print_string_node
+
+Add a PrintString node for debug output.
+
+**Parameters:**
+- `blueprint_name` (string) - Name of the target Blueprint
+- `message` (string, optional) - Default message to print (default: "Hello")
+- `node_position` (array, optional) - [X, Y] position in the graph (default: [0, 0])
+- `path` (string, optional) - Content browser path (default: "/Game/Blueprints")
+
+**Returns:**
+- Response containing the node ID and message
+
+**Pins:**
+- **Input:**
+  - `execute` - Execution input
+  - `InString` - String to print
+  - `bPrintToScreen` - Whether to print to screen (default: true)
+  - `bPrintToLog` - Whether to print to log (default: true)
+  - `TextColor` - Color for screen text
+  - `Duration` - How long to display on screen
+- **Output:**
+  - `then` - Execution continues
+
+**Example:**
+```python
+add_print_string_node(
+    blueprint_name="BP_Test",
+    message="Hello from MCP!",
+    node_position=[600, 0]
+)
+```
+
+### add_math_node
+
+Add a math operation node (Add, Subtract, Multiply, Divide).
+
+**Status:** ⚠️ **Not yet supported** - Math operators use UK2Node_CommutativeAssociativeBinaryOperator, requires different implementation.
+
+**Workaround:** Use `add_blueprint_function_node` with KismetMathLibrary functions.
+
+### add_comparison_node
+
+Add a comparison node (Greater, Less, Equal, etc.).
+
+**Status:** ⚠️ **Not yet supported** - Same issue as add_math_node.
+
+**Workaround:** Use `add_blueprint_function_node` with KismetMathLibrary comparison functions.
+
+---
+
+## Control Flow Workflow Example
+
+Here's an example using Sequence and Delay nodes:
+
+```python
+# 1. Create a Blueprint
+create_blueprint(
+    name="BP_SequenceDemo",
+    parent_class="Actor",
+    path="/Game/Blueprints"
+)
+
+# 2. Add BeginPlay event
+event_result = add_blueprint_event_node(
+    blueprint_name="BP_SequenceDemo",
+    event_name="ReceiveBeginPlay",
+    node_position=[0, 0]
+)
+
+# 3. Add Sequence node with 3 outputs
+sequence_result = add_sequence_node(
+    blueprint_name="BP_SequenceDemo",
+    num_outputs=3,
+    node_position=[300, 0]
+)
+
+# 4. Connect BeginPlay to Sequence
+connect_blueprint_nodes(
+    blueprint_name="BP_SequenceDemo",
+    source_node_id=event_result["node_id"],
+    source_pin="then",
+    target_node_id=sequence_result["node_id"],
+    target_pin="execute"
+)
+
+# 5. Add PrintString for first output
+print1_result = add_print_string_node(
+    blueprint_name="BP_SequenceDemo",
+    message="Step 1: Immediate",
+    node_position=[600, 0]
+)
+
+# 6. Add Delay node for second output
+delay_result = add_delay_node(
+    blueprint_name="BP_SequenceDemo",
+    duration=2.0,
+    node_position=[600, 150]
+)
+
+# 7. Add PrintString after delay
+print2_result = add_print_string_node(
+    blueprint_name="BP_SequenceDemo",
+    message="Step 2: After 2 seconds",
+    node_position=[900, 150]
+)
+
+# 8. Add PrintString for third output
+print3_result = add_print_string_node(
+    blueprint_name="BP_SequenceDemo",
+    message="Step 3: Also immediate",
+    node_position=[600, 300]
+)
+
+# 9. Connect Sequence outputs
+connect_blueprint_nodes(
+    blueprint_name="BP_SequenceDemo",
+    source_node_id=sequence_result["node_id"],
+    source_pin="then_0",
+    target_node_id=print1_result["node_id"],
+    target_pin="execute"
+)
+
+connect_blueprint_nodes(
+    blueprint_name="BP_SequenceDemo",
+    source_node_id=sequence_result["node_id"],
+    source_pin="then_1",
+    target_node_id=delay_result["node_id"],
+    target_pin="execute"
+)
+
+connect_blueprint_nodes(
+    blueprint_name="BP_SequenceDemo",
+    source_node_id=delay_result["node_id"],
+    source_pin="then",
+    target_node_id=print2_result["node_id"],
+    target_pin="execute"
+)
+
+connect_blueprint_nodes(
+    blueprint_name="BP_SequenceDemo",
+    source_node_id=sequence_result["node_id"],
+    source_pin="then_2",
+    target_node_id=print3_result["node_id"],
+    target_pin="execute"
+)
+
+# 10. Compile
+compile_blueprint(
+    blueprint_name="BP_SequenceDemo",
+    path="/Game/Blueprints"
+)
+```
+
+---
+
 ## Workflow Example
 
 Here's a complete workflow example that demonstrates creating a Blueprint with variables and logic:

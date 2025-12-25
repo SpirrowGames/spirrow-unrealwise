@@ -32,4 +32,16 @@ private:
     TSharedPtr<FJsonObject> HandleAddBranchNode(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleDeleteNode(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleMoveNode(const TSharedPtr<FJsonObject>& Params);
+    
+    // Control flow nodes
+    TSharedPtr<FJsonObject> HandleAddSequenceNode(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleAddDelayNode(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleAddForEachLoopNode(const TSharedPtr<FJsonObject>& Params);
+    
+    // Debug & utility nodes
+    TSharedPtr<FJsonObject> HandleAddPrintStringNode(const TSharedPtr<FJsonObject>& Params);
+    
+    // Math & comparison nodes
+    TSharedPtr<FJsonObject> HandleAddMathNode(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleAddComparisonNode(const TSharedPtr<FJsonObject>& Params);
 }; 

@@ -283,7 +283,16 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("add_variable_set_node") ||
                      CommandType == TEXT("add_branch_node") ||
                      CommandType == TEXT("delete_node") ||
-                     CommandType == TEXT("move_node"))
+                     CommandType == TEXT("move_node") ||
+                     // Control flow nodes
+                     CommandType == TEXT("add_sequence_node") ||
+                     CommandType == TEXT("add_delay_node") ||
+                     CommandType == TEXT("add_foreach_loop_node") ||
+                     // Debug & utility nodes
+                     CommandType == TEXT("add_print_string_node") ||
+                     // Math & comparison nodes
+                     CommandType == TEXT("add_math_node") ||
+                     CommandType == TEXT("add_comparison_node"))
             {
                 ResultJson = BlueprintNodeCommands->HandleCommand(CommandType, Params);
             }

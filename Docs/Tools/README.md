@@ -24,7 +24,7 @@ This document is an index to all the tools supported by SpirrowUnrealWise.
 
 ## Quick Reference
 
-### Node Tools (14 tools)
+### Node Tools (20 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -42,9 +42,16 @@ This document is an index to all the tools supported by SpirrowUnrealWise.
 | `add_branch_node` | Add branch (if/else) node |
 | `delete_blueprint_node` | Delete node from graph |
 | `move_blueprint_node` | Move node position |
+| `add_sequence_node` | Add sequence node for multiple execution branches |
+| `add_delay_node` | Add delay node for timed execution |
+| `add_foreach_loop_node` | Add ForEach loop node (not yet supported) |
+| `add_print_string_node` | Add PrintString node for debug output |
+| `add_math_node` | Add math operation node (not yet supported) |
+| `add_comparison_node` | Add comparison node (not yet supported) |
 
 ## Version History
 
+- **v0.6.0** - Added control flow and utility node tools (add_sequence_node, add_delay_node, add_print_string_node). Math/comparison nodes pending implementation.
 - **v0.5.0** - Added node manipulation tools (set_node_pin_value, add_variable_get_node, add_variable_set_node, add_branch_node, delete_blueprint_node, move_blueprint_node)
 - **v0.4.0** - Added UMG widget tools (Phase 1-4)
 - **v0.3.0** - Added GAS (Gameplay Ability System) tools

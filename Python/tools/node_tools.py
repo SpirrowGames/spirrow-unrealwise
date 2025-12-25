@@ -858,4 +858,382 @@ def register_blueprint_node_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
     
+    # ==================== CONTROL FLOW NODES ====================
+    
+    @mcp.tool()
+    def add_sequence_node(
+        ctx: Context,
+        blueprint_name: str,
+        num_outputs: int = 2,
+        node_position = None,
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Add a Sequence node for executing multiple branches in order.
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            num_outputs: Number of output execution pins (2-10, default: 2)
+            node_position: Optional [X, Y] position in the graph
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Response containing the node ID and success status
+
+        Pins:
+            Input:
+                - execute: Execution input
+            Output:
+                - Then 0, Then 1, ...: Sequential execution outputs
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            if node_position is None:
+                node_position = [0, 0]
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "num_outputs": num_outputs,
+                "node_position": node_position,
+                "path": path
+            }
+            
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+            
+            logger.info(f"Adding sequence node with {num_outputs} outputs to blueprint '{blueprint_name}'")
+            response = unreal.send_command("add_sequence_node", params)
+            
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+            
+            logger.info(f"Sequence node creation response: {response}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error adding sequence node: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+    
+    @mcp.tool()
+    def add_delay_node(
+        ctx: Context,
+        blueprint_name: str,
+        duration: float = 1.0,
+        node_position = None,
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Add a Delay node for timed execution.
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            duration: Delay duration in seconds (default: 1.0)
+            node_position: Optional [X, Y] position in the graph
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Response containing the node ID and success status
+
+        Pins:
+            Input:
+                - execute: Execution input
+                - Duration: Float delay time in seconds
+            Output:
+                - Completed: Fires after the delay
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            if node_position is None:
+                node_position = [0, 0]
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "duration": duration,
+                "node_position": node_position,
+                "path": path
+            }
+            
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+            
+            logger.info(f"Adding delay node with duration {duration}s to blueprint '{blueprint_name}'")
+            response = unreal.send_command("add_delay_node", params)
+            
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+            
+            logger.info(f"Delay node creation response: {response}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error adding delay node: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+    
+    @mcp.tool()
+    def add_foreach_loop_node(
+        ctx: Context,
+        blueprint_name: str,
+        node_position = None,
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Add a ForEach Loop node for iterating over arrays.
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            node_position: Optional [X, Y] position in the graph
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Response containing the node ID and success status
+
+        Pins:
+            Input:
+                - execute: Execution input
+                - Array: Array to iterate over
+            Output:
+                - Loop Body: Fires for each element
+                - Array Element: Current element
+                - Array Index: Current index
+                - Completed: Fires when loop finishes
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            if node_position is None:
+                node_position = [0, 0]
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "node_position": node_position,
+                "path": path
+            }
+            
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+            
+            logger.info(f"Adding ForEach loop node to blueprint '{blueprint_name}'")
+            response = unreal.send_command("add_foreach_loop_node", params)
+            
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+            
+            logger.info(f"ForEach loop node creation response: {response}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error adding ForEach loop node: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+    
+    # ==================== DEBUG & UTILITY NODES ====================
+    
+    @mcp.tool()
+    def add_print_string_node(
+        ctx: Context,
+        blueprint_name: str,
+        message: str = "Hello",
+        node_position = None,
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Add a PrintString node for debug output.
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            message: Default message to print (default: "Hello")
+            node_position: Optional [X, Y] position in the graph
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Response containing the node ID and success status
+
+        Pins:
+            Input:
+                - execute: Execution input
+                - InString: String to print
+                - bPrintToScreen: Whether to print to screen (default: true)
+                - bPrintToLog: Whether to print to log (default: true)
+                - TextColor: Color for screen text
+                - Duration: How long to display on screen
+            Output:
+                - then: Execution continues
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            if node_position is None:
+                node_position = [0, 0]
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "message": message,
+                "node_position": node_position,
+                "path": path
+            }
+            
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+            
+            logger.info(f"Adding PrintString node with message '{message}' to blueprint '{blueprint_name}'")
+            response = unreal.send_command("add_print_string_node", params)
+            
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+            
+            logger.info(f"PrintString node creation response: {response}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error adding PrintString node: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+    
+    # ==================== MATH & COMPARISON NODES ====================
+    
+    @mcp.tool()
+    def add_math_node(
+        ctx: Context,
+        blueprint_name: str,
+        operation: str,
+        value_type: str = "Float",
+        node_position = None,
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Add a math operation node (Add, Subtract, Multiply, Divide).
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            operation: Math operation - "Add", "Subtract", "Multiply", "Divide"
+            value_type: Type of values - "Float" or "Int" (default: "Float")
+            node_position: Optional [X, Y] position in the graph
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Response containing the node ID and success status
+
+        Example:
+            add_math_node(
+                blueprint_name="BP_Test",
+                operation="Add",
+                value_type="Float"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            if node_position is None:
+                node_position = [0, 0]
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "operation": operation,
+                "value_type": value_type,
+                "node_position": node_position,
+                "path": path
+            }
+            
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+            
+            logger.info(f"Adding math node ({operation}) to blueprint '{blueprint_name}'")
+            response = unreal.send_command("add_math_node", params)
+            
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+            
+            logger.info(f"Math node creation response: {response}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error adding math node: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+    
+    @mcp.tool()
+    def add_comparison_node(
+        ctx: Context,
+        blueprint_name: str,
+        operation: str,
+        value_type: str = "Float",
+        node_position = None,
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Add a comparison node (Greater, Less, Equal, etc.).
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            operation: Comparison operation - "Greater", "GreaterEqual", "Less", "LessEqual", "Equal", "NotEqual"
+            value_type: Type of values - "Float" or "Int" (default: "Float")
+            node_position: Optional [X, Y] position in the graph
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Response containing the node ID and success status
+
+        Output Pins:
+            - ReturnValue: Boolean result of comparison
+
+        Example:
+            add_comparison_node(
+                blueprint_name="BP_Test",
+                operation="Greater",
+                value_type="Float"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            if node_position is None:
+                node_position = [0, 0]
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "operation": operation,
+                "value_type": value_type,
+                "node_position": node_position,
+                "path": path
+            }
+            
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+            
+            logger.info(f"Adding comparison node ({operation}) to blueprint '{blueprint_name}'")
+            response = unreal.send_command("add_comparison_node", params)
+            
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+            
+            logger.info(f"Comparison node creation response: {response}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error adding comparison node: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+    
     logger.info("Blueprint node tools registered successfully")

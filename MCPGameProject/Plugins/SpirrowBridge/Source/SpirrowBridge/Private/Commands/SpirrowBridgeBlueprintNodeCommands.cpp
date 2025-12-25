@@ -1855,31 +1855,39 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddMathNode(c
     }
 
     // Map operation to function name
-    FName FunctionName = NAME_None;
+    FString FunctionName;
     if (ValueType == TEXT("Float"))
     {
-        if (Operation == TEXT("Add")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Add_FloatFloat);
-        else if (Operation == TEXT("Subtract")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Subtract_FloatFloat);
-        else if (Operation == TEXT("Multiply")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Multiply_FloatFloat);
-        else if (Operation == TEXT("Divide")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Divide_FloatFloat);
+        if (Operation == TEXT("Add")) FunctionName = TEXT("Add_DoubleDouble");
+        else if (Operation == TEXT("Subtract")) FunctionName = TEXT("Subtract_DoubleDouble");
+        else if (Operation == TEXT("Multiply")) FunctionName = TEXT("Multiply_DoubleDouble");
+        else if (Operation == TEXT("Divide")) FunctionName = TEXT("Divide_DoubleDouble");
     }
     else if (ValueType == TEXT("Int"))
     {
-        if (Operation == TEXT("Add")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Add_IntInt);
-        else if (Operation == TEXT("Subtract")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Subtract_IntInt);
-        else if (Operation == TEXT("Multiply")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Multiply_IntInt);
-        else if (Operation == TEXT("Divide")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Divide_IntInt);
+        if (Operation == TEXT("Add")) FunctionName = TEXT("Add_IntInt");
+        else if (Operation == TEXT("Subtract")) FunctionName = TEXT("Subtract_IntInt");
+        else if (Operation == TEXT("Multiply")) FunctionName = TEXT("Multiply_IntInt");
+        else if (Operation == TEXT("Divide")) FunctionName = TEXT("Divide_IntInt");
     }
 
-    if (FunctionName == NAME_None)
+    if (FunctionName.IsEmpty())
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(
             FString::Printf(TEXT("Unsupported operation/type: %s/%s"), *Operation, *ValueType));
     }
 
+    // Find the math function
+    UFunction* MathFunction = UKismetMathLibrary::StaticClass()->FindFunctionByName(*FunctionName);
+    if (!MathFunction)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Failed to find math function: %s"), *FunctionName));
+    }
+
     // UK2Node_CallFunction を作成
     UK2Node_CallFunction* MathNode = NewObject<UK2Node_CallFunction>(EventGraph);
-    MathNode->FunctionReference.SetExternalMember(FunctionName, UKismetMathLibrary::StaticClass());
+    MathNode->FunctionReference.SetExternalMember(MathFunction->GetFName(), UKismetMathLibrary::StaticClass());
     MathNode->NodePosX = NodePosition.X;
     MathNode->NodePosY = NodePosition.Y;
     MathNode->AllocateDefaultPins();
@@ -1947,35 +1955,43 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddComparison
     }
 
     // Map operation to function name
-    FName FunctionName = NAME_None;
+    FString FunctionName;
     if (ValueType == TEXT("Float"))
     {
-        if (Operation == TEXT("Greater")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Greater_FloatFloat);
-        else if (Operation == TEXT("GreaterEqual")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, GreaterEqual_FloatFloat);
-        else if (Operation == TEXT("Less")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Less_FloatFloat);
-        else if (Operation == TEXT("LessEqual")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, LessEqual_FloatFloat);
-        else if (Operation == TEXT("Equal")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, EqualEqual_FloatFloat);
-        else if (Operation == TEXT("NotEqual")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, NotEqual_FloatFloat);
+        if (Operation == TEXT("Greater")) FunctionName = TEXT("Greater_DoubleDouble");
+        else if (Operation == TEXT("GreaterEqual")) FunctionName = TEXT("GreaterEqual_DoubleDouble");
+        else if (Operation == TEXT("Less")) FunctionName = TEXT("Less_DoubleDouble");
+        else if (Operation == TEXT("LessEqual")) FunctionName = TEXT("LessEqual_DoubleDouble");
+        else if (Operation == TEXT("Equal")) FunctionName = TEXT("EqualEqual_DoubleDouble");
+        else if (Operation == TEXT("NotEqual")) FunctionName = TEXT("NotEqual_DoubleDouble");
     }
     else if (ValueType == TEXT("Int"))
     {
-        if (Operation == TEXT("Greater")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Greater_IntInt);
-        else if (Operation == TEXT("GreaterEqual")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, GreaterEqual_IntInt);
-        else if (Operation == TEXT("Less")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, Less_IntInt);
-        else if (Operation == TEXT("LessEqual")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, LessEqual_IntInt);
-        else if (Operation == TEXT("Equal")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, EqualEqual_IntInt);
-        else if (Operation == TEXT("NotEqual")) FunctionName = GET_FUNCTION_NAME_CHECKED(UKismetMathLibrary, NotEqual_IntInt);
+        if (Operation == TEXT("Greater")) FunctionName = TEXT("Greater_IntInt");
+        else if (Operation == TEXT("GreaterEqual")) FunctionName = TEXT("GreaterEqual_IntInt");
+        else if (Operation == TEXT("Less")) FunctionName = TEXT("Less_IntInt");
+        else if (Operation == TEXT("LessEqual")) FunctionName = TEXT("LessEqual_IntInt");
+        else if (Operation == TEXT("Equal")) FunctionName = TEXT("EqualEqual_IntInt");
+        else if (Operation == TEXT("NotEqual")) FunctionName = TEXT("NotEqual_IntInt");
     }
 
-    if (FunctionName == NAME_None)
+    if (FunctionName.IsEmpty())
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(
             FString::Printf(TEXT("Unsupported comparison/type: %s/%s"), *Operation, *ValueType));
     }
 
+    // Find the comparison function
+    UFunction* ComparisonFunction = UKismetMathLibrary::StaticClass()->FindFunctionByName(*FunctionName);
+    if (!ComparisonFunction)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Failed to find comparison function: %s"), *FunctionName));
+    }
+
     // UK2Node_CallFunction を作成
     UK2Node_CallFunction* CompareNode = NewObject<UK2Node_CallFunction>(EventGraph);
-    CompareNode->FunctionReference.SetExternalMember(FunctionName, UKismetMathLibrary::StaticClass());
+    CompareNode->FunctionReference.SetExternalMember(ComparisonFunction->GetFName(), UKismetMathLibrary::StaticClass());
     CompareNode->NodePosX = NodePosition.X;
     CompareNode->NodePosY = NodePosition.Y;
     CompareNode->AllocateDefaultPins();

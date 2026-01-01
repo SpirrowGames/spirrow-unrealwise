@@ -52,28 +52,51 @@ def register_editor_tools(mcp: FastMCP):
             return []
 
     @mcp.tool()
-    def find_actors_by_name(ctx: Context, pattern: str) -> List[str]:
-        """Find actors by name pattern."""
+    def find_actors_by_name(ctx: Context, pattern: str) -> Dict[str, Any]:
+        """Find actors by name pattern.
+        
+        Args:
+            ctx: The MCP context
+            pattern: Name pattern to search for (partial match)
+            
+        Returns:
+            Dict containing matching actors list
+        """
         from unreal_mcp_server import get_unreal_connection
         
         try:
             unreal = get_unreal_connection()
             if not unreal:
                 logger.warning("Failed to connect to Unreal Engine")
-                return []
+                return {"success": False, "actors": [], "message": "Failed to connect to Unreal Engine"}
                 
             response = unreal.send_command("find_actors_by_name", {
                 "pattern": pattern
             })
             
             if not response:
-                return []
+                return {"success": False, "actors": [], "message": "No response from Unreal Engine"}
+            
+            # Log for debugging
+            logger.info(f"find_actors_by_name response: {response}")
+            
+            # Handle different response formats
+            actors = []
+            if "result" in response and "actors" in response["result"]:
+                actors = response["result"]["actors"]
+            elif "actors" in response:
+                actors = response["actors"]
                 
-            return response.get("actors", [])
+            return {
+                "success": True,
+                "actors": actors,
+                "count": len(actors),
+                "pattern": pattern
+            }
             
         except Exception as e:
             logger.error(f"Error finding actors: {e}")
-            return []
+            return {"success": False, "actors": [], "message": str(e)}
     
     @mcp.tool()
     def spawn_actor(

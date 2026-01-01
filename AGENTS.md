@@ -484,6 +484,8 @@ search_knowledge("質量 設定", category="physics")
 
 ## 更新履歴
 
+- 2026-01-01: find_blueprint_nodes修正完了。node_typeをオプショナル化、全ノードタイプ対応（Event/Function/Variable/Branch/Sequence/Macro/InputAction/Self）、詳細情報返却（node_id, node_type, node_class, name, position, pins）
+- 2026-01-01: find_actors_by_name修正完了。レスポンス形式改善（success/pattern/count/actorsフィールド追加）でMCP表示問題を解決
 - 2026-01-01: Math/Comparisonノード動作確認完了。add_math_node (Add/Subtract/Multiply/Divide)、add_comparison_node (Greater/Less/Equal等) がFloat/Int両対応で動作OK。ピン名: A, B, ReturnValue
 - 2025-12-25: 制御フロー・ユーティリティノードツール追加（add_sequence_node, add_delay_node, add_print_string_node）
 - 2025-12-16: create_blueprint で UUserWidget を親クラスとして指定可能に。Widget Blueprint の自動生成に対応

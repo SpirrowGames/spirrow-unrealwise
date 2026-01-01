@@ -976,68 +976,182 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddBlueprintS
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleFindBlueprintNodes(const TSharedPtr<FJsonObject>& Params)
 {
-    // Get required parameters
+    // 必須パラメータ
     FString BlueprintName;
     if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
     }
 
+    // オプショナルパラメータ
     FString NodeType;
-    if (!Params->TryGetStringField(TEXT("node_type"), NodeType))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'node_type' parameter"));
-    }
+    Params->TryGetStringField(TEXT("node_type"), NodeType);
 
-    // Get path parameter (default: /Game/Blueprints)
+    FString EventType;
+    Params->TryGetStringField(TEXT("event_type"), EventType);
+
+    FString FunctionNameFilter;
+    Params->TryGetStringField(TEXT("function_name"), FunctionNameFilter);
+
+    FString VariableNameFilter;
+    Params->TryGetStringField(TEXT("variable_name"), VariableNameFilter);
+
     FString Path;
     if (!Params->TryGetStringField(TEXT("path"), Path))
     {
         Path = TEXT("/Game/Blueprints");
     }
 
-    // Find the blueprint
+    // Blueprintを検索
     UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
     if (!Blueprint)
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
     }
 
-    // Get the event graph
+    // EventGraphを取得
     UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
     if (!EventGraph)
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get event graph"));
     }
 
-    // Create a JSON array for the node GUIDs
-    TArray<TSharedPtr<FJsonValue>> NodeGuidArray;
-    
-    // Filter nodes by the exact requested type
-    if (NodeType == TEXT("Event"))
+    // ノード情報を収集
+    TArray<TSharedPtr<FJsonValue>> NodesArray;
+
+    for (UEdGraphNode* Node : EventGraph->Nodes)
     {
-        FString EventName;
-        if (!Params->TryGetStringField(TEXT("event_type"), EventName))
+        if (!Node) continue;
+
+        // ノードタイプを判定
+        FString DetectedType = TEXT("Other");
+        FString NodeName;
+
+        if (UK2Node_Event* EventNode = Cast<UK2Node_Event>(Node))
         {
-            return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'event_type' parameter for Event node search"));
-        }
-        
-        // Look for nodes with exact event name (e.g., ReceiveBeginPlay)
-        for (UEdGraphNode* Node : EventGraph->Nodes)
-        {
-            UK2Node_Event* EventNode = Cast<UK2Node_Event>(Node);
-            if (EventNode && EventNode->EventReference.GetMemberName() == FName(*EventName))
+            DetectedType = TEXT("Event");
+            NodeName = EventNode->EventReference.GetMemberName().ToString();
+
+            // EventTypeフィルタ
+            if (!EventType.IsEmpty() && NodeName != EventType)
             {
-                UE_LOG(LogTemp, Display, TEXT("Found event node with name %s: %s"), *EventName, *EventNode->NodeGuid.ToString());
-                NodeGuidArray.Add(MakeShared<FJsonValueString>(EventNode->NodeGuid.ToString()));
+                continue;
             }
         }
+        else if (UK2Node_CallFunction* FuncNode = Cast<UK2Node_CallFunction>(Node))
+        {
+            DetectedType = TEXT("Function");
+            NodeName = FuncNode->FunctionReference.GetMemberName().ToString();
+
+            // FunctionNameフィルタ
+            if (!FunctionNameFilter.IsEmpty() && NodeName != FunctionNameFilter)
+            {
+                continue;
+            }
+        }
+        else if (UK2Node_VariableGet* VarGetNode = Cast<UK2Node_VariableGet>(Node))
+        {
+            DetectedType = TEXT("VariableGet");
+            NodeName = VarGetNode->VariableReference.GetMemberName().ToString();
+
+            if (!VariableNameFilter.IsEmpty() && NodeName != VariableNameFilter)
+            {
+                continue;
+            }
+        }
+        else if (UK2Node_VariableSet* VarSetNode = Cast<UK2Node_VariableSet>(Node))
+        {
+            DetectedType = TEXT("VariableSet");
+            NodeName = VarSetNode->VariableReference.GetMemberName().ToString();
+
+            if (!VariableNameFilter.IsEmpty() && NodeName != VariableNameFilter)
+            {
+                continue;
+            }
+        }
+        else if (UK2Node_IfThenElse* BranchNode = Cast<UK2Node_IfThenElse>(Node))
+        {
+            DetectedType = TEXT("Branch");
+            NodeName = TEXT("Branch");
+        }
+        else if (UK2Node_ExecutionSequence* SeqNode = Cast<UK2Node_ExecutionSequence>(Node))
+        {
+            DetectedType = TEXT("Sequence");
+            NodeName = TEXT("Sequence");
+        }
+        else if (UK2Node_MacroInstance* MacroNode = Cast<UK2Node_MacroInstance>(Node))
+        {
+            DetectedType = TEXT("Macro");
+            if (MacroNode->GetMacroGraph())
+            {
+                NodeName = MacroNode->GetMacroGraph()->GetName();
+            }
+        }
+        else if (UK2Node_InputAction* InputNode = Cast<UK2Node_InputAction>(Node))
+        {
+            DetectedType = TEXT("InputAction");
+            NodeName = InputNode->InputActionName.ToString();
+        }
+        else if (UK2Node_Self* SelfNode = Cast<UK2Node_Self>(Node))
+        {
+            DetectedType = TEXT("Self");
+            NodeName = TEXT("Self");
+        }
+
+        // NodeTypeフィルタ（空の場合は全て通過）
+        if (!NodeType.IsEmpty() && NodeType != TEXT("All"))
+        {
+            // Variable は VariableGet/VariableSet 両方にマッチ
+            if (NodeType == TEXT("Variable"))
+            {
+                if (DetectedType != TEXT("VariableGet") && DetectedType != TEXT("VariableSet"))
+                {
+                    continue;
+                }
+            }
+            else if (DetectedType != NodeType)
+            {
+                continue;
+            }
+        }
+
+        // ノード情報をJSON化
+        TSharedPtr<FJsonObject> NodeObj = MakeShared<FJsonObject>();
+        NodeObj->SetStringField(TEXT("node_id"), Node->NodeGuid.ToString());
+        NodeObj->SetStringField(TEXT("node_type"), DetectedType);
+        NodeObj->SetStringField(TEXT("node_class"), Node->GetClass()->GetName());
+        NodeObj->SetStringField(TEXT("name"), NodeName);
+
+        // 位置情報
+        TSharedPtr<FJsonObject> PosObj = MakeShared<FJsonObject>();
+        PosObj->SetNumberField(TEXT("x"), Node->NodePosX);
+        PosObj->SetNumberField(TEXT("y"), Node->NodePosY);
+        NodeObj->SetObjectField(TEXT("position"), PosObj);
+
+        // ピン情報
+        TArray<TSharedPtr<FJsonValue>> PinsArray;
+        for (UEdGraphPin* Pin : Node->Pins)
+        {
+            if (!Pin) continue;
+
+            TSharedPtr<FJsonObject> PinObj = MakeShared<FJsonObject>();
+            PinObj->SetStringField(TEXT("name"), Pin->PinName.ToString());
+            PinObj->SetStringField(TEXT("direction"), Pin->Direction == EGPD_Input ? TEXT("Input") : TEXT("Output"));
+            PinObj->SetStringField(TEXT("type"), Pin->PinType.PinCategory.ToString());
+            PinObj->SetBoolField(TEXT("connected"), Pin->LinkedTo.Num() > 0);
+
+            PinsArray.Add(MakeShared<FJsonValueObject>(PinObj));
+        }
+        NodeObj->SetArrayField(TEXT("pins"), PinsArray);
+
+        NodesArray.Add(MakeShared<FJsonValueObject>(NodeObj));
     }
-    // Add other node types as needed (InputAction, etc.)
-    
+
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
-    ResultObj->SetArrayField(TEXT("node_guids"), NodeGuidArray);
-    
+    ResultObj->SetBoolField(TEXT("success"), true);
+    ResultObj->SetArrayField(TEXT("nodes"), NodesArray);
+    ResultObj->SetNumberField(TEXT("count"), NodesArray.Num());
+
     return ResultObj;
 }
 

@@ -134,8 +134,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleFindActorsByName(con
     }
     
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
+    ResultObj->SetStringField(TEXT("pattern"), Pattern);
     ResultObj->SetArrayField(TEXT("actors"), MatchingActors);
-    
+    ResultObj->SetNumberField(TEXT("count"), MatchingActors.Num());
+
     return ResultObj;
 }
 

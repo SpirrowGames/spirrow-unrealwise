@@ -368,6 +368,33 @@ else if (CommandType == "create_simple_material") {
 4. ✅ **`SpirrowBridge.cpp`** - ExecuteCommand 内ルーティング（**忘れがち！**）
 5. ✅ `Python/tools/*_tools.py` - MCP ツール定義
 
+### 新コマンド追加時のハンドラ選択ガイド
+
+新しいコマンドを追加する際は、以下の表を参考に適切なハンドラを選択する。
+
+| コマンドの種類 | 追加先ハンドラ | 例 |
+|---------------|-----------------|-----|
+| **Blueprint** | | |
+| Blueprint 作成・コンポーネント・プロパティ | `BlueprintCommands` | create_blueprint, add_component_to_blueprint |
+| Blueprint ノード操作（イベント・関数・変数・接続） | `BlueprintNodeCommands` | add_blueprint_event_node, connect_blueprint_nodes |
+| **UMG Widget** | | |
+| Widget 要素の追加（Text, Image, Button 等） | `UMGWidgetCommands` | add_text_to_widget, add_button_to_widget |
+| レイアウト操作（Box 追加・親変更・要素取得） | `UMGLayoutCommands` | add_vertical_box_to_widget, get_widget_elements |
+| アニメーション操作 | `UMGAnimationCommands` | create_widget_animation, add_animation_track |
+| 変数・関数・バインディング | `UMGVariableCommands` | add_widget_variable, bind_widget_to_variable |
+| **その他** | | |
+| アクター・エディタ操作 | `EditorCommands` | spawn_actor, get_actor_properties |
+| プロジェクト設定・入力システム | `ProjectCommands` | create_input_action, delete_asset |
+| Config（INI）操作 | `ConfigCommands` | get_config_value, set_config_value |
+| GAS（Gameplay Ability System） | `GASCommands` | add_gameplay_tags, create_gameplay_effect |
+| マテリアル作成 | `MaterialCommands` | create_simple_material |
+
+#### 判断のヒント
+
+- **既存コマンドと似た操作** → 同じハンドラに追加
+- **新しいカテゴリ** → 新規ハンドラ作成を検討
+- **ファイルサイズが 60KB 超** → 分割を検討
+
 ### 大きいファイルの分割候補
 
 | ファイル | サイズ | 分割案 |
@@ -383,5 +410,6 @@ else if (CommandType == "create_simple_material") {
 
 | 日付 | 内容 |
 |------|------|
+| 2026-01-02 | 新コマンド追加時のハンドラ選択ガイドを追加 |
 | 2026-01-02 | UMGCommands を4分割（Widget/Layout/Animation/Variable） |
 | 2026-01-02 | 初版作成 |

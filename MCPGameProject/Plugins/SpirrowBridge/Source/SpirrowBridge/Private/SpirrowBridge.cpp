@@ -56,7 +56,10 @@
 #include "Commands/SpirrowBridgeBlueprintNodeCommands.h"
 #include "Commands/SpirrowBridgeProjectCommands.h"
 #include "Commands/SpirrowBridgeCommonUtils.h"
-#include "Commands/SpirrowBridgeUMGCommands.h"
+#include "Commands/SpirrowBridgeUMGWidgetCommands.h"
+#include "Commands/SpirrowBridgeUMGLayoutCommands.h"
+#include "Commands/SpirrowBridgeUMGAnimationCommands.h"
+#include "Commands/SpirrowBridgeUMGVariableCommands.h"
 #include "Commands/SpirrowBridgeConfigCommands.h"
 #include "Commands/SpirrowBridgeGASCommands.h"
 #include "Commands/SpirrowBridgeMaterialCommands.h"
@@ -71,7 +74,10 @@ USpirrowBridge::USpirrowBridge()
     BlueprintCommands = MakeShared<FSpirrowBridgeBlueprintCommands>();
     BlueprintNodeCommands = MakeShared<FSpirrowBridgeBlueprintNodeCommands>();
     ProjectCommands = MakeShared<FSpirrowBridgeProjectCommands>();
-    UMGCommands = MakeShared<FSpirrowBridgeUMGCommands>();
+    UMGWidgetCommands = MakeShared<FSpirrowBridgeUMGWidgetCommands>();
+    UMGLayoutCommands = MakeShared<FSpirrowBridgeUMGLayoutCommands>();
+    UMGAnimationCommands = MakeShared<FSpirrowBridgeUMGAnimationCommands>();
+    UMGVariableCommands = MakeShared<FSpirrowBridgeUMGVariableCommands>();
     ConfigCommands = MakeShared<FSpirrowBridgeConfigCommands>();
     GASCommands = MakeShared<FSpirrowBridgeGASCommands>();
     MaterialCommands = MakeShared<FSpirrowBridgeMaterialCommands>();
@@ -83,7 +89,10 @@ USpirrowBridge::~USpirrowBridge()
     BlueprintCommands.Reset();
     BlueprintNodeCommands.Reset();
     ProjectCommands.Reset();
-    UMGCommands.Reset();
+    UMGWidgetCommands.Reset();
+    UMGLayoutCommands.Reset();
+    UMGAnimationCommands.Reset();
+    UMGVariableCommands.Reset();
     ConfigCommands.Reset();
     GASCommands.Reset();
     MaterialCommands.Reset();
@@ -308,48 +317,54 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
             {
                 ResultJson = ProjectCommands->HandleCommand(CommandType, Params);
             }
-            // UMG Commands
+            // UMG Widget Commands
             else if (CommandType == TEXT("create_umg_widget_blueprint") ||
-                     CommandType == TEXT("add_text_block_to_widget") ||
-                     CommandType == TEXT("add_button_to_widget") ||
-                     CommandType == TEXT("bind_widget_event") ||
-                     CommandType == TEXT("set_text_block_binding") ||
-                     CommandType == TEXT("add_widget_to_viewport") ||
                      CommandType == TEXT("add_text_to_widget") ||
+                     CommandType == TEXT("add_text_block_to_widget") ||
                      CommandType == TEXT("add_image_to_widget") ||
                      CommandType == TEXT("add_progressbar_to_widget") ||
-                     // Phase 1: Designer Operations
+                     CommandType == TEXT("add_button_to_widget") ||
+                     CommandType == TEXT("add_slider_to_widget") ||
+                     CommandType == TEXT("add_checkbox_to_widget") ||
+                     CommandType == TEXT("add_combobox_to_widget") ||
+                     CommandType == TEXT("add_editabletext_to_widget") ||
+                     CommandType == TEXT("add_spinbox_to_widget") ||
+                     CommandType == TEXT("add_scrollbox_to_widget") ||
+                     CommandType == TEXT("add_widget_to_viewport"))
+            {
+                ResultJson = UMGWidgetCommands->HandleCommand(CommandType, Params);
+            }
+            // UMG Layout Commands
+            else if (CommandType == TEXT("add_vertical_box_to_widget") ||
+                     CommandType == TEXT("add_horizontal_box_to_widget") ||
                      CommandType == TEXT("get_widget_elements") ||
                      CommandType == TEXT("set_widget_slot_property") ||
                      CommandType == TEXT("set_widget_element_property") ||
-                     CommandType == TEXT("add_vertical_box_to_widget") ||
-                     CommandType == TEXT("add_horizontal_box_to_widget") ||
                      CommandType == TEXT("reparent_widget_element") ||
-                     CommandType == TEXT("remove_widget_element") ||
-                     // Phase 2: Variable & Function Operations
-                     CommandType == TEXT("add_widget_variable") ||
+                     CommandType == TEXT("remove_widget_element"))
+            {
+                ResultJson = UMGLayoutCommands->HandleCommand(CommandType, Params);
+            }
+            // UMG Animation Commands
+            else if (CommandType == TEXT("create_widget_animation") ||
+                     CommandType == TEXT("add_animation_track") ||
+                     CommandType == TEXT("add_animation_keyframe") ||
+                     CommandType == TEXT("get_widget_animations"))
+            {
+                ResultJson = UMGAnimationCommands->HandleCommand(CommandType, Params);
+            }
+            // UMG Variable Commands
+            else if (CommandType == TEXT("add_widget_variable") ||
+                     CommandType == TEXT("add_widget_array_variable") ||
                      CommandType == TEXT("set_widget_variable_default") ||
                      CommandType == TEXT("add_widget_function") ||
                      CommandType == TEXT("add_widget_event") ||
                      CommandType == TEXT("bind_widget_to_variable") ||
-                     // Phase 3: Animation Operations
-                     CommandType == TEXT("create_widget_animation") ||
-                     CommandType == TEXT("add_animation_track") ||
-                     CommandType == TEXT("add_animation_keyframe") ||
-                     CommandType == TEXT("get_widget_animations") ||
-                     CommandType == TEXT("add_widget_array_variable") ||
-                     // Phase 4-A: Interactive Widgets
-                     CommandType == TEXT("add_button_to_widget_v2") ||
-                     CommandType == TEXT("bind_widget_component_event") ||
-                     CommandType == TEXT("add_slider_to_widget") ||
-                     CommandType == TEXT("add_checkbox_to_widget") ||
-                     // Phase 4-B: Additional Interactive Widgets
-                     CommandType == TEXT("add_combobox_to_widget") ||
-                     CommandType == TEXT("add_editabletext_to_widget") ||
-                     CommandType == TEXT("add_spinbox_to_widget") ||
-                     CommandType == TEXT("add_scrollbox_to_widget"))
+                     CommandType == TEXT("bind_widget_event") ||
+                     CommandType == TEXT("set_text_block_binding") ||
+                     CommandType == TEXT("bind_widget_component_event"))
             {
-                ResultJson = UMGCommands->HandleCommand(CommandType, Params);
+                ResultJson = UMGVariableCommands->HandleCommand(CommandType, Params);
             }
             // Config Commands
             else if (CommandType == TEXT("get_config_value") ||

@@ -251,6 +251,45 @@
 
 ## 最新の更新履歴
 
+### 2026-01-02: UMGCommands 分割リファクタリング完了 🆕
+
+**完了内容**:
+- `SpirrowBridgeUMGCommands.cpp` (166 KB) を4ファイルに分割
+- オプションB採用: SpirrowBridge.cpp で直接ルーティング
+
+**新ファイル構成**:
+| ファイル | サイズ | 担当 |
+|----------|--------|------|
+| `SpirrowBridgeUMGWidgetCommands.cpp` | 64 KB | Widget追加（14関数） |
+| `SpirrowBridgeUMGVariableCommands.cpp` | 40 KB | 変数・関数・バインディング（10関数） |
+| `SpirrowBridgeUMGLayoutCommands.cpp` | 32 KB | レイアウト操作（7関数） |
+| `SpirrowBridgeUMGAnimationCommands.cpp` | 23 KB | アニメーション（4関数） |
+
+**削除ファイル**:
+- `SpirrowBridgeUMGCommands.h`
+- `SpirrowBridgeUMGCommands.cpp`
+
+**変更ファイル**:
+- `SpirrowBridge.h` - 新ハンドラのインクルードとメンバ変数
+- `SpirrowBridge.cpp` - 4つのハンドラへのルーティング
+
+**テスト結果**:
+- Widget系: ✅ `create_umg_widget_blueprint`, `add_text_to_widget`
+- Layout系: ✅ `add_vertical_box_to_widget`, `get_widget_elements`
+- Animation系: ✅ `create_widget_animation`, `get_widget_animations`
+- Variable系: ✅ `add_widget_variable`, `add_widget_function`
+- 他カテゴリ: ✅ Blueprint系, Editor系に影響なし
+
+**ドキュメント**:
+- `Docs/Refactoring_UMGCommands_Split_Prompt.md` - 実装プロンプト
+- `Docs/IMPLEMENTATION_SUMMARY.md` - 更新済み
+
+**次の分割候補**:
+- `SpirrowBridgeBlueprintCommands.cpp` (93 KB)
+- `SpirrowBridgeBlueprintNodeCommands.cpp` (87 KB)
+
+---
+
 ### 2026-01-01: Math/Comparisonノード動作確認完了 🆕
 
 **テスト結果**:

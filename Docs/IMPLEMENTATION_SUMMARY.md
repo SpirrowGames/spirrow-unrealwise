@@ -4,7 +4,7 @@
 新しいチャットセッション開始時に、コードベースの全体像を把握するために参照してください。
 
 > **最終更新**: 2026-01-02  
-> **バージョン**: 0.6.3
+> **バージョン**: 0.6.4
 
 ---
 
@@ -14,33 +14,54 @@
 
 | ファイル | サイズ | 役割 |
 |----------|--------|------|
-| `SpirrowBridgeUMGCommands.cpp` | 166 KB | UMG Widget Blueprint 操作 |
 | `SpirrowBridgeBlueprintCommands.cpp` | 93 KB | Blueprint 作成・編集 |
 | `SpirrowBridgeBlueprintNodeCommands.cpp` | 87 KB | Blueprint ノード操作 |
+| `SpirrowBridgeUMGWidgetCommands.cpp` | 64 KB | UMG Widget 追加 |
 | `SpirrowBridgeGASCommands.cpp` | 55 KB | Gameplay Ability System |
+| `SpirrowBridgeUMGVariableCommands.cpp` | 40 KB | Widget 変数・バインディング |
 | `SpirrowBridgeCommonUtils.cpp` | 35 KB | 共通ユーティリティ |
+| `SpirrowBridgeUMGLayoutCommands.cpp` | 32 KB | レイアウト操作 |
 | `SpirrowBridgeEditorCommands.cpp` | 29 KB | アクター・エディタ操作 |
-| `SpirrowBridgeProjectCommands.cpp` | 14 KB | プロジェクト・入力設定 |
+| `SpirrowBridgeProjectCommands.cpp` | 25 KB | プロジェクト・入力設定 |
+| `SpirrowBridgeUMGAnimationCommands.cpp` | 23 KB | Widget アニメーション |
 | `SpirrowBridgeMaterialCommands.cpp` | 8 KB | マテリアル作成 |
 | `SpirrowBridgeConfigCommands.cpp` | 8 KB | Config（INI）操作 |
 
-**合計**: 9 ファイル、493 KB
+**合計**: 12 ファイル（UMGCommands を4分割）
 
 ---
 
 ## クラス別関数一覧
 
-### FSpirrowBridgeUMGCommands (166 KB)
+### FSpirrowBridgeUMGWidgetCommands (64 KB)
 
-Widget Blueprint の作成・編集を担当。
+Widget の追加を担当。
 
-#### Phase 1: Designer Operations
 | 関数 | MCPコマンド | 説明 |
 |------|-------------|------|
 | `HandleCreateUMGWidgetBlueprint` | `create_umg_widget_blueprint` | Widget Blueprint 作成 |
 | `HandleAddTextToWidget` | `add_text_to_widget` | TextBlock 追加 |
+| `HandleAddTextBlockToWidget` | `add_text_block_to_widget` | Legacy API |
 | `HandleAddImageToWidget` | `add_image_to_widget` | Image 追加 |
 | `HandleAddProgressBarToWidget` | `add_progressbar_to_widget` | ProgressBar 追加 |
+| `HandleAddButtonToWidget` | `add_button_to_widget` | Button 追加 |
+| `HandleAddButtonToWidgetV2` | - | 内部用 |
+| `HandleAddSliderToWidget` | `add_slider_to_widget` | Slider 追加 |
+| `HandleAddCheckBoxToWidget` | `add_checkbox_to_widget` | CheckBox 追加 |
+| `HandleAddComboBoxToWidget` | `add_combobox_to_widget` | ComboBox 追加 |
+| `HandleAddEditableTextToWidget` | `add_editabletext_to_widget` | EditableText 追加 |
+| `HandleAddSpinBoxToWidget` | `add_spinbox_to_widget` | SpinBox 追加 |
+| `HandleAddScrollBoxToWidget` | `add_scrollbox_to_widget` | ScrollBox 追加 |
+| `HandleAddWidgetToViewport` | `add_widget_to_viewport` | Legacy API |
+
+---
+
+### FSpirrowBridgeUMGLayoutCommands (32 KB)
+
+レイアウト操作を担当。
+
+| 関数 | MCPコマンド | 説明 |
+|------|-------------|------|
 | `HandleAddVerticalBoxToWidget` | `add_vertical_box_to_widget` | VerticalBox 追加 |
 | `HandleAddHorizontalBoxToWidget` | `add_horizontal_box_to_widget` | HorizontalBox 追加 |
 | `HandleGetWidgetElements` | `get_widget_elements` | 要素一覧取得 |
@@ -49,44 +70,36 @@ Widget Blueprint の作成・編集を担当。
 | `HandleReparentWidgetElement` | `reparent_widget_element` | 親変更 |
 | `HandleRemoveWidgetElement` | `remove_widget_element` | 要素削除 |
 
-#### Phase 2: Variable & Function Operations
-| 関数 | MCPコマンド | 説明 |
-|------|-------------|------|
-| `HandleAddWidgetVariable` | `add_widget_variable` | 変数追加 |
-| `HandleSetWidgetVariableDefault` | `set_widget_variable_default` | デフォルト値設定 |
-| `HandleAddWidgetFunction` | `add_widget_function` | 関数作成 |
-| `HandleAddWidgetEvent` | `add_widget_event` | イベント作成 |
-| `HandleBindWidgetToVariable` | `bind_widget_to_variable` | バインディング関数作成 |
+---
 
-#### Phase 3: Animation
+### FSpirrowBridgeUMGAnimationCommands (23 KB)
+
+Widget アニメーションを担当。
+
 | 関数 | MCPコマンド | 説明 |
 |------|-------------|------|
 | `HandleCreateWidgetAnimation` | `create_widget_animation` | アニメーション作成 |
 | `HandleAddAnimationTrack` | `add_animation_track` | トラック追加 |
 | `HandleAddAnimationKeyframe` | `add_animation_keyframe` | キーフレーム追加 |
 | `HandleGetWidgetAnimations` | `get_widget_animations` | アニメーション一覧 |
+
+---
+
+### FSpirrowBridgeUMGVariableCommands (40 KB)
+
+Widget 変数・関数・バインディングを担当。
+
+| 関数 | MCPコマンド | 説明 |
+|------|-------------|------|
+| `HandleAddWidgetVariable` | `add_widget_variable` | 変数追加 |
 | `HandleAddWidgetArrayVariable` | `add_widget_array_variable` | 配列変数追加 |
-
-#### Phase 4: Interactive Widgets
-| 関数 | MCPコマンド | 説明 |
-|------|-------------|------|
-| `HandleAddButtonToWidgetV2` | `add_button_to_widget` | Button 追加（新API） |
-| `HandleBindWidgetComponentEvent` | `bind_widget_component_event` | イベントバインディング |
-| `HandleAddSliderToWidget` | `add_slider_to_widget` | Slider 追加 |
-| `HandleAddCheckBoxToWidget` | `add_checkbox_to_widget` | CheckBox 追加 |
-| `HandleAddComboBoxToWidget` | `add_combobox_to_widget` | ComboBox 追加 |
-| `HandleAddEditableTextToWidget` | `add_editabletext_to_widget` | EditableText 追加 |
-| `HandleAddSpinBoxToWidget` | `add_spinbox_to_widget` | SpinBox 追加 |
-| `HandleAddScrollBoxToWidget` | `add_scrollbox_to_widget` | ScrollBox 追加 |
-
-#### Legacy（旧API）
-| 関数 | MCPコマンド | 説明 |
-|------|-------------|------|
-| `HandleAddTextBlockToWidget` | `add_text_block_to_widget` | 旧API |
-| `HandleAddButtonToWidget` | - | 旧API（内部用） |
-| `HandleBindWidgetEvent` | `bind_widget_event` | 旧API |
-| `HandleAddWidgetToViewport` | `add_widget_to_viewport` | 旧API |
-| `HandleSetTextBlockBinding` | `set_text_block_binding` | 旧API |
+| `HandleSetWidgetVariableDefault` | `set_widget_variable_default` | デフォルト値設定 |
+| `HandleAddWidgetFunction` | `add_widget_function` | 関数作成 |
+| `HandleAddWidgetEvent` | `add_widget_event` | イベント作成 |
+| `HandleBindWidgetToVariable` | `bind_widget_to_variable` | バインディング関数作成 |
+| `HandleBindWidgetEvent` | `bind_widget_event` | イベントバインディング |
+| `HandleSetTextBlockBinding` | `set_text_block_binding` | テキストバインディング |
+| `HandleBindWidgetComponentEvent` | `bind_widget_component_event` | コンポーネントイベント |
 
 #### ヘルパー
 | 関数 | 説明 |
@@ -313,8 +326,18 @@ if (CommandType == "create_blueprint" || ...) {
 else if (CommandType == "add_blueprint_event_node" || ...) {
     BlueprintNodeCommands->HandleCommand(...)
 }
+// UMG Commands (4分割)
 else if (CommandType == "create_umg_widget_blueprint" || ...) {
-    UMGCommands->HandleCommand(...)
+    UMGWidgetCommands->HandleCommand(...)
+}
+else if (CommandType == "add_vertical_box_to_widget" || ...) {
+    UMGLayoutCommands->HandleCommand(...)
+}
+else if (CommandType == "create_widget_animation" || ...) {
+    UMGAnimationCommands->HandleCommand(...)
+}
+else if (CommandType == "add_widget_variable" || ...) {
+    UMGVariableCommands->HandleCommand(...)
 }
 else if (CommandType == "get_actors_in_level" || ...) {
     EditorCommands->HandleCommand(...)
@@ -349,9 +372,10 @@ else if (CommandType == "create_simple_material") {
 
 | ファイル | サイズ | 分割案 |
 |----------|--------|--------|
-| `SpirrowBridgeUMGCommands.cpp` | 166 KB | Widget/Layout/Animation/Binding に4分割 |
-| `SpirrowBridgeBlueprintCommands.cpp` | 93 KB | 要検討 |
-| `SpirrowBridgeBlueprintNodeCommands.cpp` | 87 KB | 要検討 |
+| `SpirrowBridgeBlueprintCommands.cpp` | 93 KB | Component/Graph/Property に3分割検討 |
+| `SpirrowBridgeBlueprintNodeCommands.cpp` | 87 KB | Event/Flow/Math に3分割検討 |
+
+> **Note**: `SpirrowBridgeUMGCommands.cpp` (166KB) は 2026-01-02 に4分割完了。
 
 ---
 
@@ -359,4 +383,5 @@ else if (CommandType == "create_simple_material") {
 
 | 日付 | 内容 |
 |------|------|
+| 2026-01-02 | UMGCommands を4分割（Widget/Layout/Animation/Variable） |
 | 2026-01-02 | 初版作成 |

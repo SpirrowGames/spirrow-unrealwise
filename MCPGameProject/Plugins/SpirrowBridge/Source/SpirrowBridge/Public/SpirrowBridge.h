@@ -12,7 +12,10 @@
 #include "Commands/SpirrowBridgeBlueprintCommands.h"
 #include "Commands/SpirrowBridgeBlueprintNodeCommands.h"
 #include "Commands/SpirrowBridgeProjectCommands.h"
-#include "Commands/SpirrowBridgeUMGCommands.h"
+#include "Commands/SpirrowBridgeUMGWidgetCommands.h"
+#include "Commands/SpirrowBridgeUMGLayoutCommands.h"
+#include "Commands/SpirrowBridgeUMGAnimationCommands.h"
+#include "Commands/SpirrowBridgeUMGVariableCommands.h"
 #include "Commands/SpirrowBridgeConfigCommands.h"
 #include "Commands/SpirrowBridgeGASCommands.h"
 #include "Commands/SpirrowBridgeMaterialCommands.h"
@@ -63,7 +66,10 @@ private:
 	TSharedPtr<FSpirrowBridgeBlueprintCommands> BlueprintCommands;
 	TSharedPtr<FSpirrowBridgeBlueprintNodeCommands> BlueprintNodeCommands;
 	TSharedPtr<FSpirrowBridgeProjectCommands> ProjectCommands;
-	TSharedPtr<FSpirrowBridgeUMGCommands> UMGCommands;
+	TSharedPtr<FSpirrowBridgeUMGWidgetCommands> UMGWidgetCommands;
+	TSharedPtr<FSpirrowBridgeUMGLayoutCommands> UMGLayoutCommands;
+	TSharedPtr<FSpirrowBridgeUMGAnimationCommands> UMGAnimationCommands;
+	TSharedPtr<FSpirrowBridgeUMGVariableCommands> UMGVariableCommands;
 	TSharedPtr<FSpirrowBridgeConfigCommands> ConfigCommands;
 	TSharedPtr<FSpirrowBridgeGASCommands> GASCommands;
 	TSharedPtr<FSpirrowBridgeMaterialCommands> MaterialCommands;

@@ -251,7 +251,36 @@
 
 ## 最新の更新履歴
 
-### 2026-01-02: UMGCommands 分割リファクタリング完了 🆕
+### 2026-01-03: BlueprintCommands 分割リファクタリング完了 (Phase 0.6.5) 🆕
+
+**完了内容**:
+- `SpirrowBridgeBlueprintCommands.cpp` (95 KB) を3ファイルに分割
+- `SpirrowBridgeBlueprintNodeCommands.cpp` (68 KB) を3ファイルに分割
+- オプションB採用: 各ルーターファイルから分割クラスへ委譲
+
+**新ファイル構成 - Blueprint系**:
+| ファイル | サイズ | 担当 |
+|----------|--------|------|
+| `SpirrowBridgeBlueprintCoreCommands.cpp` | 23 KB | 作成/コンパイル/スポーン/複製/グラフ取得（6関数） |
+| `SpirrowBridgeBlueprintComponentCommands.cpp` | 26 KB | コンポーネント追加/プロパティ設定/物理（5関数） |
+| `SpirrowBridgeBlueprintPropertyCommands.cpp` | 21 KB | クラススキャン/配列プロパティ（3関数） |
+| `SpirrowBridgeBlueprintCommands.cpp` | 1.7 KB | ルーター |
+
+**新ファイル構成 - BlueprintNode系**:
+| ファイル | サイズ | 担当 |
+|----------|--------|------|
+| `SpirrowBridgeBlueprintNodeCoreCommands.cpp` | 24 KB | 接続/検索/イベント/関数呼び出し（7関数） |
+| `SpirrowBridgeBlueprintNodeVariableCommands.cpp` | 14 KB | 変数/Get/Set/Self参照/InputAction（6関数） |
+| `SpirrowBridgeBlueprintNodeControlFlowCommands.cpp` | 21 KB | Branch/Sequence/Delay/Loop/Math/Print（8関数） |
+| `SpirrowBridgeBlueprintNodeCommands.cpp` | 1.7 KB | ルーター |
+
+**削減効果**:
+- 最大ファイルサイズ: 95KB → 26KB (73%削減)
+- 合計6ファイル追加、既存2ファイルはルーターに変換
+
+---
+
+### 2026-01-02: UMGCommands 分割リファクタリング完了
 
 **完了内容**:
 - `SpirrowBridgeUMGCommands.cpp` (166 KB) を4ファイルに分割

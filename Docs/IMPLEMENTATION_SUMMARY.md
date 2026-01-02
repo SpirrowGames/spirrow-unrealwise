@@ -3,8 +3,8 @@
 このドキュメントは、SpirrowBridge プラグインの C++ 実装概要をまとめたものです。
 新しいチャットセッション開始時に、コードベースの全体像を把握するために参照してください。
 
-> **最終更新**: 2026-01-02  
-> **バージョン**: 0.6.4
+> **最終更新**: 2026-01-03  
+> **バージョン**: 0.6.5
 
 ---
 
@@ -12,26 +12,143 @@
 
 ### Commands ディレクトリ
 
+#### Blueprint 系（3分割 + ルーター）
+
 | ファイル | サイズ | 役割 |
 |----------|--------|------|
-| `SpirrowBridgeBlueprintCommands.cpp` | 93 KB | Blueprint 作成・編集 |
-| `SpirrowBridgeBlueprintNodeCommands.cpp` | 87 KB | Blueprint ノード操作 |
-| `SpirrowBridgeUMGWidgetCommands.cpp` | 64 KB | UMG Widget 追加 |
-| `SpirrowBridgeGASCommands.cpp` | 55 KB | Gameplay Ability System |
-| `SpirrowBridgeUMGVariableCommands.cpp` | 40 KB | Widget 変数・バインディング |
+| `SpirrowBridgeBlueprintCoreCommands.cpp` | 23 KB | Blueprint 作成/コンパイル/スポーン/複製/グラフ取得 |
+| `SpirrowBridgeBlueprintComponentCommands.cpp` | 26 KB | コンポーネント追加/プロパティ設定/物理 |
+| `SpirrowBridgeBlueprintPropertyCommands.cpp` | 21 KB | クラススキャン/配列プロパティ |
+| `SpirrowBridgeBlueprintCommands.cpp` | 1.7 KB | ルーター（上記3ファイルへ委譲） |
+
+#### BlueprintNode 系（3分割 + ルーター）
+
+| ファイル | サイズ | 役割 |
+|----------|--------|------|
+| `SpirrowBridgeBlueprintNodeCoreCommands.cpp` | 24 KB | 接続/検索/イベント/関数呼び出し |
+| `SpirrowBridgeBlueprintNodeVariableCommands.cpp` | 14 KB | 変数/Get/Set/Self参照/InputAction |
+| `SpirrowBridgeBlueprintNodeControlFlowCommands.cpp` | 21 KB | Branch/Sequence/Delay/Loop/Math/Print |
+| `SpirrowBridgeBlueprintNodeCommands.cpp` | 1.7 KB | ルーター（上記3ファイルへ委譲） |
+
+#### UMG Widget 系（4分割）
+
+| ファイル | サイズ | 役割 |
+|----------|--------|------|
+| `SpirrowBridgeUMGWidgetCommands.cpp` | 64 KB | Widget 追加 |
+| `SpirrowBridgeUMGVariableCommands.cpp` | 40 KB | 変数/バインディング |
+| `SpirrowBridgeUMGLayoutCommands.cpp` | 32 KB | レイアウト |
+| `SpirrowBridgeUMGAnimationCommands.cpp` | 23 KB | アニメーション |
+
+#### その他
+
+| ファイル | サイズ | 役割 |
+|----------|--------|------|
+| `SpirrowBridgeGASCommands.cpp` | 55 KB | GAS |
 | `SpirrowBridgeCommonUtils.cpp` | 35 KB | 共通ユーティリティ |
-| `SpirrowBridgeUMGLayoutCommands.cpp` | 32 KB | レイアウト操作 |
 | `SpirrowBridgeEditorCommands.cpp` | 29 KB | アクター・エディタ操作 |
 | `SpirrowBridgeProjectCommands.cpp` | 25 KB | プロジェクト・入力設定 |
-| `SpirrowBridgeUMGAnimationCommands.cpp` | 23 KB | Widget アニメーション |
 | `SpirrowBridgeMaterialCommands.cpp` | 8 KB | マテリアル作成 |
 | `SpirrowBridgeConfigCommands.cpp` | 8 KB | Config（INI）操作 |
 
-**合計**: 12 ファイル（UMGCommands を4分割）
+**合計**: 18 ファイル（Blueprint系6分割、UMG系4分割完了）
 
 ---
 
 ## クラス別関数一覧
+
+### FSpirrowBridgeBlueprintCoreCommands (23 KB)
+
+Blueprint の作成・基本操作を担当。
+
+| 関数 | MCPコマンド | 説明 |
+|------|-------------|------|
+| `HandleCreateBlueprint` | `create_blueprint` | Blueprint 作成 |
+| `HandleCompileBlueprint` | `compile_blueprint` | コンパイル |
+| `HandleSpawnBlueprintActor` | `spawn_blueprint_actor` | Blueprint アクター生成 |
+| `HandleSetBlueprintProperty` | `set_blueprint_property` | Blueprint プロパティ設定 |
+| `HandleDuplicateBlueprint` | `duplicate_blueprint` | Blueprint 複製 |
+| `HandleGetBlueprintGraph` | `get_blueprint_graph` | ノードグラフ取得 |
+
+---
+
+### FSpirrowBridgeBlueprintComponentCommands (26 KB)
+
+コンポーネント追加・プロパティ設定を担当。
+
+| 関数 | MCPコマンド | 説明 |
+|------|-------------|------|
+| `HandleAddComponentToBlueprint` | `add_component_to_blueprint` | コンポーネント追加 |
+| `HandleSetComponentProperty` | `set_component_property` | コンポーネントプロパティ設定 |
+| `HandleSetPhysicsProperties` | `set_physics_properties` | 物理設定 |
+| `HandleSetStaticMeshProperties` | `set_static_mesh_properties` | StaticMesh 設定 |
+| `HandleSetPawnProperties` | - | Pawn プロパティ設定（内部用） |
+
+#### ヘルパー
+| 関数 | 説明 |
+|------|------|
+| `AddComponentToBlueprint` | コンポーネント追加の実装 |
+
+---
+
+### FSpirrowBridgeBlueprintPropertyCommands (21 KB)
+
+クラススキャン・配列プロパティを担当。
+
+| 関数 | MCPコマンド | 説明 |
+|------|-------------|------|
+| `HandleScanProjectClasses` | `scan_project_classes` | プロジェクトクラススキャン |
+| `HandleSetBlueprintClassArray` | `set_blueprint_class_array` | クラス配列設定 |
+| `HandleSetStructArrayProperty` | `set_struct_array_property` | 構造体配列設定 |
+
+---
+
+### FSpirrowBridgeBlueprintNodeCoreCommands (24 KB)
+
+Blueprint ノードの接続・検索・基本操作を担当。
+
+| 関数 | MCPコマンド | 説明 |
+|------|-------------|------|
+| `HandleConnectBlueprintNodes` | `connect_blueprint_nodes` | ノード接続 |
+| `HandleFindBlueprintNodes` | `find_blueprint_nodes` | ノード検索 |
+| `HandleSetNodePinValue` | `set_node_pin_value` | ピン値設定 |
+| `HandleDeleteNode` | `delete_blueprint_node` | ノード削除 |
+| `HandleMoveNode` | `move_blueprint_node` | ノード移動 |
+| `HandleAddBlueprintEvent` | `add_blueprint_event_node` | イベントノード追加 |
+| `HandleAddBlueprintFunctionCall` | `add_blueprint_function_node` | 関数呼び出しノード追加 |
+
+---
+
+### FSpirrowBridgeBlueprintNodeVariableCommands (14 KB)
+
+変数・Self参照・入力アクションを担当。
+
+| 関数 | MCPコマンド | 説明 |
+|------|-------------|------|
+| `HandleAddBlueprintVariable` | `add_blueprint_variable` | 変数追加 |
+| `HandleAddVariableGetNode` | `add_variable_get_node` | 変数 Get ノード追加 |
+| `HandleAddVariableSetNode` | `add_variable_set_node` | 変数 Set ノード追加 |
+| `HandleAddBlueprintGetSelfComponentReference` | `add_blueprint_get_self_component_reference` | コンポーネント参照追加 |
+| `HandleAddBlueprintSelfReference` | `add_blueprint_self_reference` | Self 参照追加 |
+| `HandleAddBlueprintInputActionNode` | `add_blueprint_input_action_node` | 入力アクションノード追加 |
+
+---
+
+### FSpirrowBridgeBlueprintNodeControlFlowCommands (21 KB)
+
+制御フロー・ユーティリティノードを担当。
+
+| 関数 | MCPコマンド | 説明 |
+|------|-------------|------|
+| `HandleAddBranchNode` | `add_branch_node` | Branch ノード追加 |
+| `HandleAddSequenceNode` | `add_sequence_node` | Sequence ノード追加 |
+| `HandleAddDelayNode` | `add_delay_node` | Delay ノード追加 |
+| `HandleAddForEachLoopNode` | `add_foreach_loop_node` | **非推奨** |
+| `HandleAddForLoopWithBreakNode` | `add_forloop_with_break_node` | ForLoopWithBreak 追加 |
+| `HandleAddPrintStringNode` | `add_print_string_node` | PrintString ノード追加 |
+| `HandleAddMathNode` | `add_math_node` | 演算ノード追加 |
+| `HandleAddComparisonNode` | `add_comparison_node` | 比較ノード追加 |
+
+---
 
 ### FSpirrowBridgeUMGWidgetCommands (64 KB)
 
@@ -108,77 +225,6 @@ Widget 変数・関数・バインディングを担当。
 
 ---
 
-### FSpirrowBridgeBlueprintCommands (93 KB)
-
-Blueprint の作成・コンポーネント追加を担当。
-
-| 関数 | MCPコマンド | 説明 |
-|------|-------------|------|
-| `HandleCreateBlueprint` | `create_blueprint` | Blueprint 作成 |
-| `HandleAddComponentToBlueprint` | `add_component_to_blueprint` | コンポーネント追加 |
-| `HandleSetComponentProperty` | `set_component_property` | コンポーネントプロパティ設定 |
-| `HandleSetPhysicsProperties` | `set_physics_properties` | 物理設定 |
-| `HandleCompileBlueprint` | `compile_blueprint` | コンパイル |
-| `HandleSpawnBlueprintActor` | `spawn_blueprint_actor` | Blueprint アクター生成 |
-| `HandleSetBlueprintProperty` | `set_blueprint_property` | Blueprint プロパティ設定 |
-| `HandleSetStaticMeshProperties` | `set_static_mesh_properties` | StaticMesh 設定 |
-| `HandleSetPawnProperties` | - | Pawn プロパティ設定（内部用） |
-| `HandleScanProjectClasses` | `scan_project_classes` | プロジェクトクラススキャン |
-| `HandleDuplicateBlueprint` | `duplicate_blueprint` | Blueprint 複製 |
-| `HandleGetBlueprintGraph` | `get_blueprint_graph` | ノードグラフ取得 |
-| `HandleSetBlueprintClassArray` | `set_blueprint_class_array` | クラス配列設定 |
-| `HandleSetStructArrayProperty` | `set_struct_array_property` | 構造体配列設定 |
-
-#### ヘルパー
-| 関数 | 説明 |
-|------|------|
-| `AddComponentToBlueprint` | コンポーネント追加の実装 |
-
----
-
-### FSpirrowBridgeBlueprintNodeCommands (87 KB)
-
-Blueprint ノードグラフの操作を担当。
-
-#### 基本ノード操作
-| 関数 | MCPコマンド | 説明 |
-|------|-------------|------|
-| `HandleConnectBlueprintNodes` | `connect_blueprint_nodes` | ノード接続 |
-| `HandleAddBlueprintGetSelfComponentReference` | `add_blueprint_get_self_component_reference` | コンポーネント参照追加 |
-| `HandleAddBlueprintEvent` | `add_blueprint_event_node` | イベントノード追加 |
-| `HandleAddBlueprintFunctionCall` | `add_blueprint_function_node` | 関数呼び出しノード追加 |
-| `HandleAddBlueprintVariable` | `add_blueprint_variable` | 変数追加 |
-| `HandleAddBlueprintInputActionNode` | `add_blueprint_input_action_node` | 入力アクションノード追加 |
-| `HandleAddBlueprintSelfReference` | `add_blueprint_self_reference` | Self 参照追加 |
-| `HandleFindBlueprintNodes` | `find_blueprint_nodes` | ノード検索 |
-
-#### ノード操作（基本）
-| 関数 | MCPコマンド | 説明 |
-|------|-------------|------|
-| `HandleSetNodePinValue` | `set_node_pin_value` | ピン値設定 |
-| `HandleAddVariableGetNode` | `add_variable_get_node` | 変数 Get ノード追加 |
-| `HandleAddVariableSetNode` | `add_variable_set_node` | 変数 Set ノード追加 |
-| `HandleAddBranchNode` | `add_branch_node` | Branch ノード追加 |
-| `HandleDeleteNode` | `delete_blueprint_node` | ノード削除 |
-| `HandleMoveNode` | `move_blueprint_node` | ノード移動 |
-
-#### 制御フローノード
-| 関数 | MCPコマンド | 説明 |
-|------|-------------|------|
-| `HandleAddSequenceNode` | `add_sequence_node` | Sequence ノード追加 |
-| `HandleAddDelayNode` | `add_delay_node` | Delay ノード追加 |
-| `HandleAddForEachLoopNode` | `add_foreach_loop_node` | **非推奨** |
-| `HandleAddForLoopWithBreakNode` | `add_forloop_with_break_node` | ForLoopWithBreak 追加 |
-
-#### ユーティリティノード
-| 関数 | MCPコマンド | 説明 |
-|------|-------------|------|
-| `HandleAddPrintStringNode` | `add_print_string_node` | PrintString ノード追加 |
-| `HandleAddMathNode` | `add_math_node` | 演算ノード追加 |
-| `HandleAddComparisonNode` | `add_comparison_node` | 比較ノード追加 |
-
----
-
 ### FSpirrowBridgeGASCommands (55 KB)
 
 Gameplay Ability System 関連の操作を担当。
@@ -226,7 +272,7 @@ Gameplay Ability System 関連の操作を担当。
 
 ---
 
-### FSpirrowBridgeProjectCommands (14 KB)
+### FSpirrowBridgeProjectCommands (25 KB)
 
 プロジェクト設定・入力システムを担当。
 
@@ -320,13 +366,15 @@ Config（INI）ファイル操作を担当。
 
 ```cpp
 // ExecuteCommand() 内でカテゴリ別に振り分け
+// Blueprint系 → BlueprintCommands（内部で3ファイルに委譲）
 if (CommandType == "create_blueprint" || ...) {
     BlueprintCommands->HandleCommand(...)
 }
+// BlueprintNode系 → BlueprintNodeCommands（内部で3ファイルに委譲）
 else if (CommandType == "add_blueprint_event_node" || ...) {
     BlueprintNodeCommands->HandleCommand(...)
 }
-// UMG Commands (4分割)
+// UMG Commands (4分割、SpirrowBridge.cppから直接ルーティング)
 else if (CommandType == "create_umg_widget_blueprint" || ...) {
     UMGWidgetCommands->HandleCommand(...)
 }
@@ -356,6 +404,16 @@ else if (CommandType == "create_simple_material") {
 }
 ```
 
+### Blueprint 系の内部ルーティング
+
+```cpp
+// FSpirrowBridgeBlueprintCommands::HandleCommand()
+// → CoreCommands / ComponentCommands / PropertyCommands へ委譲
+
+// FSpirrowBridgeBlueprintNodeCommands::HandleCommand()
+// → CoreCommands / VariableCommands / ControlFlowCommands へ委譲
+```
+
 ---
 
 ## 注意事項
@@ -375,8 +433,13 @@ else if (CommandType == "create_simple_material") {
 | コマンドの種類 | 追加先ハンドラ | 例 |
 |---------------|-----------------|-----|
 | **Blueprint** | | |
-| Blueprint 作成・コンポーネント・プロパティ | `BlueprintCommands` | create_blueprint, add_component_to_blueprint |
-| Blueprint ノード操作（イベント・関数・変数・接続） | `BlueprintNodeCommands` | add_blueprint_event_node, connect_blueprint_nodes |
+| Blueprint 作成・スポーン・複製・グラフ | `BlueprintCoreCommands` | create_blueprint, duplicate_blueprint |
+| コンポーネント追加・プロパティ・物理 | `BlueprintComponentCommands` | add_component_to_blueprint, set_physics_properties |
+| クラススキャン・配列プロパティ | `BlueprintPropertyCommands` | scan_project_classes, set_blueprint_class_array |
+| **BlueprintNode** | | |
+| ノード接続・検索・イベント・関数 | `BlueprintNodeCoreCommands` | connect_blueprint_nodes, add_blueprint_event_node |
+| 変数・Get/Set・Self参照・入力アクション | `BlueprintNodeVariableCommands` | add_blueprint_variable, add_variable_get_node |
+| Branch・Sequence・Delay・Loop・Math | `BlueprintNodeControlFlowCommands` | add_branch_node, add_math_node |
 | **UMG Widget** | | |
 | Widget 要素の追加（Text, Image, Button 等） | `UMGWidgetCommands` | add_text_to_widget, add_button_to_widget |
 | レイアウト操作（Box 追加・親変更・要素取得） | `UMGLayoutCommands` | add_vertical_box_to_widget, get_widget_elements |
@@ -395,14 +458,15 @@ else if (CommandType == "create_simple_material") {
 - **新しいカテゴリ** → 新規ハンドラ作成を検討
 - **ファイルサイズが 60KB 超** → 分割を検討
 
-### 大きいファイルの分割候補
+### 大きいファイルの分割状況
 
-| ファイル | サイズ | 分割案 |
-|----------|--------|--------|
-| `SpirrowBridgeBlueprintCommands.cpp` | 93 KB | Component/Graph/Property に3分割検討 |
-| `SpirrowBridgeBlueprintNodeCommands.cpp` | 87 KB | Event/Flow/Math に3分割検討 |
-
-> **Note**: `SpirrowBridgeUMGCommands.cpp` (166KB) は 2026-01-02 に4分割完了。
+| ファイル | 状態 | 備考 |
+|----------|------|------|
+| `SpirrowBridgeUMGCommands.cpp` | ✅ 完了 | 2026-01-02 に4分割 |
+| `SpirrowBridgeBlueprintCommands.cpp` | ✅ 完了 | 2026-01-03 に3分割 |
+| `SpirrowBridgeBlueprintNodeCommands.cpp` | ✅ 完了 | 2026-01-03 に3分割 |
+| `SpirrowBridgeUMGWidgetCommands.cpp` | 📋 候補 | 64KB、将来的に分割検討 |
+| `SpirrowBridgeGASCommands.cpp` | 📋 候補 | 55KB、将来的に分割検討 |
 
 ---
 
@@ -410,6 +474,8 @@ else if (CommandType == "create_simple_material") {
 
 | 日付 | 内容 |
 |------|------|
+| 2026-01-03 | BlueprintCommands を3分割（Core/Component/Property） |
+| 2026-01-03 | BlueprintNodeCommands を3分割（Core/Variable/ControlFlow） |
 | 2026-01-02 | 新コマンド追加時のハンドラ選択ガイドを追加 |
 | 2026-01-02 | UMGCommands を4分割（Widget/Layout/Animation/Variable） |
 | 2026-01-02 | 初版作成 |

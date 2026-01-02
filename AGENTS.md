@@ -248,11 +248,25 @@ BeginPlay → GetController → CastToPlayerController → GetEnhancedInputLocal
        ↓ TCP
 [SpirrowBridge.cpp] ExecuteCommand() ← コマンドルーティング（メイン）
        ↓
-[各CommandHandler]
-  - SpirrowBridgeEditorCommands.cpp   ← アクター操作
-  - SpirrowBridgeBlueprintCommands.cpp ← Blueprint操作
-  - SpirrowBridgeProjectCommands.cpp   ← プロジェクト操作
-  - etc.
+[各CommandHandler] ← 18ファイル構成
+  - SpirrowBridgeEditorCommands.cpp      ← アクター操作
+  - SpirrowBridgeBlueprintCommands.cpp   ← Blueprint操作（ルーター）
+    ├─ BlueprintCoreCommands.cpp         ← 作成/コンパイル/スポーン
+    ├─ BlueprintComponentCommands.cpp    ← コンポーネント/物理
+    └─ BlueprintPropertyCommands.cpp     ← クラススキャン/配列
+  - SpirrowBridgeBlueprintNodeCommands.cpp ← ノード操作（ルーター）
+    ├─ BlueprintNodeCoreCommands.cpp     ← 接続/検索/イベント/関数
+    ├─ BlueprintNodeVariableCommands.cpp ← 変数/Get/Set/Self
+    └─ BlueprintNodeControlFlowCommands.cpp ← Branch/Delay/Math
+  - SpirrowBridgeUMGWidgetCommands.cpp   ← Widget追加
+  - SpirrowBridgeUMGLayoutCommands.cpp   ← レイアウト操作
+  - SpirrowBridgeUMGAnimationCommands.cpp ← アニメーション
+  - SpirrowBridgeUMGVariableCommands.cpp ← Widget変数/バインディング
+  - SpirrowBridgeProjectCommands.cpp     ← プロジェクト操作
+  - SpirrowBridgeGASCommands.cpp         ← GAS
+  - SpirrowBridgeConfigCommands.cpp      ← Config操作
+  - SpirrowBridgeMaterialCommands.cpp    ← マテリアル
+  - SpirrowBridgeCommonUtils.cpp         ← 共通ユーティリティ
 ```
 
 ### チェックリスト（必須）
@@ -468,6 +482,7 @@ search_knowledge("質量 設定", category="physics")
 
 ## 更新履歴
 
+- 2026-01-03: Phase 0.6.5 BlueprintCommands分割完了。BlueprintCommands.cpp (95KB)→3分割、BlueprintNodeCommands.cpp (68KB)→3分割、最大ファイル26KBに削減。Commands合記18ファイル構成に
 - 2026-01-02: Enhanced Input Blueprint統合機能実装完了。add_mapping_context_to_blueprint（BeginPlayにAddMappingContextノードチェーン自動追加）、set_default_mapping_context（PlayerController/Character両対応）を追加
 - 2026-01-01: find_blueprint_nodes修正完了。node_typeをオプショナル化、全ノードタイプ対応（Event/Function/Variable/Branch/Sequence/Macro/InputAction/Self）、詳細情報返却（node_id, node_type, node_class, name, position, pins）
 - 2026-01-01: find_actors_by_name修正完了。レスポンス形式改善（success/pattern/count/actorsフィールド追加）でMCP表示問題を解決

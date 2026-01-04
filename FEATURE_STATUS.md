@@ -6,7 +6,7 @@
 
 > **バージョン**: Phase E (エラーハンドリング統一完了)  
 > **ステータス**: Beta  
-> **最終更新**: 2026-01-03
+> **最終更新**: 2026-01-05
 
 ---
 
@@ -17,15 +17,15 @@
 | ツール | 状態 | 備考 |
 |--------|------|------|
 | `get_actors_in_level` | ✅ 動作OK | レベル内の全アクター取得 |
-| `find_actors_by_name` | 🔲 未確認 | |
+| `find_actors_by_name` | ✅ 動作OK | パターンマッチ検索 |
 | `spawn_actor` | ✅ 動作OK | アクター作成のみ、メッシュ設定は別途必要 |
-| `delete_actor` | 🔲 未確認 | |
-| `set_actor_transform` | 🔲 未確認 | |
+| `delete_actor` | ✅ 動作OK | |
+| `set_actor_transform` | ✅ 動作OK | location/rotation/scale対応 |
 | `get_actor_properties` | ✅ 動作OK | |
 | `set_actor_property` | ✅ 動作OK | アクター自体のプロパティを設定。rationale対応 |
 | `set_actor_component_property` | ✅ 動作OK | アクターのコンポーネントのプロパティを設定。rationale対応 |
 | `rename_actor` | ✅ 動作OK | アクター名変更（ActorLabel/Name両対応） |
-| `get_actor_components` | 🔲 未確認 | アクターのコンポーネント一覧取得 |
+| `get_actor_components` | ✅ 動作OK | アクターのコンポーネント一覧取得 |
 
 ### Blueprint操作
 
@@ -35,23 +35,23 @@
 | `spawn_blueprint_actor` | ✅ 動作OK | pathパラメータ対応（デフォルト: /Game/Blueprints） |
 | `add_component_to_blueprint` | ✅ 動作OK | pathパラメータ対応（デフォルト: /Game/Blueprints） |
 | `set_static_mesh_properties` | ✅ 動作OK | Engine標準メッシュで確認。pathパラメータ対応 |
-| `set_component_property` | 🔲 未確認 | pathパラメータ対応 |
-| `set_physics_properties` | 🔲 未確認 | pathパラメータ対応 |
+| `set_component_property` | ✅ 動作OK | pathパラメータ対応 |
+| `set_physics_properties` | ✅ 動作OK | pathパラメータ対応 |
 | `compile_blueprint` | ✅ 動作OK | pathパラメータ対応（デフォルト: /Game/Blueprints） |
-| `set_blueprint_property` | 🔲 未確認 | pathパラメータ対応 |
+| `set_blueprint_property` | ✅ 動作OK | pathパラメータ対応 |
 
 ### BPノードグラフ操作
 
 | ツール | 状態 | 備考 |
 |--------|------|------|
 | `add_blueprint_event_node` | ✅ 動作OK | ReceiveBeginPlay確認。pathパラメータ対応 |
-| `add_blueprint_input_action_node` | 🔲 未確認 | pathパラメータ対応 |
+| `add_blueprint_input_action_node` | ✅ 動作OK | pathパラメータ対応 |
 | `add_blueprint_function_node` | ✅ 動作OK | target指定が重要（self, KismetSystemLibrary等）。pathパラメータ対応 |
 | `connect_blueprint_nodes` | ✅ 動作OK | ピン名: then → execute。pathパラメータ対応 |
-| `add_blueprint_variable` | 🔲 未確認 | pathパラメータ対応 |
-| `add_blueprint_get_self_component_reference` | 🔲 未確認 | pathパラメータ対応 |
-| `add_blueprint_self_reference` | 🔲 未確認 | pathパラメータ対応 |
-| `find_blueprint_nodes` | 🔲 未確認 | pathパラメータ対応 |
+| `add_blueprint_variable` | ✅ 動作OK | pathパラメータ対応 |
+| `add_blueprint_get_self_component_reference` | ✅ 動作OK | pathパラメータ対応 |
+| `add_blueprint_self_reference` | ✅ 動作OK | pathパラメータ対応 |
+| `find_blueprint_nodes` | ✅ 動作OK | pathパラメータ対応 |
 
 ### UMG Widget操作
 

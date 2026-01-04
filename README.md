@@ -1,362 +1,96 @@
-<div align="center">
+# SpirrowUnrealWise
 
-# Spirrow-UnrealWise
-<span style="color: #555555">Unreal Engine 5 ナレッジアシスタント MCP サーバー</span>
+[![Unreal Engine](https://img.shields.io/badge/Unreal%20Engine-5.5+-blue)](https://www.unrealengine.com/)
+[![Python](https://img.shields.io/badge/Python-3.11+-green)](https://www.python.org/)
+[![MCP](https://img.shields.io/badge/MCP-Model%20Context%20Protocol-purple)](https://modelcontextprotocol.io/)
+[![Status](https://img.shields.io/badge/Status-Beta-yellow)]()
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Unreal Engine](https://img.shields.io/badge/Unreal%20Engine-5.5%2B-orange)](https://www.unrealengine.com)
-[![Python](https://img.shields.io/badge/Python-3.12%2B-yellow)](https://www.python.org)
-[![Version](https://img.shields.io/badge/Version-0.6.6-green)](https://github.com/SpirrowGames/spirrow-unrealwise)
-[![Status](https://img.shields.io/badge/Status-Beta-brightgreen)](https://github.com/SpirrowGames/spirrow-unrealwise)
+**SpirrowUnrealWise** は、AI（Claude）と Unreal Engine 5 を連携させる MCP (Model Context Protocol) サーバーです。自然言語でのBlueprint操作、レベルデザイン、UI作成を実現し、AIドリブンなゲーム開発ワークフローを提供します。
 
-</div>
+## ✨ 主な機能
 
-このプロジェクトは、Cursor、Windsurf、Claude DesktopなどのAIアシスタントクライアントが、Model Context Protocol (MCP)を通じて自然言語でUnreal Engineを制御できるようにします。
+### 🎮 Actor操作
+- レベル内アクターの一覧取得・検索
+- アクターのスポーン・削除・Transform操作
+- コンポーネントの取得・プロパティ設定
 
-## ⚙️ 現在のステータス
+### 📘 Blueprint自動化
+- Blueprintの作成・複製・コンパイル
+- コンポーネントの追加（StaticMesh, Collision, Physics等）
+- 変数・関数・イベントノードの追加
+- ノード接続・グラフ操作
+- プロパティ設定（ObjectProperty, ClassProperty対応）
 
-このプロジェクトは現在**ベータ版**です。主要な機能は安定して動作していますが、以下の点にご注意ください：
+### 🎮 Enhanced Input対応
+- Input Action / Input Mapping Context の作成
+- キーバインディング設定
+- Blueprintへのマッピングコンテキスト自動設定
 
-- APIや機能は変更される可能性があります
-- テストフレームワークが整備され、主要機能の動作確認済みです
-- エラーハンドリングが強化され、構造化されたエラーコードを返します
-- フィードバックや貢献を歓迎します
+### 🖼️ UMG Widget操作
+- Widget Blueprintの作成
+- UI要素の追加（Text, Image, Button, ProgressBar, Slider等）
+- レイアウト・アンカー設定
+- アニメーション作成
+- 変数・関数・イベントバインディング
 
-### 最新の更新 (v0.6.6)
+### ⚔️ Gameplay Ability System (GAS)
+- Gameplay Tags の追加・管理
+- GameplayEffect / GameplayAbility の作成
+- AbilitySystemComponent の設定
+- GAS対応キャラクターの作成
 
-- **Phase C完了**: テストフレームワーク作成、エラーハンドリング強化
-- **UMG Widgetツール**: Button, Slider, CheckBox, ComboBox, EditableText, SpinBox, ScrollBox対応
-- **Blueprintコマンド分割**: 95KBの巨大ファイルを管理しやすく分割
+### 🎨 マテリアル作成
+- テンプレートベースのマテリアル作成
+- カスタムテンプレートの保存・再利用
 
-## 🎯 プロジェクトの目標
+### ⚙️ プロジェクト設定
+- Config (ini) ファイルの読み書き
+- GameMode / DefaultMap 等の設定
 
-Spirrow-UnrealWiseは、単なるBlueprint生成ツールではなく、**UE5ナレッジアシスタント**として機能することを目指します。
+### 🧠 RAG知識ベース
+- プロジェクト固有の知識を蓄積
+- 設計決定の自動記録（rationale）
+- プロジェクトコンテキストの管理
 
-### 解決する課題
-- 「実現したい機能に対して、UE5でどのノード/クラス/APIを使えばいいかわからない」
-- 選択肢の存在自体を知らない問題
+---
 
-### 3層アーキテクチャ（予定）
-```
-Layer 1: ナレッジアシスタント
-  - 目的からの逆引き検索
-  - ノード/クラスの解説
-  - プロジェクトコンテキストを考慮した提案
+## 🚀 クイックスタート
 
-Layer 2: RAGサーバー
-  - プロジェクト固有のナレッジ蓄積
-  - 過去の意思決定・失敗の記録
-  - 使うほど賢くなる
+### 必要要件
 
-Layer 3: Blueprint生成（オプション）
-  - 確定したノード構成をBlueprintに生成
-  - 対話的に構成を決めてから生成
-```
+- **Unreal Engine 5.5+**
+- **Python 3.11+**
+- **uv** (Python パッケージマネージャー)
+- **Claude Desktop** または MCP対応クライアント
 
-## 🌟 概要
+### 1. リポジトリのクローン
 
-Unreal MCP統合は、自然言語を通じてUnreal Engineを制御するための包括的なツールを提供します：
-
-| カテゴリ | 機能 |
-|----------|-------------|
-| **アクター管理** | • アクターの作成と削除（キューブ、球体、ライト、カメラなど）<br>• アクターのトランスフォーム設定（位置、回転、スケール）<br>• アクタープロパティのクエリと名前による検索<br>• アクターとコンポーネントのプロパティ設定対応（基本型・Enum・アセット参照）<br>• アセット参照プロパティ対応（`TObjectPtr<T>`, `TSoftObjectPtr<T>`, `TSubclassOf<T>`）<br>• コンポーネント一覧の取得機能<br>• 現在のレベル内の全アクターをリスト表示 |
-| **Blueprint開発** | • カスタムコンポーネントを持つ新しいBlueprintクラスの作成<br>• **Widget Blueprint対応**（UUserWidget 親クラス指定で自動生成）<br>• コンポーネントの追加と設定（メッシュ、カメラ、ライトなど）<br>• コンポーネントプロパティと物理設定の設定<br>• Blueprintプロパティ設定（基本型・Enum・アセット参照対応）<br>• アセットパス自動補完とクラス型検証機能<br>• Blueprintのコンパイルとアクターのスポーン<br>• カスタムフォルダパスでのBlueprint作成・操作（pathパラメータ対応）<br>• C++親クラスのプロパティへのアクセス対応 |
-| **Blueprint ノードグラフ** | • イベントノードの追加（BeginPlay、Tickなど）<br>• 関数呼び出しノードの作成と接続<br>• カスタム型とデフォルト値を持つ変数の追加<br>• コンポーネントと自己参照の作成<br>• グラフ内のノードの検索と管理<br>• 全ノード操作ツールでpathパラメータ対応 |
-| **入力システム** | • Enhanced Input Actionアセットの作成（Digital/Axis1D/2D/3D対応）<br>• Input Mapping Contextアセットの作成<br>• アクションマッピングの追加（トリガー、モディファイア対応）<br>• レガシー入力マッピングの作成（Action/Axis） |
-| **プロジェクト設定** | • Config（ini）ファイルの読み書き<br>• デフォルトGameModeやマップ設定の変更<br>• 対応ファイル：DefaultEngine.ini、DefaultGame.ini、DefaultEditor.ini、DefaultInput.ini<br>• セクション一覧の取得 |
-| **GAS（Gameplay Ability System）** | • Gameplay Tags の管理（DefaultGameplayTags.ini 操作）<br>• タグの一括追加・削除<br>• コメント設定によるタグの説明記録<br>• プレフィックスフィルタによるタグ検索<br>• GAS関連アセット一覧取得（GameplayEffect/Ability/Cue/AttributeSet）<br>• アセットタイプ・パスフィルタリング<br>• GameplayEffect Blueprint作成（Modifiers/Tags/Duration/Stacking設定）<br>• **UE5コンポーネントベース実装**: TargetTagsGameplayEffectComponentによるタグ付与（FInheritedTagContainer.Added/CombinedTags両方に設定）<br>• GameplayAbility Blueprint作成（Tags/Cost/Cooldown/Policies設定）<br>• GAS Character作成（ASC自動設定）<br>• **UE5.7互換性**: protectedプロパティへのリフレクションベースアクセス、FindOrAddComponentによるコンポーネント管理 |
-| **アセット管理** | • Content Browserからのアセット削除<br>• アセット存在確認とエラーハンドリング<br>• Blueprint複製機能（カスタムパス対応）<br>• Blueprintノードグラフ構成の取得（ノード、接続、変数、コンポーネント情報）<br>• アセットリネーム機能（参照自動更新、Redirector作成） |
-| **エディタコントロール** | • 特定のアクターまたは位置へのビューポートフォーカス<br>• ビューポートカメラの向きと距離の制御 |
-| **プロジェクト構造解析** | • C++クラスとBlueprintアセットのスキャン<br>• 親クラス・モジュール・パスによるフィルタリング<br>• Blueprintタイプフィルタ（Actor/Widget/Anim/Interface等）<br>• REINST_*クラス（Live Coding一時クラス）の自動除外<br>• プロジェクト固有のクラス階層の可視化<br>• Engineクラスの除外オプション |
-| **ナレッジアシスタント** | • やりたいことから関連ノード/クラス/アセットを検索<br>• RAGナレッジとプロジェクトクラスを統合検索<br>• 日本語・英語キーワード自動抽出<br>• UEクラス/関数の推奨提案<br>• プロジェクト固有のクラスマッチング |
-| **RAGナレッジ管理** | • プロジェクト固有のナレッジをRAGサーバーに保存・検索<br>• カテゴリとタグによる整理<br>• 過去の設計判断や問題解決策を蓄積<br>• 使うほど賢くなるナレッジベース |
-
-これらすべての機能は、AIアシスタントを介した自然言語コマンドでアクセスでき、Unreal Engineワークフローの自動化と制御を簡単にします。
-
-### ナレッジアシスタント機能について
-
-`find_relevant_nodes` ツールは、「やりたいこと」から逆引きで関連するUEノード、クラス、アセットを提案します。RAGナレッジベースとプロジェクトクラスを統合検索し、日本語・英語の両方に対応しています。
-
-**主な機能**:
-- **キーワード抽出**: クエリから自動的にキーワードを抽出（日本語→英語変換対応）
-- **UEクラス推奨**: 30以上のキーワードマッピングに基づき、適切なエンジンクラス/関数を提案
-- **RAG検索**: プロジェクト固有のナレッジベースから関連情報を検索（関連度スコア付き）
-- **プロジェクトクラススキャン**: キーワードに基づいてスマートにフィルタリングされたプロジェクトクラスを検索
-
-**使用例**:
-```python
-# 日本語クエリ - ジャンプ機能の実装方法を調べる
-find_relevant_nodes("ジャンプを実装したい")
-# 推奨: Character, CharacterMovementComponent, Jump, LaunchCharacter
-
-# 英語クエリ - AI敵の追跡機能を調べる
-find_relevant_nodes("make enemy chase player")
-# 推奨: AIController, AIMoveTo, MoveToActor, BehaviorTree
-
-# プロジェクトクラスのみ検索 - RAGを使わずに既存クラスを探す
-find_relevant_nodes("character movement", include_rag=False)
-
-# RAGナレッジのみ検索 - プロジェクトクラスをスキャンせずに知識を探す
-find_relevant_nodes("UI widget design patterns", include_project=False)
+```bash
+git clone https://github.com/your-repo/spirrow-unrealwise.git
+cd spirrow-unrealwise
 ```
 
-**対応キーワード例**:
-- **移動系**: jump/ジャンプ, move/移動, walk/歩く, run/走る, sprint, fly/飛ぶ, swim/泳ぐ, crouch/しゃがむ
-- **戦闘系**: damage/ダメージ, health/体力, attack/攻撃, shoot/撃つ, projectile/弾, hit/当たり
-- **AI系**: ai, chase/追いかける, patrol/巡回, follow/ついていく, enemy/敵
-- **物理系**: physics/物理, collision/衝突, overlap/重なり, trigger/トリガー
-- **その他**: animation/アニメーション, input/入力, ui/widget, camera/カメラ, save/保存, timer/タイマー, network/ネットワーク
+### 2. Python環境のセットアップ
 
-### Blueprint親クラス指定について
+```bash
+# uvのインストール（未インストールの場合）
+pip install uv
 
-`create_blueprint`でC++親クラスを指定する際、Aプレフィックスの有無を気にする必要はありません。システムは以下の3段階で親クラスを検索します：
-
-**検索優先順位**:
-1. **直接StaticClass参照** - 一般的なエンジンクラス（APawn、AActor、ACharacter）
-2. **TObjectIterator検索** - ロード済みの全クラスを検索（最も確実）
-3. **LoadClass検索** - 複数のモジュールパスとプレフィックスパターンを試行
-
-**Method 3の検索パターン**（9通り試行）:
-- Aプレフィックスあり: `/Script/Engine.AClassName`、`/Script/Game.AClassName`、`/Script/ProjectName.AClassName`
-- Aプレフィックスなし: `/Script/Engine.ClassName`、`/Script/Game.ClassName`、`/Script/ProjectName.ClassName` ← **UEリフレクション標準**
-- ユーザー入力そのまま: `/Script/Engine.UserInput`、`/Script/Game.UserInput`、`/Script/ProjectName.UserInput`
-
-**重要**: UE5のリフレクションシステムは、C++クラスをAプレフィックス**なし**で登録します（例：`APlayerCharacterBase` → `/Script/TrapxTrapCpp.PlayerCharacterBase`）。そのため、Method 3ではAプレフィックスなしのパスが最も成功しやすいです。
-
-**使用例**:
-```python
-# どちらの指定でも動作します
-create_blueprint(name="BP_Player", parent_class="PlayerCharacterBase")
-create_blueprint(name="BP_Player", parent_class="APlayerCharacterBase")
+# 依存関係のインストール
+cd Python
+uv sync
 ```
 
-## 🧩 コンポーネント
+### 3. Unreal Engineプラグインのセットアップ
 
-### サンプルプロジェクト (MCPGameProject) `MCPGameProject`
-- Blank Projectをベースに、SpirrowBridgeプラグインを追加したもの。
+1. `MCPGameProject/Plugins/SpirrowBridge` フォルダを対象プロジェクトの `Plugins` フォルダにコピー
+2. Unreal Editorでプロジェクトを開く
+3. **Edit > Plugins** で "SpirrowBridge" を有効化
+4. エディタを再起動
 
-### プラグイン (SpirrowBridge) `MCPGameProject/Plugins/SpirrowBridge`
-- MCP通信用のネイティブTCPサーバー
-- Unreal Editorサブシステムとの統合
-- アクター操作ツールの実装
-- コマンド実行とレスポンス処理
+### 4. Claude Desktop設定
 
-### Python MCPサーバー `Python/unreal_mcp_server.py`
-- `unreal_mcp_server.py`に実装
-- C++プラグインへのTCPソケット接続管理（ポート55557）
-- コマンドのシリアライズとレスポンスのパース
-- エラーハンドリングと接続管理
-- `tools`ディレクトリからツールモジュールのロードと登録
-- FastMCPライブラリを使用してModel Context Protocolを実装
-
-### RAGサーバー連携 `Python/tools/rag_tools.py`
-- 外部RAGサーバーとの統合によるナレッジ管理
-- プロジェクト固有の知識を蓄積・検索
-- カテゴリとタグによる整理機能
-- 環境変数 `RAG_SERVER_URL` で接続先を設定（デフォルト: `http://localhost:8100`）
-
-**利用可能なツール**:
-- `search_knowledge` - ナレッジベースを検索
-- `add_knowledge` - 新しいナレッジを追加
-- `list_knowledge` - 全ナレッジを一覧表示
-- `delete_knowledge` - ナレッジを削除
-
-## 📂 ディレクトリ構造
-
-- **MCPGameProject/** - サンプルUnrealプロジェクト
-  - **Plugins/SpirrowBridge/** - C++プラグインソース
-    - **Source/SpirrowBridge/** - プラグインソースコード
-    - **SpirrowBridge.uplugin** - プラグイン定義
-
-- **Python/** - Pythonサーバーとツール
-  - **tools/** - アクター、エディタ、Blueprint操作用ツールモジュール
-  - **scripts/** - サンプルスクリプトとデモ
-
-- **Docs/** - 包括的なドキュメント
-  - ドキュメントインデックスは [Docs/README.md](Docs/README.md) を参照
-
-## 🚀 クイックスタートガイド
-
-### 前提条件
-- Unreal Engine 5.5, 5.6, 5.7（5.5+で動作確認済み）
-- Python 3.12+
-- MCPクライアント（例：Claude Desktop、Cursor、Windsurf）
-
-### サンプルプロジェクト
-
-すぐに始めるには、`MCPGameProject`のスタータープロジェクトを使用してください。これは`SpirrowBridge.uplugin`が既に設定されたUE 5.x対応のBlank Starter Projectです。
-
-1. **プロジェクトの準備**
-   - .uprojectファイルを右クリック
-   - Visual Studioプロジェクトファイルを生成
-2. **プロジェクトのビルド（プラグインを含む）**
-   - ソリューション（`.sln`）を開く
-   - ターゲットとして`Development Editor`を選択
-   - ビルド
-
-### プラグイン
-既存のプロジェクトでプラグインを使用したい場合：
-
-1. **プラグインをプロジェクトにコピー**
-   - `MCPGameProject/Plugins/SpirrowBridge`をプロジェクトのPluginsフォルダにコピー
-
-2. **プラグインを有効化**
-   - Edit > Plugins
-   - Editorカテゴリで「SpirrowBridge」を検索
-   - プラグインを有効化
-   - プロンプトが表示されたらエディタを再起動
-
-   **依存関係**: SpirrowBridgeは以下のプラグインに依存しています（自動的に有効化されます）：
-   - **GameplayAbilities** - GAS (Gameplay Ability System) 機能に必要
-   - **EditorScriptingUtilities** - エディタ操作に必要
-   - **EnhancedInput** - 入力システム操作に必要
-
-3. **プラグインのビルド**
-   - .uprojectファイルを右クリック
-   - Visual Studioプロジェクトファイルを生成
-   - ソリューション（`.sln`）を開く
-   - ターゲットプラットフォームと出力設定でビルド
-
-#### UE 5.x 互換性に関する注意
-
-SpirrowBridgeはUE 5.5、5.6、5.7で動作確認済みです。プロジェクトの `.Target.cs` ファイルは、これらのバージョン全てで互換性のある設定になっています：
-
-- `BuildSettingsVersion.V5` を使用（UE 5.5+で利用可能）
-- `EngineIncludeOrderVersion.Unreal5_5` を使用（UE 5.5+で利用可能）
-- `CppCompileWarningSettings.UndefinedIdentifierWarningLevel` を使用（UE 5.6+の推奨設定）
-
-**UE5.7でのGAS API変更への対応**
-
-UE5.7では、`UGameplayAbility`の多くのプロパティが`protected`セクションに移動されました。SpirrowBridgeは**リフレクションベースのプロパティアクセス**を使用してこの問題に対応しています：
-
-- **対象プロパティ**: AbilityTags、CancelAbilitiesWithTag、BlockAbilitiesWithTag、ActivationOwnedTags、ActivationRequiredTags、ActivationBlockedTags、CostGameplayEffectClass、CooldownGameplayEffectClass、InstancingPolicy、NetExecutionPolicy
-- **実装方法**: `FProperty::FindPropertyByName` + `ContainerPtrToValuePtr` を使用した間接アクセス
-- **利点**: UE5.5（public）とUE5.7（protected）の両方で同じコードが動作
-
-この実装により、プラグインは複数のUEバージョン間で高い互換性を維持しています。
-
-他のバージョンのUnreal Engineで使用する場合、`.Target.cs` ファイルでビルドエラーが発生する可能性があります。その場合は、エンジンバージョンに応じて適切なビルド設定バージョンに調整してください。
-
-### Pythonサーバーのセットアップ
-
-Python環境のセットアップ、MCPサーバーの実行、直接またはサーバーベースの接続の使用など、詳細な手順は [Python/README.md](Python/README.md) を参照してください。
-
-#### クイック起動（Windows）
-
-プロジェクトルートに、便利な起動スクリプトを用意しています：
-
-**PowerShell**:
-```powershell
-.\start_mcp_server.ps1
-```
-
-**コマンドプロンプト**:
-```cmd
-start_mcp_server.bat
-```
-
-起動スクリプトは以下を自動で行います：
-1. ローカル設定ファイルの読み込み（存在する場合）
-2. Pythonディレクトリへの移動
-3. uvのインストール確認
-4. MCPサーバーの起動
-
-**サーバーの停止**:
-- `Ctrl+C` を押すとサーバーをシャットダウンします
-- グレースフルシャットダウンを試み、5秒後に自動的に強制終了します
-- "Waiting for connections to close" で固まることはありません
-
-#### ローカル設定ファイル（環境固有の設定）
-
-環境固有の設定（RAGサーバーURLなど）は、以下の2つの方法で管理できます。これらのファイルはgitに追跡されないため、各環境で異なる設定を安全に保存できます。
-
-##### 方法1: .env ファイル（推奨）
-
-1. テンプレートをコピー：
-   ```bash
-   cp .env.example .env
-   ```
-
-2. `.env` ファイルを編集して設定を変更：
-   ```bash
-   # .env の例
-   RAG_SERVER_URL=http://your-rag-server:8100
-   UNREAL_HOST=127.0.0.1
-   UNREAL_PORT=55557
-   ```
-
-3. MCPサーバーを起動すると、自動的に設定が読み込まれます
-
-##### 方法2: シェルスクリプト設定ファイル
-
-1. テンプレートをコピー：
-   ```powershell
-   # PowerShell用
-   cp config.example.ps1 config.local.ps1
-
-   # バッチファイル用
-   copy config.example.bat config.local.bat
-   ```
-
-2. `config.local.ps1` または `config.local.bat` を編集して設定を変更：
-   ```powershell
-   # config.local.ps1 の例
-   $env:RAG_SERVER_URL = "http://your-rag-server:8100"
-   ```
-
-3. 起動スクリプトを実行すると、自動的に設定が読み込まれます
-
-**設定の優先順位**:
-1. 環境変数（最優先）
-2. `.env` ファイル
-3. `config.local.ps1` / `config.local.bat`
-4. デフォルト値
-
-**利用可能な設定**:
-- `RAG_SERVER_URL` - RAGサーバーの接続先（デフォルト: `http://localhost:8100`）
-- `UNREAL_HOST` - Unreal Engine接続用ホスト（デフォルト: `127.0.0.1`）
-- `UNREAL_PORT` - Unreal Engine接続用ポート（デフォルト: `55557`）
-
-### 起動モード
-
-Spirrow-UnrealWiseは2つのトランスポートモードをサポートしています：
-
-#### Stdio モード（デフォルト）
-
-MCPクライアント（Claude Desktop等）のサブプロセスとして動作します。
-設定が簡単ですが、Python側のコード変更時にはMCPクライアントの再起動が必要です。
-
-**起動**: MCPクライアントの設定で自動起動（後述）
-
-#### SSE モード（開発推奨）
-
-独立したHTTPサーバーとして動作します。
-Python側のコード変更時にMCPサーバーだけ再起動すれば反映されるため、開発効率が向上します。
-
-**起動**:
-```powershell
-# PowerShell
-.\start_mcp_server_sse.ps1
-
-# コマンドプロンプト
-start_mcp_server_sse.bat
-```
-
-**エンドポイント**: `http://localhost:8000/sse`
-
-#### ワークフロー比較
-
-| 操作 | Stdio モード | SSE モード |
-|------|-------------|-----------|
-| Python変更の反映 | MCPクライアント再起動 | MCPサーバーのみ再起動（Ctrl+C → 再実行） |
-| 初期設定 | JSON設定のみ | サーバー手動起動 + JSON設定 |
-| 推奨用途 | 本番利用 | 開発・デバッグ |
-
-### MCPクライアントの設定
-
-#### Stdio モード（デフォルト）
-
-MCPクライアントに応じて、以下のJSONをmcp設定に使用してください。
+`claude_desktop_config.json` に以下を追加:
 
 ```json
 {
@@ -365,131 +99,277 @@ MCPクライアントに応じて、以下のJSONをmcp設定に使用してく�
       "command": "uv",
       "args": [
         "--directory",
-        "<path/to/the/folder/PYTHON>",
+        "C:/path/to/spirrow-unrealwise/Python",
         "run",
-        "unreal_mcp_server.py"
-      ]
-    }
-  }
-}
-```
-
-#### SSE モード（開発推奨）
-
-1. まずMCPサーバーを手動起動：
-```powershell
-   .\start_mcp_server_sse.ps1
-```
-
-2. MCPクライアントの設定：
-```json
-   {
-     "mcpServers": {
-       "spirrow-unrealwise": {
-         "url": "http://localhost:8000/sse"
-       }
-     }
-   }
-```
-
-3. Python変更時の反映手順：
-   - サーバーを Ctrl+C で停止
-   - `.\start_mcp_server_sse.ps1` で再起動
-   - MCPクライアントの再起動は不要！
-
-例は`mcp.json`にあります。
-
-### MCP設定ファイルの場所
-
-使用するMCPクライアントによって、設定ファイルの場所が異なります：
-
-| MCPクライアント | 設定ファイルの場所 | 備考 |
-|------------|------------------------------|-------|
-| Claude Desktop | `~/.config/claude-desktop/mcp.json` | Windows: `%USERPROFILE%\.config\claude-desktop\mcp.json` |
-| Cursor | `.cursor/mcp.json` | プロジェクトルートディレクトリに配置 |
-| Windsurf | `~/.config/windsurf/mcp.json` | Windows: `%USERPROFILE%\.config\windsurf\mcp.json` |
-
-各クライアントは上記の例と同じJSON形式を使用します。
-MCPクライアントに応じて、適切な場所に設定を配置してください。
-
-### RAGサーバーの設定（オプション）
-
-RAGナレッジ管理機能を使用する場合、以下の3つの方法でRAGサーバーのURLを指定できます：
-
-#### 方法1: .env ファイル（推奨）
-
-1. `.env.example` から `.env` ファイルを作成：
-   ```bash
-   cp .env.example .env
-   ```
-
-2. `.env` ファイルでRAGサーバーのURLを設定：
-   ```bash
-   RAG_SERVER_URL=http://your-rag-server:8100
-   ```
-
-この方法が最もシンプルで、MCPクライアントの設定変更が不要です。
-
-#### 方法2: MCPクライアントの環境変数設定
-
-MCPクライアントの設定ファイルで環境変数を指定：
-
-```json
-{
-  "mcpServers": {
-    "spirrow-unrealwise": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "<path/to/the/folder/PYTHON>",
-        "run",
-        "unreal_mcp_server.py"
+        "python",
+        "-m",
+        "spirrow_unrealwise"
       ],
       "env": {
-        "RAG_SERVER_URL": "http://your-rag-server:8100"
+        "SPIRROW_UE_HOST": "127.0.0.1",
+        "SPIRROW_UE_PORT": "8080"
       }
     }
   }
 }
 ```
 
-#### 方法3: システム環境変数
+### 5. 動作確認
 
-システムまたはシェルの環境変数として設定：
+1. Unreal Editorを起動（SpirrowBridgeプラグイン有効）
+2. Claude Desktopを起動
+3. Claudeに「レベル内のアクター一覧を取得して」と依頼
+
+---
+
+## 📖 使用例
+
+### Blueprintの作成
+
+```
+「BP_Enemy という Actor Blueprint を /Game/Blueprints/Characters に作成して」
+```
+
+### コンポーネントの追加
+
+```
+「BP_Enemy に SphereComponent を DetectionSphere という名前で追加して、半径を500に設定して」
+```
+
+### Enhanced Input設定
+
+```
+「IA_Attack という Digital タイプの Input Action を作成して、
+IMC_Default に左クリックでバインドして」
+```
+
+### Widget作成
+
+```
+「WBP_HealthBar という Widget Blueprint を作成して、
+中央に ProgressBar を配置して」
+```
+
+### GAS設定
+
+```
+「GE_Damage という Instant タイプの GameplayEffect を作成して、
+Health 属性を -25 する Modifier を追加して」
+```
+
+---
+
+## 🛠️ ツール一覧
+
+### Actor操作 (8ツール)
+| ツール | 説明 |
+|--------|------|
+| `get_actors_in_level` | レベル内の全アクター取得 |
+| `find_actors_by_name` | 名前パターンでアクター検索 |
+| `spawn_actor` | アクターをスポーン |
+| `delete_actor` | アクターを削除 |
+| `set_actor_transform` | Transform設定 |
+| `get_actor_properties` | プロパティ取得 |
+| `set_actor_property` | プロパティ設定 |
+| `get_actor_components` | コンポーネント一覧 |
+
+### Blueprint操作 (25+ツール)
+| ツール | 説明 |
+|--------|------|
+| `create_blueprint` | Blueprint作成 |
+| `duplicate_blueprint` | Blueprint複製 |
+| `compile_blueprint` | コンパイル |
+| `add_component_to_blueprint` | コンポーネント追加 |
+| `set_component_property` | コンポーネントプロパティ設定 |
+| `set_blueprint_property` | BPプロパティ設定 |
+| `add_blueprint_variable` | 変数追加 |
+| `add_blueprint_event_node` | イベントノード追加 |
+| `add_blueprint_function_node` | 関数ノード追加 |
+| `connect_blueprint_nodes` | ノード接続 |
+| ... | その他多数 |
+
+### UMG Widget操作 (30+ツール)
+| ツール | 説明 |
+|--------|------|
+| `create_umg_widget_blueprint` | Widget BP作成 |
+| `add_text_to_widget` | テキスト追加 |
+| `add_image_to_widget` | 画像追加 |
+| `add_button_to_widget` | ボタン追加 |
+| `add_progressbar_to_widget` | プログレスバー追加 |
+| `create_widget_animation` | アニメーション作成 |
+| `add_widget_variable` | 変数追加 |
+| `add_widget_function` | 関数追加 |
+| ... | その他多数 |
+
+### Enhanced Input (5ツール)
+| ツール | 説明 |
+|--------|------|
+| `create_input_action` | Input Action作成 |
+| `create_input_mapping_context` | IMC作成 |
+| `add_action_to_mapping_context` | マッピング追加 |
+| `add_mapping_context_to_blueprint` | BPにIMC設定 |
+| `set_default_mapping_context` | デフォルトIMC設定 |
+
+### GAS (8ツール)
+| ツール | 説明 |
+|--------|------|
+| `add_gameplay_tags` | タグ追加 |
+| `list_gameplay_tags` | タグ一覧 |
+| `create_gameplay_effect` | GameplayEffect作成 |
+| `create_gameplay_ability` | GameplayAbility作成 |
+| `create_gas_character` | GAS対応キャラクター作成 |
+| ... | その他 |
+
+### Config・ユーティリティ
+| ツール | 説明 |
+|--------|------|
+| `get_config_value` | Config値取得 |
+| `set_config_value` | Config値設定 |
+| `scan_project_classes` | プロジェクトクラス検索 |
+| `find_relevant_nodes` | 関連ノード検索 |
+
+### RAG知識ベース
+| ツール | 説明 |
+|--------|------|
+| `search_knowledge` | 知識検索 |
+| `add_knowledge` | 知識追加 |
+| `list_knowledge` | 知識一覧 |
+| `get_project_context` | プロジェクトコンテキスト取得 |
+| `update_project_context` | コンテキスト更新 |
+
+---
+
+## 📁 プロジェクト構造
+
+```
+spirrow-unrealwise/
+├── Python/                          # MCPサーバー (Python)
+│   ├── spirrow_unrealwise/
+│   │   ├── __main__.py              # エントリーポイント
+│   │   ├── server.py                # MCPサーバー本体
+│   │   ├── ue_client.py             # UE通信クライアント
+│   │   └── tools/                   # ツール定義
+│   │       ├── actor_tools.py
+│   │       ├── blueprint_tools.py
+│   │       ├── widget_tools.py
+│   │       ├── gas_tools.py
+│   │       └── ...
+│   ├── tests/                       # テストスイート
+│   └── pyproject.toml
+│
+├── MCPGameProject/                  # UEプラグイン
+│   └── Plugins/
+│       └── SpirrowBridge/
+│           ├── Source/
+│           │   └── SpirrowBridge/
+│           │       ├── Private/
+│           │       │   ├── SpirrowBridgeModule.cpp
+│           │       │   ├── SpirrowBridgeRouter.cpp
+│           │       │   ├── Commands/      # 18コマンドファイル
+│           │       │   │   ├── SpirrowBridgeActorCommands.cpp
+│           │       │   │   ├── SpirrowBridgeBlueprintCommands.cpp
+│           │       │   │   ├── SpirrowBridgeUMGWidgetCommands.cpp
+│           │       │   │   └── ...
+│           │       │   └── Utils/
+│           │       └── Public/
+│           │           └── SpirrowBridge.h
+│           └── SpirrowBridge.uplugin
+│
+├── Docs/                            # ドキュメント
+│   ├── PATTERNS.md                  # 実装パターン集
+│   ├── IMPLEMENTATION_SUMMARY.md
+│   └── ...
+│
+├── CLAUDE.md                        # AI向けプロジェクト概要
+├── AGENTS.md                        # AIエージェント向けガイド
+└── FEATURE_STATUS.md                # 機能実装状況
+```
+
+---
+
+## 🔧 開発者向け情報
+
+### アーキテクチャ
+
+```
+┌─────────────────┐     MCP      ┌─────────────────┐    TCP/JSON    ┌─────────────────┐
+│  Claude/AI      │◄────────────►│  Python Server  │◄──────────────►│  UE Plugin      │
+│  (MCP Client)   │              │  (MCP Server)   │                │  (SpirrowBridge)│
+└─────────────────┘              └─────────────────┘                └─────────────────┘
+```
+
+### 新規コマンドの追加
+
+1. `Python/spirrow_unrealwise/tools/` に新規ツールを定義
+2. `MCPGameProject/Plugins/SpirrowBridge/Source/SpirrowBridge/Private/Commands/` にC++実装を追加
+3. `SpirrowBridgeRouter.cpp` にルーティングを追加
+4. `FEATURE_STATUS.md` を更新
+
+詳細は `Docs/PATTERNS.md` を参照。
+
+### テスト
 
 ```bash
-# Unix/macOS
-export RAG_SERVER_URL=http://your-rag-server:8100
+cd Python
 
-# Windows (PowerShell)
-$env:RAG_SERVER_URL="http://your-rag-server:8100"
+# 基本動作確認
+uv run python -m pytest tests/smoke_test.py -v
+
+# 全テスト
+uv run python -m pytest tests/ -v
 ```
 
-**設定の優先順位**:
-1. システム環境変数（最優先）
-2. MCPクライアントの `env` 設定
-3. `.env` ファイル
-4. デフォルト値（`http://localhost:8100`）
+### エラーハンドリング
 
-環境変数を設定しない場合、デフォルトで `http://localhost:8100` に接続を試みます。
+全コマンドで統一されたエラーコード体系を使用:
+- `ESpirrowErrorCode::Success` - 成功
+- `ESpirrowErrorCode::AssetNotFound` - アセット未発見
+- `ESpirrowErrorCode::InvalidParameter` - パラメータ不正
+- `ESpirrowErrorCode::OperationFailed` - 操作失敗
+- など12種類
 
-## 📝 ライセンス
+---
 
-このプロジェクトはMITライセンスの下で公開されています。
+## 📋 バージョン履歴
 
-### 帰属表示
+### v0.6.6+ (Beta)
+- UMGWidgetCommands 3ファイル分割
+- Phase E: 全18 Commands エラーハンドリング統一
+- Blueprint系6ファイル分割完了
 
-このプロジェクトは [chongdashu/unreal-mcp](https://github.com/chongdashu/unreal-mcp) （MIT License）をベースに、SpirrowGames向けに拡張したものです。
+### v0.6.0
+- GAS (Gameplay Ability System) 対応
+- GameplayTags / GameplayEffect / GameplayAbility ツール
 
-```
-Original work Copyright (c) 2024 Chong-U Lim (chongdashu)
-Modified work Copyright (c) 2025 SpirrowGames
-```
+### v0.5.0
+- UMG Widget操作ツール
+- アニメーション対応
+- 変数・関数バインディング
 
-オリジナルプロジェクトの作者に感謝します。
+### v0.4.0
+- Enhanced Input対応
+- Config操作ツール
 
-## 💡 質問・問い合わせ
+### v0.3.0
+- Blueprint ノードグラフ操作
+- RAG知識ベース統合
 
-このプロジェクトに関する質問は、以下までお願いします：
-- **オリジナルプロジェクト**: [@chongdashu](https://www.x.com/chongdashu)
-- **このフォーク**: SpirrowGames
+---
+
+## 🤝 貢献
+
+Issue・Pull Request 歓迎します。
+
+---
+
+## 📄 ライセンス
+
+MIT License
+
+---
+
+## 🔗 関連リンク
+
+- [Model Context Protocol](https://modelcontextprotocol.io/)
+- [Unreal Engine Documentation](https://docs.unrealengine.com/)
+- [Claude](https://claude.ai/)

@@ -86,4 +86,98 @@ private:
 	 * Convert a Blackboard key to JSON representation.
 	 */
 	TSharedPtr<FJsonObject> BlackboardKeyToJson(const struct FBlackboardEntry& Entry);
+
+	// ===== BT Node Operation Commands (Phase G) =====
+
+	/**
+	 * Add a composite node (Selector, Sequence, SimpleParallel) to a BehaviorTree.
+	 */
+	TSharedPtr<FJsonObject> HandleAddBTCompositeNode(const TSharedPtr<FJsonObject>& Params);
+
+	/**
+	 * Add a task node to a BehaviorTree.
+	 */
+	TSharedPtr<FJsonObject> HandleAddBTTaskNode(const TSharedPtr<FJsonObject>& Params);
+
+	/**
+	 * Add a decorator node to a BehaviorTree node.
+	 */
+	TSharedPtr<FJsonObject> HandleAddBTDecoratorNode(const TSharedPtr<FJsonObject>& Params);
+
+	/**
+	 * Add a service node to a composite node.
+	 */
+	TSharedPtr<FJsonObject> HandleAddBTServiceNode(const TSharedPtr<FJsonObject>& Params);
+
+	/**
+	 * Connect nodes in a BehaviorTree (set parent-child relationship).
+	 */
+	TSharedPtr<FJsonObject> HandleConnectBTNodes(const TSharedPtr<FJsonObject>& Params);
+
+	/**
+	 * Set a property on a BehaviorTree node.
+	 */
+	TSharedPtr<FJsonObject> HandleSetBTNodeProperty(const TSharedPtr<FJsonObject>& Params);
+
+	/**
+	 * Delete a node from a BehaviorTree.
+	 */
+	TSharedPtr<FJsonObject> HandleDeleteBTNode(const TSharedPtr<FJsonObject>& Params);
+
+	/**
+	 * List available BehaviorTree node types.
+	 */
+	TSharedPtr<FJsonObject> HandleListBTNodeTypes(const TSharedPtr<FJsonObject>& Params);
+
+	// ===== BT Node Operation Helpers =====
+
+	/**
+	 * Get the UClass for a BT composite node type string.
+	 */
+	UClass* GetBTCompositeNodeClass(const FString& TypeString);
+
+	/**
+	 * Get the UClass for a BT task node type string.
+	 */
+	UClass* GetBTTaskNodeClass(const FString& TypeString);
+
+	/**
+	 * Get the UClass for a BT decorator type string.
+	 */
+	UClass* GetBTDecoratorClass(const FString& TypeString);
+
+	/**
+	 * Get the UClass for a BT service type string.
+	 */
+	UClass* GetBTServiceClass(const FString& TypeString);
+
+	/**
+	 * Find a BT node by ID within a BehaviorTree.
+	 */
+	class UBTNode* FindBTNodeById(class UBehaviorTree* BehaviorTree, const FString& NodeId);
+
+	/**
+	 * Convert a BT node to JSON representation.
+	 */
+	TSharedPtr<FJsonObject> BTNodeToJson(class UBTNode* Node);
+
+	/**
+	 * Get description for a composite node type.
+	 */
+	FString GetCompositeDescription(const FString& Type);
+
+	/**
+	 * Get description for a task node type.
+	 */
+	FString GetTaskDescription(const FString& Type);
+
+	/**
+	 * Get description for a decorator node type.
+	 */
+	FString GetDecoratorDescription(const FString& Type);
+
+	/**
+	 * Get description for a service node type.
+	 */
+	FString GetServiceDescription(const FString& Type);
 };

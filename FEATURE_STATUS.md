@@ -4,9 +4,9 @@
 
 このドキュメントは、MCPツールの動作確認状況と今後追加予定の機能をまとめたものです。
 
-> **バージョン**: Phase E (エラーハンドリング統一完了)  
+> **バージョン**: Phase G (BehaviorTree Node Operations完了)  
 > **ステータス**: Beta  
-> **最終更新**: 2026-01-05
+> **最終更新**: 2026-01-06
 
 ---
 
@@ -94,6 +94,19 @@
 | `set_behavior_tree_blackboard` | ✅ 実装完了 | BTにBlackboard設定。テスト完備 |
 | `get_behavior_tree_structure` | ✅ 実装完了 | BT構造情報取得。テスト完備 |
 
+#### BehaviorTree Node Operations (Phase G) 🆕
+
+| ツール | 状態 | 備考 |
+|--------|------|------|
+| `add_bt_composite_node` | ✅ 実装完了 | Selector/Sequence/SimpleParallel追加 |
+| `add_bt_task_node` | ✅ 実装完了 | MoveTo/Wait等9タスク + カスタムBP対応 |
+| `add_bt_decorator_node` | ✅ 実装完了 | Blackboard/Cooldown等9デコレータ + カスタムBP対応 |
+| `add_bt_service_node` | ✅ 実装完了 | DefaultFocus/RunEQS等3サービス + カスタムBP対応 |
+| `connect_bt_nodes` | ✅ 実装完了 | 親子接続、Root設定、挿入位置指定可能 |
+| `set_bt_node_property` | ✅ 実装完了 | リフレクション経由でノードプロパティ設定 |
+| `delete_bt_node` | ✅ 実装完了 | ノード削除（再帰的に全参照から削除） |
+| `list_bt_node_types` | ✅ 実装完了 | 利用可能なノードタイプ一覧取得、カテゴリ指定可能 |
+
 #### ユーティリティ
 
 | ツール | 状態 | 備考 |
@@ -104,7 +117,87 @@
 
 ## 最新の更新履歴
 
-### 2026-01-05: AI (BehaviorTree / Blackboard) ツール実装・テスト完了 ✅
+### 2026-01-06: Phase G - BehaviorTree Node Operations 実装完了 + UE 5.6+ API対応 ✅ 🆕
+
+**実装内容**:
+- **8つの新MCPツール追加**: BehaviorTreeノードグラフをプログラマティックに構築
+- **C++リファクタリング**: AICommandsを6ファイルに分割（保守性向上）
+- **C++実装総量**: 1,805行（6ファイル分割構成）
+- **Python実装**: ai_tools.py拡張（455行 → 1,015行）
+- **UE 5.6+ API互換性対応**: Decorator格納方式変更、TryGetField API変更に対応 🆕
+
+**Phase G新規ツール (8個)**:
+| カテゴリ | ツール | 説明 |
+|---------|--------|------|
+| Node Creation | `add_bt_composite_node` | Selector/Sequence/SimpleParallel追加 |
+| Node Creation | `add_bt_task_node` | MoveTo/Wait等9タスク + カスタムBP対応 |
+| Node Creation | `add_bt_decorator_node` | Blackboard/Cooldown等9デコレータ + カスタムBP対応 |
+| Node Creation | `add_bt_service_node` | DefaultFocus/RunEQS等3サービス + カスタムBP対応 |
+| Node Operation | `connect_bt_nodes` | 親子接続、Root設定、挿入位置指定 |
+| Node Operation | `set_bt_node_property` | リフレクション経由プロパティ設定 |
+| Node Operation | `delete_bt_node` | ノード削除（再帰的に全参照削除） |
+| Utility | `list_bt_node_types` | 利用可能なノードタイプ一覧 |
+
+**対応BTノードタイプ**:
+- **Composite (3種)**: Selector, Sequence, SimpleParallel
+- **Task (9種)**: MoveTo, MoveDirectlyToward, Wait, WaitBlackboardTime, PlaySound, PlayAnimation, RotateToFaceBBEntry, RunBehavior, RunBehaviorDynamic
+- **Decorator (9種)**: Blackboard, CompareBBEntries, Cooldown, DoesPathExist, ForceSuccess, IsAtLocation, Loop, TagCooldown, TimeLimit
+- **Service (3種)**: DefaultFocus, RunEQS, BlackboardBase
+- **カスタムBlueprint対応**: `/Game/AI/{Tasks|Decorators|Services}/`から自動検索
+
+**C++リファクタリング (6ファイル構成)**:
+```
+MCPGameProject/Plugins/SpirrowBridge/Source/SpirrowBridge/Private/Commands/
+├── SpirrowBridgeAICommands.cpp (155行) - ルーター
+├── SpirrowBridgeAICommands_Blackboard.cpp (340行) - Phase F: Blackboard
+├── SpirrowBridgeAICommands_BehaviorTree.cpp (260行) - Phase F: BehaviorTree
+├── SpirrowBridgeAICommands_BTNodeHelpers.cpp (240行) - Phase G: ヘルパー関数
+├── SpirrowBridgeAICommands_BTNodeCreation.cpp (360行) - Phase G: Add handlers
+└── SpirrowBridgeAICommands_BTNodeOperations.cpp (450行) - Phase G: Op handlers
+```
+
+**統合作業**:
+- SpirrowBridge.cpp: Phase G 8コマンドのルーティング追加
+- ai_tools.py: 8ツール実装（詳細なdocstring、使用例付き）
+- 全ファイル構文チェック完了
+
+**技術的特徴**:
+- **ノードID**: `UObject::GetName()`使用（例: "BTComposite_Selector_0"）
+- **接続方式**: `FBTCompositeChild`構造体（EdGraphピンではなくデータ構造）
+- **再帰検索**: Lambda関数によるBTツリー階層探索
+- **カスタムBP対応**: 規約ベースパス検索（`/Game/AI/Tasks/MyTask.MyTask`）
+- **プロパティ設定**: `FSpirrowBridgeCommonUtils::SetObjectProperty()`でリフレクション
+
+**Phase F+G統合 (全17ツール)**:
+- Phase F: Blackboard/BehaviorTree作成（8ツール）
+- Phase G: BT Node Operations（8ツール）
+- Utility: AI Asset管理（1ツール）
+
+**UE 5.6+ API互換性対応** 🆕:
+- **問題**: UE 5.5向けプロンプトで実装したが、両プロジェクトはUE 5.7使用
+- **原因1**: Decoratorの格納方法が変更（`Node->Decorators` → `Child.Decorators`）
+- **原因2**: `FJsonObject::TryGetField`のシグネチャ変更
+- **修正内容**:
+  - `BTNodeHelpers.cpp`: Decorator検索を`Child.Decorators`経由に変更
+  - `BTNodeCreation.cpp`: Decorator追加を再帰的に`FBTCompositeChild`検索するロジックに書き直し
+  - `BTNodeOperations.cpp`: Decorator削除を`Child.Decorators`から削除、`TryGetField`を新API使用
+  - 両プロジェクト（spirrow-unrealwise、TrapxTrapCpp）に適用済み
+- **技術詳細**:
+  - **旧API** (UE 5.5): `CompositeNode->Decorators.Add(Decorator)`
+  - **新API** (UE 5.6+): `Parent->Children[i].Decorators.Add(Decorator)`
+  - **TryGetField旧**: `Params->TryGetField(TEXT("key"), OutPtr)`
+  - **TryGetField新**: `TSharedPtr<FJsonValue> Value = Params->TryGetField(TEXT("key"))`
+
+**Python側整理** (追加作業 2026-01-06):
+- `spirrow_unrealwise/` パッケージ構造を削除、フラットな `tools/` 構造に統一
+- `tools/ai_tools.py` をPhase G版に更新（`from unreal_mcp_server import` 使用）
+- MCPサーバー再起動後、全Phase Gツール動作確認完了
+
+**ビルド状況**: ✅ UE 5.6/5.7互換、構文チェック完了、Unreal Editor起動時に自動ビルド
+
+---
+
+### 2026-01-05: Phase F - AI (BehaviorTree / Blackboard) ツール実装・テスト完了 ✅
 
 **実装内容**:
 - **8つの新MCPツール追加**: AI開発に必須のBehaviorTree/Blackboard操作
@@ -260,10 +353,10 @@ python run_tests.py -m ai -v   # 詳細出力
 
 ## テスト環境
 
-- **Unreal Engine**: 5.7
-- **プロジェクト**: TrapxTrapCpp
+- **Unreal Engine**: 5.7 (5.6+ API互換対応済み)
+- **プロジェクト**: TrapxTrapCpp, MCPGameProject (spirrow-unrealwise)
 - **RAGサーバー**: AIサーバー :8100
-- **最終確認日**: 2026-01-03
+- **最終確認日**: 2026-01-06
 
 ---
 

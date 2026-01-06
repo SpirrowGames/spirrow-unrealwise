@@ -3,8 +3,8 @@
 このドキュメントは、SpirrowBridge プラグインの C++ 実装概要をまとめたものです。
 新しいチャットセッション開始時に、コードベースの全体像を把握するために参照してください。
 
-> **最終更新**: 2026-01-05
-> **バージョン**: Phase F (AI Tools実装完了)
+> **最終更新**: 2026-01-06
+> **バージョン**: Phase G (BT Node Operations実装完了)
 
 ---
 
@@ -50,11 +50,16 @@
 | `SpirrowBridgeCommonUtils.cpp` | 35 KB | 共通ユーティリティ |
 | `SpirrowBridgeEditorCommands.cpp` | 29 KB | アクター・エディタ操作 |
 | `SpirrowBridgeProjectCommands.cpp` | 25 KB | プロジェクト・入力設定 |
-| `SpirrowBridgeAICommands.cpp` | 21 KB | AI (BehaviorTree/Blackboard) 🆕 |
+| `SpirrowBridgeAICommands.cpp` | 1.5 KB | AI (BehaviorTree/Blackboard) ルーター 🆕 |
+| `SpirrowBridgeAICommands_Blackboard.cpp` | 11 KB | Blackboard操作（Phase F） 🆕 |
+| `SpirrowBridgeAICommands_BehaviorTree.cpp` | 8.5 KB | BehaviorTree操作（Phase F） 🆕 |
+| `SpirrowBridgeAICommands_BTNodeHelpers.cpp` | 8 KB | BTノードヘルパー関数（Phase G） 🆕 |
+| `SpirrowBridgeAICommands_BTNodeCreation.cpp` | 12 KB | BTノード追加（Phase G） 🆕 |
+| `SpirrowBridgeAICommands_BTNodeOperations.cpp` | 15 KB | BTノード操作（Phase G） 🆕 |
 | `SpirrowBridgeMaterialCommands.cpp` | 8 KB | マテリアル作成 |
 | `SpirrowBridgeConfigCommands.cpp` | 8 KB | Config（INI）操作 |
 
-**合計**: 22 ファイル（Blueprint系6分割、UMG系7分割完了、AI追加）
+**合計**: 27 ファイル（Blueprint系6分割、UMG系7分割、AI系6分割完了）
 
 ---
 
@@ -304,11 +309,19 @@ Config（INI）ファイル操作を担当。
 
 ---
 
-### FSpirrowBridgeAICommands (21 KB) 🆕
+### FSpirrowBridgeAICommands (1.5 KB) - ルーター 🆕
 
-AI（BehaviorTree / Blackboard）操作を担当。
+AI（BehaviorTree / Blackboard）操作を担当。6ファイル構成のルーター。
 
-#### Blackboard 操作
+| 関数 | 説明 |
+|------|------|
+| `HandleCommand` | AI関連コマンドを適切なハンドラへ振り分け（6ファイル：Blackboard, BehaviorTree, BTNodeHelpers, BTNodeCreation, BTNodeOperations） |
+
+---
+
+### FSpirrowBridgeAICommands - Blackboard (11 KB) - Phase F 🆕
+
+Blackboard Data Asset の操作を担当。
 
 | 関数 | MCPコマンド | 説明 |
 |------|-------------|------|
@@ -317,33 +330,122 @@ AI（BehaviorTree / Blackboard）操作を担当。
 | `HandleRemoveBlackboardKey` | `remove_blackboard_key` | Blackboardキー削除 |
 | `HandleListBlackboardKeys` | `list_blackboard_keys` | Blackboardキー一覧取得 |
 
-#### BehaviorTree 操作
-
-| 関数 | MCPコマンド | 説明 |
-|------|-------------|------|
-| `HandleCreateBehaviorTree` | `create_behavior_tree` | BehaviorTree Asset作成 |
-| `HandleSetBehaviorTreeBlackboard` | `set_behavior_tree_blackboard` | BTにBlackboard設定 |
-| `HandleGetBehaviorTreeStructure` | `get_behavior_tree_structure` | BT構造情報取得 |
-
-#### ユーティリティ
-
-| 関数 | MCPコマンド | 説明 |
-|------|-------------|------|
-| `HandleListAIAssets` | `list_ai_assets` | AI関連アセット一覧取得 |
-
 #### ヘルパー
 
 | 関数 | 説明 |
 |------|------|
 | `FindBlackboardAsset` | Blackboardアセット検索 |
-| `FindBehaviorTreeAsset` | BehaviorTreeアセット検索 |
-| `GetBlackboardKeyTypeClass` | Blackboardキータイプクラス取得 |
+| `GetBlackboardKeyTypeClass` | Blackboardキータイプクラス取得（10タイプ） |
 | `BlackboardKeyToJson` | BlackboardキーをJSON変換 |
 
 **対応Blackboardキータイプ**:
 - Bool, Int, Float, String, Name
 - Vector, Rotator
 - Object, Class, Enum
+
+---
+
+### FSpirrowBridgeAICommands - BehaviorTree (8.5 KB) - Phase F 🆕
+
+BehaviorTree Asset の操作を担当。
+
+| 関数 | MCPコマンド | 説明 |
+|------|-------------|------|
+| `HandleCreateBehaviorTree` | `create_behavior_tree` | BehaviorTree Asset作成 |
+| `HandleSetBehaviorTreeBlackboard` | `set_behavior_tree_blackboard` | BTにBlackboard設定 |
+| `HandleGetBehaviorTreeStructure` | `get_behavior_tree_structure` | BT構造情報取得 |
+| `HandleListAIAssets` | `list_ai_assets` | AI関連アセット一覧取得 |
+
+#### ヘルパー
+
+| 関数 | 説明 |
+|------|------|
+| `FindBehaviorTreeAsset` | BehaviorTreeアセット検索 |
+
+---
+
+### FSpirrowBridgeAICommands - BTNodeHelpers (8 KB) - Phase G 🆕
+
+BehaviorTree ノード操作のヘルパー関数を担当。
+
+| 関数 | 説明 |
+|------|------|
+| `GetBTCompositeNodeClass` | Composite（Selector/Sequence/SimpleParallel）のUClass取得 |
+| `GetBTTaskNodeClass` | Task（MoveTo/Wait等9種）のUClass取得 + カスタムBP検索 |
+| `GetBTDecoratorClass` | Decorator（Blackboard/Cooldown等9種）のUClass取得 + カスタムBP検索 |
+| `GetBTServiceClass` | Service（DefaultFocus等3種）のUClass取得 + カスタムBP検索 |
+| `BTNodeToJson` | BTノードをJSON変換 |
+| `FindBTNodeById` | ノードID（UObject名）で再帰検索 ⚠️ **UE 5.6+ API対応済み** |
+| `GetCompositeDescription` | Composite種別の説明文取得 |
+| `GetTaskDescription` | Task種別の説明文取得 |
+| `GetDecoratorDescription` | Decorator種別の説明文取得 |
+| `GetServiceDescription` | Service種別の説明文取得 |
+
+**カスタムBlueprint対応パス**:
+- Task: `/Game/AI/Tasks/{TaskName}.{TaskName}`
+- Decorator: `/Game/AI/Decorators/{DecoratorName}.{DecoratorName}`
+- Service: `/Game/AI/Services/{ServiceName}.{ServiceName}`
+
+**⚠️ UE 5.6+ API互換性対応**:
+`FindBTNodeById`のDecorator検索ロジック:
+- **旧** (UE 5.5): `Composite->Decorators[i]` で直接アクセス
+- **新** (UE 5.6+): `Child.Decorators[i]` で`FBTCompositeChild`配列経由でアクセス
+
+---
+
+### FSpirrowBridgeAICommands - BTNodeCreation (12 KB) - Phase G 🆕
+
+BehaviorTree ノードの追加を担当。
+
+| 関数 | MCPコマンド | 説明 |
+|------|-------------|------|
+| `HandleAddBTCompositeNode` | `add_bt_composite_node` | Composite ノード追加（Selector/Sequence/SimpleParallel） |
+| `HandleAddBTTaskNode` | `add_bt_task_node` | Task ノード追加（9種 + カスタムBP） |
+| `HandleAddBTDecoratorNode` | `add_bt_decorator_node` | Decorator ノード追加（9種 + カスタムBP） ⚠️ **UE 5.6+ API対応済み** |
+| `HandleAddBTServiceNode` | `add_bt_service_node` | Service ノード追加（3種 + カスタムBP） |
+
+**対応BTノードタイプ**:
+- **Composite (3種)**: Selector, Sequence, SimpleParallel
+- **Task (9種)**: MoveTo, MoveDirectlyToward, Wait, WaitBlackboardTime, PlaySound, PlayAnimation, RotateToFaceBBEntry, RunBehavior, RunBehaviorDynamic
+- **Decorator (9種)**: Blackboard, CompareBBEntries, Cooldown, DoesPathExist, ForceSuccess, IsAtLocation, Loop, TagCooldown, TimeLimit
+- **Service (3種)**: DefaultFocus, RunEQS, BlackboardBase
+
+**⚠️ UE 5.6+ API互換性対応**:
+`HandleAddBTDecoratorNode`のDecorator追加ロジック:
+- **旧** (UE 5.5):
+  ```cpp
+  CompositeNode->Decorators.Add(NewDecorator);
+  TaskNode->Decorators.Add(NewDecorator);
+  ```
+- **新** (UE 5.6+):
+  ```cpp
+  // 再帰的にFBTCompositeChild配列を探索して対象ノードを見つけ、
+  // そのChild.Decorators配列に追加
+  for (FBTCompositeChild& Child : Parent->Children) {
+      if (Child.ChildComposite == TargetNode || Child.ChildTask == TargetNode) {
+          Child.Decorators.Add(NewDecorator);
+      }
+  }
+  ```
+
+---
+
+### FSpirrowBridgeAICommands - BTNodeOperations (15 KB) - Phase G 🆕
+
+BehaviorTree ノードの操作を担当。
+
+| 関数 | MCPコマンド | 説明 |
+|------|-------------|------|
+| `HandleConnectBTNodes` | `connect_bt_nodes` | ノード接続（親子関係設定、Root設定、挿入位置指定） |
+| `HandleSetBTNodeProperty` | `set_bt_node_property` | ノードプロパティ設定（リフレクション経由） |
+| `HandleDeleteBTNode` | `delete_bt_node` | ノード削除（再帰的に全参照から削除） |
+| `HandleListBTNodeTypes` | `list_bt_node_types` | 利用可能なノードタイプ一覧取得（カテゴリ指定可能） |
+
+**技術的特徴**:
+- **ノードID**: `UObject::GetName()`使用（例: "BTComposite_Selector_0"）
+- **接続方式**: `FBTCompositeChild`構造体（EdGraphピンではなくデータ構造）
+- **再帰削除**: Lambda関数で全階層からノード参照を削除
+- **プロパティ設定**: `FSpirrowBridgeCommonUtils::SetObjectProperty()`でリフレクション
 
 ---
 
@@ -528,7 +630,11 @@ else if (CommandType == "add_gameplay_tags" || ...) {
 else if (CommandType == "create_simple_material") {
     MaterialCommands->HandleCommand(...)
 }
-else if (CommandType == "create_blackboard" || ...) {
+else if (CommandType == "create_blackboard" ||
+         CommandType == "add_blackboard_key" ||
+         CommandType == "create_behavior_tree" ||
+         CommandType == "add_bt_composite_node" ||
+         CommandType == "connect_bt_nodes" || ...) {
     AICommands->HandleCommand(...)
 }
 ```
@@ -579,7 +685,10 @@ else if (CommandType == "create_blackboard" || ...) {
 | プロジェクト設定・入力システム | `ProjectCommands` | create_input_action, delete_asset |
 | Config（INI）操作 | `ConfigCommands` | get_config_value, set_config_value |
 | GAS（Gameplay Ability System） | `GASCommands` | add_gameplay_tags, create_gameplay_effect |
-| AI（BehaviorTree / Blackboard） 🆕 | `AICommands` | create_blackboard, add_blackboard_key, create_behavior_tree |
+| AI Blackboard（Phase F） 🆕 | `AICommands` → `Blackboard` | create_blackboard, add_blackboard_key, list_blackboard_keys |
+| AI BehaviorTree（Phase F） 🆕 | `AICommands` → `BehaviorTree` | create_behavior_tree, set_behavior_tree_blackboard |
+| AI BTNode Creation（Phase G） 🆕 | `AICommands` → `BTNodeCreation` | add_bt_composite_node, add_bt_task_node, add_bt_decorator_node |
+| AI BTNode Operations（Phase G） 🆕 | `AICommands` → `BTNodeOperations` | connect_bt_nodes, set_bt_node_property, delete_bt_node |
 | マテリアル作成 | `MaterialCommands` | create_simple_material |
 
 #### 判断のヒント
@@ -605,6 +714,7 @@ else if (CommandType == "create_blackboard" || ...) {
 
 | 日付 | 内容 |
 |------|------|
+| 2026-01-06 | **Phase G**: BT Node Operations実装完了（AICommands 6ファイル分割、Phase G 8ツール追加） |
 | 2026-01-05 | **Phase F**: AI Tools実装完了（SpirrowBridgeAICommands追加、8ツール、16テスト） |
 | 2026-01-03 | **Phase E**: 全18 Commandsファイルにエラーハンドリング統一適用 |
 | 2026-01-03 | SpirrowBridgeCommonUtils.hにエラーコード12個追加 |

@@ -401,7 +401,16 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("create_behavior_tree") ||
                      CommandType == TEXT("set_behavior_tree_blackboard") ||
                      CommandType == TEXT("get_behavior_tree_structure") ||
-                     CommandType == TEXT("list_ai_assets"))
+                     CommandType == TEXT("list_ai_assets") ||
+                     // Phase G: BT Node Operations
+                     CommandType == TEXT("add_bt_composite_node") ||
+                     CommandType == TEXT("add_bt_task_node") ||
+                     CommandType == TEXT("add_bt_decorator_node") ||
+                     CommandType == TEXT("add_bt_service_node") ||
+                     CommandType == TEXT("connect_bt_nodes") ||
+                     CommandType == TEXT("set_bt_node_property") ||
+                     CommandType == TEXT("delete_bt_node") ||
+                     CommandType == TEXT("list_bt_node_types"))
             {
                 ResultJson = AICommands->HandleCommand(CommandType, Params);
             }

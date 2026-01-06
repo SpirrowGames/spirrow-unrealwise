@@ -43,6 +43,12 @@
 - テンプレートベースのマテリアル作成
 - カスタムテンプレートの保存・再利用
 
+### 🤖 AIシステム (BehaviorTree / Blackboard)
+- Blackboard Data Assetの作成・キー管理
+- BehaviorTree Assetの作成・Blackboard連携
+- BTノード操作 (Selector/Sequence/Task/Decorator/Service)
+- ノード接続・プロパティ設定
+
 ### ⚙️ プロジェクト設定
 - Config (ini) ファイルの読み書き
 - GameMode / DefaultMap 等の設定
@@ -220,6 +226,23 @@ Health 属性を -25 する Modifier を追加して」
 | `create_gas_character` | GAS対応キャラクター作成 |
 | ... | その他 |
 
+### AIシステム (17ツール)
+| ツール | 説明 |
+|--------|------|
+| `create_blackboard` | Blackboard作成 |
+| `add_blackboard_key` | キー追加 (10タイプ対応) |
+| `list_blackboard_keys` | キー一覧 |
+| `create_behavior_tree` | BehaviorTree作成 |
+| `add_bt_composite_node` | Selector/Sequence/SimpleParallel追加 |
+| `add_bt_task_node` | MoveTo/Wait等9タスク追加 |
+| `add_bt_decorator_node` | Blackboard/Cooldown等9デコレータ追加 |
+| `add_bt_service_node` | DefaultFocus/RunEQS等サービス追加 |
+| `connect_bt_nodes` | ノード接続 |
+| `set_bt_node_property` | ノードプロパティ設定 |
+| `delete_bt_node` | ノード削除 |
+| `list_bt_node_types` | 利用可能ノードタイプ一覧 |
+| `list_ai_assets` | AIアセット一覧 |
+
 ### Config・ユーティリティ
 | ツール | 説明 |
 |--------|------|
@@ -244,16 +267,18 @@ Health 属性を -25 する Modifier を追加して」
 ```
 spirrow-unrealwise/
 ├── Python/                          # MCPサーバー (Python)
-│   ├── spirrow_unrealwise/
-│   │   ├── __main__.py              # エントリーポイント
-│   │   ├── server.py                # MCPサーバー本体
-│   │   ├── ue_client.py             # UE通信クライアント
-│   │   └── tools/                   # ツール定義
-│   │       ├── actor_tools.py
-│   │       ├── blueprint_tools.py
-│   │       ├── widget_tools.py
-│   │       ├── gas_tools.py
-│   │       └── ...
+│   ├── unreal_mcp_server.py         # MCPサーバー本体
+│   ├── tools/                       # ツール定義
+│   │   ├── editor_tools.py          # Actor操作
+│   │   ├── blueprint_tools.py       # Blueprint操作
+│   │   ├── node_tools.py            # BPノード操作
+│   │   ├── umg_tools.py             # UMG Widget操作
+│   │   ├── gas_tools.py             # GAS操作
+│   │   ├── ai_tools.py              # AI操作 (BT/BB)
+│   │   ├── config_tools.py          # Config操作
+│   │   ├── material_tools.py        # マテリアル操作
+│   │   ├── rag_tools.py             # RAG知識ベース
+│   │   └── ...
 │   ├── tests/                       # テストスイート
 │   └── pyproject.toml
 │
@@ -331,6 +356,13 @@ uv run python -m pytest tests/ -v
 ---
 
 ## 📋 バージョン履歴
+
+### v0.7.0 (Beta) - Phase G
+- **AIシステム完全対応**: BehaviorTree / Blackboard 17ツール
+- Phase F: Blackboard/BehaviorTree作成 (8ツール)
+- Phase G: BTノード操作 (8ツール) + ユーティリティ (1ツール)
+- UE 5.6+ API互換性対応
+- C++ AI Commands 6ファイル分割構成
 
 ### v0.6.6+ (Beta)
 - UMGWidgetCommands 3ファイル分割

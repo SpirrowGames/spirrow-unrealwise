@@ -36,7 +36,8 @@ public class SpirrowBridge : ModuleRules
 				"Json",
 				"JsonUtilities",
 				"DeveloperSettings",
-				"AIModule"
+				"AIModule",
+				"NavigationSystem"
 			}
 		);
 		

@@ -4,6 +4,36 @@
 
 ---
 
+## 2026-01-06: Phase H - AIPerception & EQS
+
+**概要**: AI感知システムとEnvironment Query System操作11ツール追加
+
+**AIPerception (6ツール)**:
+- `add_ai_perception_component` - AIControllerにPerceptionComponent追加
+- `configure_sight_sense` - 視覚設定（距離/角度/アフィリエーション）
+- `configure_hearing_sense` - 聴覚設定
+- `configure_damage_sense` - ダメージ感知設定
+- `set_perception_dominant_sense` - 優先センス設定
+- `add_perception_stimuli_source` - 被検知側コンポーネント追加
+
+**EQS (5ツール)**:
+- `create_eqs_query` - EQS Query Asset作成
+- `add_eqs_generator` - Generator追加（SimpleGrid/Donut/OnCircle/ActorsOfClass等）
+- `add_eqs_test` - Test追加（Distance/Trace/Dot等）+ scoring_factor対応
+- `set_eqs_test_property` - Testプロパティ設定（基本型のみ）
+- `list_eqs_assets` - EQSアセット一覧
+
+**技術詳細**:
+- C++: AIPerceptionCommands (18KB) + EQSCommands (16KB)
+- Python: perception_tools.py + eqs_tools.py
+- テスト: test_phase_h.py (13テスト)
+
+**既知の制限**:
+- `set_eqs_test_property`でStruct型（FAIDataProviderFloatValue）は未対応
+- → `add_eqs_test`の`scoring_factor`パラメータで代替可能
+
+---
+
 ## 2026-01-06: Phase G - BehaviorTree Node Operations
 
 **概要**: BTノードグラフをプログラマティックに構築する8ツール追加

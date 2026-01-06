@@ -2,11 +2,11 @@
 
 C++ 実装の全体像。新しいセッション開始時の参照用。
 
-> **最終更新**: 2026-01-06 | **バージョン**: Phase G
+> **最終更新**: 2026-01-06 | **バージョン**: Phase H
 
 ---
 
-## ファイル構成 (27ファイル)
+## ファイル構成 (29ファイル)
 
 ### Commands ディレクトリ
 
@@ -51,6 +51,13 @@ C++ 実装の全体像。新しいセッション開始時の参照用。
 | `AICommands_BTNodeCreation` | 12 KB | BTノード追加 |
 | `AICommands_BTNodeOperations` | 15 KB | BTノード操作 |
 
+#### AI Perception & EQS 系 (Phase H)
+
+| ファイル | サイズ | 担当 |
+|----------|--------|------|
+| `AIPerceptionCommands` | 18 KB | AIPerceptionComponent/Sense設定 |
+| `EQSCommands` | 16 KB | EQS Query/Generator/Test |
+
 #### その他
 
 | ファイル | サイズ | 担当 |
@@ -82,6 +89,8 @@ create_input_action ...         → ProjectCommands
 get_config_value ...            → ConfigCommands
 add_gameplay_tags ...           → GASCommands
 create_blackboard, add_bt_* ... → AICommands
+add_ai_perception_component ... → AIPerceptionCommands
+create_eqs_query, add_eqs_* ... → EQSCommands
 create_simple_material          → MaterialCommands
 ```
 

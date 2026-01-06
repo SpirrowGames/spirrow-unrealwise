@@ -64,6 +64,8 @@
 #include "Commands/SpirrowBridgeGASCommands.h"
 #include "Commands/SpirrowBridgeMaterialCommands.h"
 #include "Commands/SpirrowBridgeAICommands.h"
+#include "Commands/SpirrowBridgeAIPerceptionCommands.h"
+#include "Commands/SpirrowBridgeEQSCommands.h"
 
 // Default settings
 #define MCP_SERVER_HOST "127.0.0.1"
@@ -83,6 +85,8 @@ USpirrowBridge::USpirrowBridge()
     GASCommands = MakeShared<FSpirrowBridgeGASCommands>();
     MaterialCommands = MakeShared<FSpirrowBridgeMaterialCommands>();
     AICommands = MakeShared<FSpirrowBridgeAICommands>();
+    AIPerceptionCommands = MakeShared<FSpirrowBridgeAIPerceptionCommands>();
+    EQSCommands = MakeShared<FSpirrowBridgeEQSCommands>();
 }
 
 USpirrowBridge::~USpirrowBridge()
@@ -99,6 +103,8 @@ USpirrowBridge::~USpirrowBridge()
     GASCommands.Reset();
     MaterialCommands.Reset();
     AICommands.Reset();
+    AIPerceptionCommands.Reset();
+    EQSCommands.Reset();
 }
 
 // Initialize subsystem
@@ -413,6 +419,25 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("list_bt_node_types"))
             {
                 ResultJson = AICommands->HandleCommand(CommandType, Params);
+            }
+            // AI Perception Commands (Phase H-1)
+            else if (CommandType == TEXT("add_ai_perception_component") ||
+                     CommandType == TEXT("configure_sight_sense") ||
+                     CommandType == TEXT("configure_hearing_sense") ||
+                     CommandType == TEXT("configure_damage_sense") ||
+                     CommandType == TEXT("set_perception_dominant_sense") ||
+                     CommandType == TEXT("add_perception_stimuli_source"))
+            {
+                ResultJson = AIPerceptionCommands->HandleCommand(CommandType, Params);
+            }
+            // EQS Commands (Phase H-2)
+            else if (CommandType == TEXT("create_eqs_query") ||
+                     CommandType == TEXT("add_eqs_generator") ||
+                     CommandType == TEXT("add_eqs_test") ||
+                     CommandType == TEXT("set_eqs_test_property") ||
+                     CommandType == TEXT("list_eqs_assets"))
+            {
+                ResultJson = EQSCommands->HandleCommand(CommandType, Params);
             }
             else
             {

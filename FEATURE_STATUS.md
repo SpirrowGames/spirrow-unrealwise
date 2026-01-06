@@ -1,7 +1,7 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: Phase G  
-> **ステータス**: Beta  
+> **バージョン**: Phase H
+> **ステータス**: Beta
 > **最終更新**: 2026-01-06
 
 ---
@@ -17,10 +17,12 @@
 | Enhanced Input | 5 | ✅ |
 | GAS | 8 | ✅ |
 | AI (BT/BB) | 17 | ✅ |
+| AI Perception | 6 | ✅ 🆕 |
+| EQS | 5 | ✅ 🆕 |
 | Material | 5 | ✅ |
 | Config | 3 | ✅ |
 | RAG | 4 | ✅ |
-| **合計** | **97** | |
+| **合計** | **108** | |
 
 ---
 
@@ -55,6 +57,12 @@
 - **BTノード操作 (8)**: `add_bt_composite_node`, `add_bt_task_node`, `add_bt_decorator_node`, `add_bt_service_node`, `connect_bt_nodes`, `set_bt_node_property`, `delete_bt_node`, `list_bt_node_types`
 - **ユーティリティ (1)**: `list_ai_assets`
 
+### AI Perception (6) 🆕
+`add_ai_perception_component`, `configure_sight_sense`, `configure_hearing_sense`, `configure_damage_sense`, `set_perception_dominant_sense`, `add_perception_stimuli_source`
+
+### EQS (5) 🆕
+`create_eqs_query`, `add_eqs_generator`, `add_eqs_test`, `set_eqs_test_property`, `list_eqs_assets`
+
 ### Material (5)
 `list_material_templates`, `get_material_template`, `save_material_template`, `delete_material_template`, `create_material_from_template`, `create_simple_material`
 
@@ -67,6 +75,11 @@
 ---
 
 ## 最新の更新
+
+### Phase H (2026-01-06) 🆕
+- **AI Perception (6ツール)**: AIPerceptionComponent、Sight/Hearing/Damage Sense設定、StimuliSource
+- **EQS (5ツール)**: Environment Query System、Generator/Test操作
+- NavigationSystem依存追加
 
 ### Phase G (2026-01-06)
 - BTノード操作8ツール追加（Selector/Sequence/Task/Decorator/Service）

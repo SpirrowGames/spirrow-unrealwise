@@ -287,6 +287,8 @@ from tools.config_tools import register_config_tools
 from tools.gas_tools import register_gas_tools
 from tools.material_tools import register_material_tools
 from tools.ai_tools import register_ai_tools
+from tools.perception_tools import register_perception_tools
+from tools.eqs_tools import register_eqs_tools
 
 # Register tools
 register_editor_tools(mcp)
@@ -299,7 +301,9 @@ register_knowledge_tools(mcp)
 register_config_tools(mcp)
 register_gas_tools(mcp)
 register_material_tools(mcp)
-register_ai_tools(mcp)  
+register_ai_tools(mcp)
+register_perception_tools(mcp)
+register_eqs_tools(mcp)
 
 @mcp.prompt()
 def info():

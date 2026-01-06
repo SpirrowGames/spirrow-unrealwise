@@ -35,7 +35,8 @@ public class SpirrowBridge : ModuleRules
 				"HTTP",
 				"Json",
 				"JsonUtilities",
-				"DeveloperSettings"
+				"DeveloperSettings",
+				"AIModule"
 			}
 		);
 		

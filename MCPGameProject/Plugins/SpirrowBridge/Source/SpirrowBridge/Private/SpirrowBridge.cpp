@@ -63,6 +63,7 @@
 #include "Commands/SpirrowBridgeConfigCommands.h"
 #include "Commands/SpirrowBridgeGASCommands.h"
 #include "Commands/SpirrowBridgeMaterialCommands.h"
+#include "Commands/SpirrowBridgeAICommands.h"
 
 // Default settings
 #define MCP_SERVER_HOST "127.0.0.1"
@@ -81,6 +82,7 @@ USpirrowBridge::USpirrowBridge()
     ConfigCommands = MakeShared<FSpirrowBridgeConfigCommands>();
     GASCommands = MakeShared<FSpirrowBridgeGASCommands>();
     MaterialCommands = MakeShared<FSpirrowBridgeMaterialCommands>();
+    AICommands = MakeShared<FSpirrowBridgeAICommands>();
 }
 
 USpirrowBridge::~USpirrowBridge()
@@ -96,6 +98,7 @@ USpirrowBridge::~USpirrowBridge()
     ConfigCommands.Reset();
     GASCommands.Reset();
     MaterialCommands.Reset();
+    AICommands.Reset();
 }
 
 // Initialize subsystem
@@ -389,6 +392,18 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
             else if (CommandType == TEXT("create_simple_material"))
             {
                 ResultJson = MaterialCommands->HandleCommand(CommandType, Params);
+            }
+            // AI Commands
+            else if (CommandType == TEXT("create_blackboard") ||
+                     CommandType == TEXT("add_blackboard_key") ||
+                     CommandType == TEXT("remove_blackboard_key") ||
+                     CommandType == TEXT("list_blackboard_keys") ||
+                     CommandType == TEXT("create_behavior_tree") ||
+                     CommandType == TEXT("set_behavior_tree_blackboard") ||
+                     CommandType == TEXT("get_behavior_tree_structure") ||
+                     CommandType == TEXT("list_ai_assets"))
+            {
+                ResultJson = AICommands->HandleCommand(CommandType, Params);
             }
             else
             {

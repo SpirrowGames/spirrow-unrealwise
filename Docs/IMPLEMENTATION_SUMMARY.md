@@ -3,8 +3,8 @@
 このドキュメントは、SpirrowBridge プラグインの C++ 実装概要をまとめたものです。
 新しいチャットセッション開始時に、コードベースの全体像を把握するために参照してください。
 
-> **最終更新**: 2026-01-03  
-> **バージョン**: Phase E (エラーハンドリング統一完了)
+> **最終更新**: 2026-01-05
+> **バージョン**: Phase F (AI Tools実装完了)
 
 ---
 
@@ -50,10 +50,11 @@
 | `SpirrowBridgeCommonUtils.cpp` | 35 KB | 共通ユーティリティ |
 | `SpirrowBridgeEditorCommands.cpp` | 29 KB | アクター・エディタ操作 |
 | `SpirrowBridgeProjectCommands.cpp` | 25 KB | プロジェクト・入力設定 |
+| `SpirrowBridgeAICommands.cpp` | 21 KB | AI (BehaviorTree/Blackboard) 🆕 |
 | `SpirrowBridgeMaterialCommands.cpp` | 8 KB | マテリアル作成 |
 | `SpirrowBridgeConfigCommands.cpp` | 8 KB | Config（INI）操作 |
 
-**合計**: 21 ファイル（Blueprint系6分割、UMG系7分割完了）
+**合計**: 22 ファイル（Blueprint系6分割、UMG系7分割完了、AI追加）
 
 ---
 
@@ -303,6 +304,49 @@ Config（INI）ファイル操作を担当。
 
 ---
 
+### FSpirrowBridgeAICommands (21 KB) 🆕
+
+AI（BehaviorTree / Blackboard）操作を担当。
+
+#### Blackboard 操作
+
+| 関数 | MCPコマンド | 説明 |
+|------|-------------|------|
+| `HandleCreateBlackboard` | `create_blackboard` | Blackboard Data Asset作成 |
+| `HandleAddBlackboardKey` | `add_blackboard_key` | Blackboardキー追加（10タイプ対応） |
+| `HandleRemoveBlackboardKey` | `remove_blackboard_key` | Blackboardキー削除 |
+| `HandleListBlackboardKeys` | `list_blackboard_keys` | Blackboardキー一覧取得 |
+
+#### BehaviorTree 操作
+
+| 関数 | MCPコマンド | 説明 |
+|------|-------------|------|
+| `HandleCreateBehaviorTree` | `create_behavior_tree` | BehaviorTree Asset作成 |
+| `HandleSetBehaviorTreeBlackboard` | `set_behavior_tree_blackboard` | BTにBlackboard設定 |
+| `HandleGetBehaviorTreeStructure` | `get_behavior_tree_structure` | BT構造情報取得 |
+
+#### ユーティリティ
+
+| 関数 | MCPコマンド | 説明 |
+|------|-------------|------|
+| `HandleListAIAssets` | `list_ai_assets` | AI関連アセット一覧取得 |
+
+#### ヘルパー
+
+| 関数 | 説明 |
+|------|------|
+| `FindBlackboardAsset` | Blackboardアセット検索 |
+| `FindBehaviorTreeAsset` | BehaviorTreeアセット検索 |
+| `GetBlackboardKeyTypeClass` | Blackboardキータイプクラス取得 |
+| `BlackboardKeyToJson` | BlackboardキーをJSON変換 |
+
+**対応Blackboardキータイプ**:
+- Bool, Int, Float, String, Name
+- Vector, Rotator
+- Object, Class, Enum
+
+---
+
 ### FSpirrowBridgeMaterialCommands (8 KB)
 
 マテリアル作成を担当。
@@ -484,6 +528,9 @@ else if (CommandType == "add_gameplay_tags" || ...) {
 else if (CommandType == "create_simple_material") {
     MaterialCommands->HandleCommand(...)
 }
+else if (CommandType == "create_blackboard" || ...) {
+    AICommands->HandleCommand(...)
+}
 ```
 
 ### Blueprint 系の内部ルーティング
@@ -532,6 +579,7 @@ else if (CommandType == "create_simple_material") {
 | プロジェクト設定・入力システム | `ProjectCommands` | create_input_action, delete_asset |
 | Config（INI）操作 | `ConfigCommands` | get_config_value, set_config_value |
 | GAS（Gameplay Ability System） | `GASCommands` | add_gameplay_tags, create_gameplay_effect |
+| AI（BehaviorTree / Blackboard） 🆕 | `AICommands` | create_blackboard, add_blackboard_key, create_behavior_tree |
 | マテリアル作成 | `MaterialCommands` | create_simple_material |
 
 #### 判断のヒント
@@ -557,6 +605,7 @@ else if (CommandType == "create_simple_material") {
 
 | 日付 | 内容 |
 |------|------|
+| 2026-01-05 | **Phase F**: AI Tools実装完了（SpirrowBridgeAICommands追加、8ツール、16テスト） |
 | 2026-01-03 | **Phase E**: 全18 Commandsファイルにエラーハンドリング統一適用 |
 | 2026-01-03 | SpirrowBridgeCommonUtils.hにエラーコード12個追加 |
 | 2026-01-03 | Phase D: ドキュメント整備完了 |

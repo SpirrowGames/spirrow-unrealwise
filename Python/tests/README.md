@@ -11,6 +11,7 @@ tests/
 ├── test_framework.py    # テストフレームワーク
 ├── test_umg_widgets.py  # UMG Widgetテスト
 ├── test_blueprints.py   # Blueprintテスト
+├── test_ai_tools.py     # AI (BehaviorTree/Blackboard) テスト
 ├── run_tests.py         # テストランナー
 ├── smoke_test.py        # クイックスモークテスト
 └── README.md            # このファイル
@@ -56,6 +57,9 @@ python run_tests.py -m umg
 # Blueprintテストのみ
 python run_tests.py -m blueprint
 
+# AIテストのみ (BehaviorTree/Blackboard)
+python run_tests.py -m ai
+
 # ノードテストのみ
 python run_tests.py -m node
 
@@ -98,6 +102,15 @@ python run_tests.py test_umg_widgets.py
 | `TestBlueprintComponent` | 2 | コンポーネント追加、メッシュ設定 |
 | `TestBlueprintNode` | 5 | Event, PrintString, Delay, Branch, Sequence |
 | `TestBlueprintIntegration` | 1 | 完全なBlueprint作成 |
+
+### AIテスト (`test_ai_tools.py`)
+
+| クラス | テスト数 | 内容 |
+|--------|---------|------|
+| `TestBlackboard` | 8 | Blackboard作成、キー追加（Bool/Int/Float/Vector/Object）、キー削除、一覧取得 |
+| `TestBehaviorTree` | 4 | BehaviorTree作成、Blackboard連携、Blackboard設定、構造取得 |
+| `TestAIUtility` | 3 | AIアセット一覧（全て/Blackboardのみ/BehaviorTreeのみ） |
+| `TestAIIntegration` | 1 | 完全なAIシステム作成（Blackboard+BehaviorTree） |
 
 ## 🛠️ テストフレームワーク
 

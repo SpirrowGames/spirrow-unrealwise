@@ -75,9 +75,96 @@
 | `list_knowledge` | ✅ 動作OK | 登録済みナレッジ一覧取得 |
 | `delete_knowledge` | ✅ 動作OK | ID指定でナレッジ削除 |
 
+### AI操作 (BehaviorTree / Blackboard) 🆕
+
+#### Blackboard
+
+| ツール | 状態 | 備考 |
+|--------|------|------|
+| `create_blackboard` | ✅ 実装完了 | Blackboard Data Asset作成。テスト完備 |
+| `add_blackboard_key` | ✅ 実装完了 | キー追加（Bool/Int/Float/String/Name/Vector/Rotator/Object/Class/Enum対応）。テスト完備 |
+| `remove_blackboard_key` | ✅ 実装完了 | キー削除。テスト完備 |
+| `list_blackboard_keys` | ✅ 実装完了 | キー一覧取得。テスト完備 |
+
+#### BehaviorTree
+
+| ツール | 状態 | 備考 |
+|--------|------|------|
+| `create_behavior_tree` | ✅ 実装完了 | BehaviorTree Asset作成、Blackboard連携可能。テスト完備 |
+| `set_behavior_tree_blackboard` | ✅ 実装完了 | BTにBlackboard設定。テスト完備 |
+| `get_behavior_tree_structure` | ✅ 実装完了 | BT構造情報取得。テスト完備 |
+
+#### ユーティリティ
+
+| ツール | 状態 | 備考 |
+|--------|------|------|
+| `list_ai_assets` | ✅ 実装完了 | AI関連アセット（BT/BB）一覧取得、パスフィルタ対応。テスト完備 |
+
 ---
 
 ## 最新の更新履歴
+
+### 2026-01-05: AI (BehaviorTree / Blackboard) ツール実装・テスト完了 ✅
+
+**実装内容**:
+- **8つの新MCPツール追加**: AI開発に必須のBehaviorTree/Blackboard操作
+- **C++実装**: SpirrowBridgeAICommands (674行)
+- **Python実装**: ai_tools.py (455行、正しいインポートパス使用)
+- **テスト実装**: test_ai_tools.py (16テスト)
+- **Build.cs更新**: AIModule依存追加
+
+**新規ツール**:
+| カテゴリ | ツール | 説明 |
+|---------|--------|------|
+| Blackboard | `create_blackboard` | Blackboard Data Asset作成 |
+| Blackboard | `add_blackboard_key` | キー追加（10タイプ対応） |
+| Blackboard | `remove_blackboard_key` | キー削除 |
+| Blackboard | `list_blackboard_keys` | キー一覧取得 |
+| BehaviorTree | `create_behavior_tree` | BehaviorTree Asset作成 |
+| BehaviorTree | `set_behavior_tree_blackboard` | BTにBlackboard紐付け |
+| BehaviorTree | `get_behavior_tree_structure` | BT構造情報取得 |
+| Utility | `list_ai_assets` | AI関連アセット一覧 |
+
+**対応Blackboardキータイプ (10種)**:
+- プリミティブ: Bool, Int, Float, String, Name
+- 数学: Vector, Rotator
+- 参照: Object, Class, Enum
+
+**新規ファイル**:
+```
+MCPGameProject/Plugins/SpirrowBridge/Source/SpirrowBridge/
+├── Public/Commands/SpirrowBridgeAICommands.h (95行)
+└── Private/Commands/SpirrowBridgeAICommands.cpp (674行)
+
+Python/
+├── tools/ai_tools.py (455行)
+└── tests/test_ai_tools.py (16テスト)
+```
+
+**統合作業**:
+- SpirrowBridge.h/.cpp: AICommands統合
+- SpirrowBridge.Build.cs: AIModule依存追加
+- unreal_mcp_server.py: `from tools.ai_tools import register_ai_tools`
+- ValidateRequiredString使用箇所を正しいパターンに修正（11箇所）
+
+**テスト実装 (test_ai_tools.py)**:
+| テストクラス | テスト数 | 内容 |
+|-------------|---------|------|
+| `TestBlackboard` | 8 | Blackboard作成、キー追加（Bool/Int/Float/Vector/Object）、キー削除、一覧取得 |
+| `TestBehaviorTree` | 4 | BehaviorTree作成、Blackboard連携、Blackboard設定、構造取得 |
+| `TestAIUtility` | 3 | AIアセット一覧（全て/Blackboardのみ/BehaviorTreeのみ） |
+| `TestAIIntegration` | 1 | 完全なAIシステム作成（Blackboard+BehaviorTree統合） |
+
+**テスト実行方法**:
+```bash
+cd Python/tests
+python run_tests.py -m ai      # AIテストのみ
+python run_tests.py -m ai -v   # 詳細出力
+```
+
+**ビルド状況**: ✅ コンパイル成功（3.68秒）
+
+---
 
 ### 2026-01-03: Phase E - 全Commandsエラーハンドリング統一 🆕
 
@@ -201,6 +288,7 @@
 | `conftest.py` | pytest fixtures |
 | `test_umg_widgets.py` | UMG Widgetテスト (13テスト) |
 | `test_blueprints.py` | Blueprintテスト (11テスト) |
+| `test_ai_tools.py` | AI (BehaviorTree/Blackboard) テスト (16テスト) 🆕 |
 | `run_tests.py` | CLIテストランナー |
 | `smoke_test.py` | スタンドアロン スモークテスト |
 | `README.md` | テストドキュメント |

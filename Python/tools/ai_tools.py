@@ -410,14 +410,16 @@ def register_ai_tools(mcp: FastMCP):
 		ctx: Context,
 		behavior_tree_name: str,
 		node_type: str,
+		parent_node_id: str = "",
 		path: str = "/Game/AI/BehaviorTrees",
-		node_name: Optional[str] = None
+		node_name: Optional[str] = None,
+		child_index: int = -1
 	) -> Dict[str, Any]:
 		"""
 		Add a composite node (Selector/Sequence/SimpleParallel) to a BehaviorTree.
 
 		Composite nodes control the flow of execution through their children.
-		After creating, use connect_bt_nodes() to add the node to the tree.
+		The node is immediately connected to the tree upon creation.
 
 		Args:
 			behavior_tree_name: Name of the target BehaviorTree
@@ -425,32 +427,36 @@ def register_ai_tools(mcp: FastMCP):
 				- "Selector": Tries children in order until one succeeds
 				- "Sequence": Runs children in order until one fails
 				- "SimpleParallel": Runs main task with background tasks
+			parent_node_id: ID of parent node to connect to. Empty or "Root" to set as root node.
 			path: Content browser path where the BehaviorTree is located
 			node_name: Optional display name for the node in the editor
+			child_index: Index to insert at (-1 = append to end)
 
 		Returns:
 			Dict containing:
 			- success: Whether the operation succeeded
 			- behavior_tree_name: Name of the BehaviorTree
-			- node_id: Unique ID of the created node (use for connect_bt_nodes)
+			- node_id: Unique ID of the created node
 			- node_type: Type string that was specified
 			- node_class: Actual UClass name
 			- node_name: Display name (if specified)
+			- parent_node_id: Parent node ID (if specified)
 
 		Examples:
-			# Create a Selector node (tries children until one succeeds)
+			# Create a Selector as root node
 			result = add_bt_composite_node(
 				behavior_tree_name="BT_Enemy",
 				node_type="Selector",
-				node_name="Attack Or Flee"
+				parent_node_id="Root",
+				node_name="Main Selector"
 			)
-			# Use result["node_id"] to connect this node
 
-			# Create a Sequence node (runs children until one fails)
+			# Create a Sequence as child of the root Selector
 			add_bt_composite_node(
-				behavior_tree_name="BT_Patrol",
+				behavior_tree_name="BT_Enemy",
 				node_type="Sequence",
-				node_name="Patrol Loop"
+				parent_node_id="BTComposite_Selector_0",
+				node_name="Attack Sequence"
 			)
 		"""
 		from unreal_mcp_server import get_unreal_connection
@@ -463,7 +469,9 @@ def register_ai_tools(mcp: FastMCP):
 			params = {
 				"behavior_tree_name": behavior_tree_name,
 				"node_type": node_type,
-				"path": path
+				"parent_node_id": parent_node_id,
+				"path": path,
+				"child_index": child_index
 			}
 			if node_name:
 				params["node_name"] = node_name
@@ -485,14 +493,16 @@ def register_ai_tools(mcp: FastMCP):
 		ctx: Context,
 		behavior_tree_name: str,
 		task_type: str,
+		parent_node_id: str,
 		path: str = "/Game/AI/BehaviorTrees",
-		node_name: Optional[str] = None
+		node_name: Optional[str] = None,
+		child_index: int = -1
 	) -> Dict[str, Any]:
 		"""
 		Add a task node to a BehaviorTree.
 
 		Task nodes are leaf nodes that perform actions.
-		After creating, use connect_bt_nodes() to add the node to the tree.
+		The node is immediately connected to the specified parent composite node.
 
 		Args:
 			behavior_tree_name: Name of the target BehaviorTree
@@ -511,30 +521,35 @@ def register_ai_tools(mcp: FastMCP):
 				Custom Blueprint tasks:
 				- Use the Blueprint name (e.g., "MyCustomTask")
 				- Must exist at /Game/AI/Tasks/
+			parent_node_id: ID of parent composite node to connect to (required)
 			path: Content browser path where the BehaviorTree is located
 			node_name: Optional display name for the node in the editor
+			child_index: Index to insert at (-1 = append to end)
 
 		Returns:
 			Dict containing:
 			- success: Whether the operation succeeded
 			- behavior_tree_name: Name of the BehaviorTree
-			- node_id: Unique ID of the created node (use for connect_bt_nodes)
+			- node_id: Unique ID of the created node
 			- task_type: Type string that was specified
 			- node_class: Actual UClass name
+			- parent_node_id: Parent node ID
 			- node_name: Display name (if specified)
 
 		Examples:
-			# Add MoveTo task
+			# Add MoveTo task to a Selector
 			result = add_bt_task_node(
 				behavior_tree_name="BT_Enemy",
 				task_type="BTTask_MoveTo",
+				parent_node_id="BTComposite_Selector_0",
 				node_name="Move To Player"
 			)
 
-			# Add Wait task
+			# Add Wait task to a Sequence
 			add_bt_task_node(
 				behavior_tree_name="BT_Patrol",
 				task_type="BTTask_Wait",
+				parent_node_id="BTComposite_Sequence_0",
 				node_name="Wait 3 Seconds"
 			)
 		"""
@@ -548,7 +563,9 @@ def register_ai_tools(mcp: FastMCP):
 			params = {
 				"behavior_tree_name": behavior_tree_name,
 				"task_type": task_type,
-				"path": path
+				"parent_node_id": parent_node_id,
+				"path": path,
+				"child_index": child_index
 			}
 			if node_name:
 				params["node_name"] = node_name
@@ -739,15 +756,16 @@ def register_ai_tools(mcp: FastMCP):
 		child_index: int = -1
 	) -> Dict[str, Any]:
 		"""
-		Connect two BehaviorTree nodes (parent-child relationship).
+		Relocate an existing BehaviorTree node to a new parent.
 
-		This establishes the tree hierarchy. Parent must be a Composite node.
-		Use "Root" as parent_node_id to set the root node of the tree.
+		This is used to move nodes that are already in the tree to a different parent.
+		The node is automatically removed from its current parent before being added to the new one.
+		For creating new nodes, use add_bt_composite_node() or add_bt_task_node() with parent_node_id.
 
 		Args:
 			behavior_tree_name: Name of the target BehaviorTree
-			parent_node_id: ID of the parent node (must be Composite), or "Root"
-			child_node_id: ID of the child node to connect
+			parent_node_id: ID of the new parent node (must be Composite), or "Root"
+			child_node_id: ID of the existing child node to relocate
 			path: Content browser path where the BehaviorTree is located
 			child_index: Index to insert child at (-1 = append to end)
 
@@ -760,21 +778,21 @@ def register_ai_tools(mcp: FastMCP):
 			- child_index: Index where child was inserted (if specified)
 
 		Examples:
-			# Set root node
+			# Move a node to become root
 			connect_bt_nodes(
 				behavior_tree_name="BT_Enemy",
 				parent_node_id="Root",
 				child_node_id="BTComposite_Selector_0"
 			)
 
-			# Connect task to selector
+			# Move a task to a different selector
 			connect_bt_nodes(
 				behavior_tree_name="BT_Enemy",
-				parent_node_id="BTComposite_Selector_0",
+				parent_node_id="BTComposite_Selector_1",
 				child_node_id="BTTask_MoveTo_0"
 			)
 
-			# Insert at specific index
+			# Move to a specific position
 			connect_bt_nodes(
 				behavior_tree_name="BT_Enemy",
 				parent_node_id="BTComposite_Sequence_0",

@@ -17,13 +17,6 @@ public:
 	~FSpirrowBridgeAICommands();
 
 	/**
-	 * Cache for BT nodes that have been created but not yet connected to the tree.
-	 * Key: BehaviorTree asset path -> (NodeId -> Node pointer)
-	 * This is needed because FindBTNodeById can only search nodes connected to RootNode.
-	 */
-	static TMap<FString, TMap<FString, UBTNode*>> PendingBTNodes;
-
-	/**
 	 * Main command handler that routes to specific handlers.
 	 */
 	TSharedPtr<FJsonObject> HandleCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params);
@@ -165,6 +158,12 @@ private:
 	 * Find a BT node by ID within a BehaviorTree.
 	 */
 	class UBTNode* FindBTNodeById(class UBehaviorTree* BehaviorTree, const FString& NodeId);
+
+	/**
+	 * Remove a node from its parent in the BehaviorTree.
+	 * Used for relocating nodes to a new parent.
+	 */
+	void RemoveNodeFromParent(class UBehaviorTree* BehaviorTree, class UBTNode* TargetNode);
 
 	/**
 	 * Convert a BT node to JSON representation.

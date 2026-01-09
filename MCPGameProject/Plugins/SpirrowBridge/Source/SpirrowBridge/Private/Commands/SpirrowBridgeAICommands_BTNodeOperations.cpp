@@ -1,18 +1,150 @@
 #include "Commands/SpirrowBridgeAICommands.h"
 #include "Commands/SpirrowBridgeCommonUtils.h"
 
-// BehaviorTree includes
+// BehaviorTree runtime includes
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BTCompositeNode.h"
 #include "BehaviorTree/BTTaskNode.h"
 #include "BehaviorTree/BTDecorator.h"
 #include "BehaviorTree/BTService.h"
 
+// ★ Graph-based includes (UE5.7) ★
+#include "EdGraph/EdGraph.h"
+#include "AIGraphTypes.h"
+#include "BehaviorTreeGraph.h"
+#include "BehaviorTreeGraphNode.h"
+#include "BehaviorTreeGraphNode_Root.h"
+#include "BehaviorTreeGraphNode_Composite.h"
+#include "BehaviorTreeGraphNode_Task.h"
+#include "BehaviorTreeGraphNode_Decorator.h"
+#include "BehaviorTreeGraphNode_Service.h"
+#include "EdGraphSchema_BehaviorTree.h"
+
 // Asset management includes
 #include "UObject/SavePackage.h"
 #include "Misc/PackageName.h"
 
-// ===== Phase G: BT Node Operation Handlers =====
+// ===== Helper Functions for Graph-Based Node Operations =====
+
+/**
+ * Get the BehaviorTreeGraph from a BehaviorTree asset
+ */
+static UBehaviorTreeGraph* GetBTGraph(UBehaviorTree* BehaviorTree)
+{
+	return Cast<UBehaviorTreeGraph>(BehaviorTree->BTGraph);
+}
+
+/**
+ * Find a graph node by its runtime node ID
+ */
+static UBehaviorTreeGraphNode* FindGraphNodeByIdInternal(UBehaviorTreeGraph* BTGraph, const FString& NodeId)
+{
+	for (UEdGraphNode* Node : BTGraph->Nodes)
+	{
+		UBehaviorTreeGraphNode* BTGraphNode = Cast<UBehaviorTreeGraphNode>(Node);
+		if (BTGraphNode && BTGraphNode->NodeInstance)
+		{
+			if (BTGraphNode->NodeInstance->GetName() == NodeId)
+			{
+				return BTGraphNode;
+			}
+		}
+	}
+	return nullptr;
+}
+
+/**
+ * Find the Root graph node
+ */
+static UBehaviorTreeGraphNode_Root* FindRootGraphNodeInternal(UBehaviorTreeGraph* BTGraph)
+{
+	for (UEdGraphNode* Node : BTGraph->Nodes)
+	{
+		if (UBehaviorTreeGraphNode_Root* RootNode = Cast<UBehaviorTreeGraphNode_Root>(Node))
+		{
+			return RootNode;
+		}
+	}
+	return nullptr;
+}
+
+/**
+ * Connect two graph nodes via pins
+ */
+static bool ConnectGraphNodesInternal(UBehaviorTreeGraphNode* ParentGraphNode, UBehaviorTreeGraphNode* ChildGraphNode)
+{
+	// Get output pin from parent
+	UEdGraphPin* ParentOutputPin = nullptr;
+	for (UEdGraphPin* Pin : ParentGraphNode->Pins)
+	{
+		if (Pin->Direction == EGPD_Output)
+		{
+			ParentOutputPin = Pin;
+			break;
+		}
+	}
+
+	// Get input pin from child
+	UEdGraphPin* ChildInputPin = nullptr;
+	for (UEdGraphPin* Pin : ChildGraphNode->Pins)
+	{
+		if (Pin->Direction == EGPD_Input)
+		{
+			ChildInputPin = Pin;
+			break;
+		}
+	}
+
+	if (!ParentOutputPin || !ChildInputPin)
+	{
+		return false;
+	}
+
+	// Connect using MakeLinkTo
+	ParentOutputPin->MakeLinkTo(ChildInputPin);
+
+	return true;
+}
+
+/**
+ * Disconnect a graph node from its parent
+ */
+static void DisconnectGraphNode(UBehaviorTreeGraphNode* GraphNode)
+{
+	// Break all input pin links
+	for (UEdGraphPin* Pin : GraphNode->Pins)
+	{
+		if (Pin->Direction == EGPD_Input)
+		{
+			Pin->BreakAllPinLinks();
+		}
+	}
+}
+
+/**
+ * Finalize and save the BehaviorTree graph
+ */
+static void FinalizeAndSaveBTGraphInternal(UBehaviorTreeGraph* BTGraph, UBehaviorTree* BehaviorTree)
+{
+	// Notify graph changed
+	BTGraph->NotifyGraphChanged();
+
+	// Rebuild runtime tree
+	BTGraph->UpdateAsset();
+
+	// Mark package dirty
+	BehaviorTree->MarkPackageDirty();
+
+	// Save package
+	UPackage* Package = BehaviorTree->GetOutermost();
+	FString PackageFileName = FPackageName::LongPackageNameToFilename(
+		Package->GetName(), FPackageName::GetAssetPackageExtension());
+	FSavePackageArgs SaveArgs;
+	SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
+	UPackage::SavePackage(Package, BehaviorTree, *PackageFileName, SaveArgs);
+}
+
+// ===== Phase G: BT Node Operation Handlers (Graph-Based) =====
 
 TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleConnectBTNodes(
 	const TSharedPtr<FJsonObject>& Params)
@@ -51,81 +183,82 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleConnectBTNodes(
 			FString::Printf(TEXT("BehaviorTree not found: %s at %s"), *BehaviorTreeName, *Path));
 	}
 
-	// 子ノード取得
-	UBTNode* ChildNode = FindBTNodeById(BehaviorTree, ChildNodeId);
-	if (!ChildNode)
+	// ★ Graph取得 ★
+	UBehaviorTreeGraph* BTGraph = GetBTGraph(BehaviorTree);
+	if (!BTGraph)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::NodeCreationFailed,
+			TEXT("BehaviorTree has no graph. Create nodes first using add_bt_composite_node or add_bt_task_node."));
+	}
+
+	// ★ 子グラフノード取得 ★
+	UBehaviorTreeGraphNode* ChildGraphNode = FindGraphNodeByIdInternal(BTGraph, ChildNodeId);
+	if (!ChildGraphNode)
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
 			ESpirrowErrorCode::NodeNotFound,
-			FString::Printf(TEXT("Child node not found: %s"), *ChildNodeId));
+			FString::Printf(TEXT("Child graph node not found: %s"), *ChildNodeId));
 	}
 
 	// Root接続の場合
 	if (ParentNodeId.Equals(TEXT("Root"), ESearchCase::IgnoreCase))
 	{
-		UBTCompositeNode* RootComposite = Cast<UBTCompositeNode>(ChildNode);
-		if (!RootComposite)
-		{
-			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-				ESpirrowErrorCode::InvalidOperation,
-				TEXT("Root node must be a composite node"));
-		}
-		BehaviorTree->RootNode = RootComposite;
-	}
-	else
-	{
-		// 親ノード取得
-		UBTNode* ParentNode = FindBTNodeById(BehaviorTree, ParentNodeId);
-		if (!ParentNode)
+		UBehaviorTreeGraphNode_Root* RootGraphNode = FindRootGraphNodeInternal(BTGraph);
+		if (!RootGraphNode)
 		{
 			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
 				ESpirrowErrorCode::NodeNotFound,
-				FString::Printf(TEXT("Parent node not found: %s"), *ParentNodeId));
+				TEXT("Root node not found in graph"));
 		}
 
-		UBTCompositeNode* ParentComposite = Cast<UBTCompositeNode>(ParentNode);
-		if (!ParentComposite)
+		// 既存の接続を解除
+		DisconnectGraphNode(ChildGraphNode);
+
+		// ★ ピン接続でRoot->Childを接続 ★
+		bool bConnected = ConnectGraphNodesInternal(RootGraphNode, ChildGraphNode);
+		if (!bConnected)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::InvalidOperation,
+				TEXT("Failed to connect child to Root node via pins"));
+		}
+	}
+	else
+	{
+		// ★ 親グラフノード取得 ★
+		UBehaviorTreeGraphNode* ParentGraphNode = FindGraphNodeByIdInternal(BTGraph, ParentNodeId);
+		if (!ParentGraphNode)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::NodeNotFound,
+				FString::Printf(TEXT("Parent graph node not found: %s"), *ParentNodeId));
+		}
+
+		// Compositeノードかどうか確認
+		UBehaviorTreeGraphNode_Composite* ParentCompositeGraphNode = Cast<UBehaviorTreeGraphNode_Composite>(ParentGraphNode);
+		if (!ParentCompositeGraphNode)
 		{
 			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
 				ESpirrowErrorCode::InvalidOperation,
 				TEXT("Parent node must be a composite node (Selector/Sequence)"));
 		}
 
-		// 子として追加
-		FBTCompositeChild NewChild;
-		NewChild.ChildComposite = Cast<UBTCompositeNode>(ChildNode);
-		NewChild.ChildTask = Cast<UBTTaskNode>(ChildNode);
+		// 既存の接続を解除
+		DisconnectGraphNode(ChildGraphNode);
 
-		if (ChildIndex >= 0 && ChildIndex < ParentComposite->Children.Num())
+		// ★ ピン接続で Parent->Child を接続 ★
+		bool bConnected = ConnectGraphNodesInternal(ParentGraphNode, ChildGraphNode);
+		if (!bConnected)
 		{
-			ParentComposite->Children.Insert(NewChild, ChildIndex);
-		}
-		else
-		{
-			ParentComposite->Children.Add(NewChild);
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::InvalidOperation,
+				TEXT("Failed to connect nodes via pins"));
 		}
 	}
 
-	// 接続成功後、キャッシュからノードを削除（もうツリーに接続されたので）
-	FString BTAssetPath = BehaviorTree->GetPathName();
-	if (TMap<FString, UBTNode*>* NodeMap = PendingBTNodes.Find(BTAssetPath))
-	{
-		NodeMap->Remove(ChildNodeId);
-		// 空になったらマップ自体も削除
-		if (NodeMap->Num() == 0)
-		{
-			PendingBTNodes.Remove(BTAssetPath);
-		}
-	}
-
-	// 保存
-	BehaviorTree->MarkPackageDirty();
-	UPackage* Package = BehaviorTree->GetOutermost();
-	FString PackageFileName = FPackageName::LongPackageNameToFilename(
-		Package->GetName(), FPackageName::GetAssetPackageExtension());
-	FSavePackageArgs SaveArgs;
-	SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
-	UPackage::SavePackage(Package, BehaviorTree, *PackageFileName, SaveArgs);
+	// ★ グラフ更新と保存 ★
+	FinalizeAndSaveBTGraphInternal(BTGraph, BehaviorTree);
 
 	// レスポンス
 	TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject());
@@ -181,13 +314,31 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleSetBTNodeProperty(
 			FString::Printf(TEXT("BehaviorTree not found: %s at %s"), *BehaviorTreeName, *Path));
 	}
 
-	// ノード取得
-	UBTNode* TargetNode = FindBTNodeById(BehaviorTree, NodeId);
+	// ★ Graph取得 ★
+	UBehaviorTreeGraph* BTGraph = GetBTGraph(BehaviorTree);
+	if (!BTGraph)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::NodeCreationFailed,
+			TEXT("BehaviorTree has no graph"));
+	}
+
+	// ★ グラフノード取得 ★
+	UBehaviorTreeGraphNode* GraphNode = FindGraphNodeByIdInternal(BTGraph, NodeId);
+	if (!GraphNode)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::NodeNotFound,
+			FString::Printf(TEXT("Graph node not found: %s"), *NodeId));
+	}
+
+	// ★ ランタイムノード取得 ★
+	UBTNode* TargetNode = Cast<UBTNode>(GraphNode->NodeInstance);
 	if (!TargetNode)
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
 			ESpirrowErrorCode::NodeNotFound,
-			FString::Printf(TEXT("Node not found: %s"), *NodeId));
+			FString::Printf(TEXT("Runtime node not found for graph node: %s"), *NodeId));
 	}
 
 	// プロパティ設定
@@ -202,14 +353,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleSetBTNodeProperty(
 			FString::Printf(TEXT("Failed to set property %s: %s"), *PropertyName, *ErrorMessage));
 	}
 
-	// 保存
-	BehaviorTree->MarkPackageDirty();
-	UPackage* Package = BehaviorTree->GetOutermost();
-	FString PackageFileName = FPackageName::LongPackageNameToFilename(
-		Package->GetName(), FPackageName::GetAssetPackageExtension());
-	FSavePackageArgs SaveArgs;
-	SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
-	UPackage::SavePackage(Package, BehaviorTree, *PackageFileName, SaveArgs);
+	// ★ グラフ更新と保存 ★
+	FinalizeAndSaveBTGraphInternal(BTGraph, BehaviorTree);
 
 	// レスポンス
 	TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject());
@@ -247,82 +392,56 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleDeleteBTNode(
 			FString::Printf(TEXT("BehaviorTree not found: %s at %s"), *BehaviorTreeName, *Path));
 	}
 
-	// ノード取得
-	UBTNode* TargetNode = FindBTNodeById(BehaviorTree, NodeId);
-	if (!TargetNode)
+	// ★ Graph取得 ★
+	UBehaviorTreeGraph* BTGraph = GetBTGraph(BehaviorTree);
+	if (!BTGraph)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::NodeCreationFailed,
+			TEXT("BehaviorTree has no graph"));
+	}
+
+	// ★ グラフノード取得 ★
+	UBehaviorTreeGraphNode* GraphNode = FindGraphNodeByIdInternal(BTGraph, NodeId);
+	if (!GraphNode)
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
 			ESpirrowErrorCode::NodeNotFound,
-			FString::Printf(TEXT("Node not found: %s"), *NodeId));
+			FString::Printf(TEXT("Graph node not found: %s"), *NodeId));
 	}
 
-	// Rootノードの場合
-	if (BehaviorTree->RootNode == TargetNode)
+	// ★ 全てのピン接続を解除 ★
+	for (UEdGraphPin* Pin : GraphNode->Pins)
 	{
-		BehaviorTree->RootNode = nullptr;
+		Pin->BreakAllPinLinks();
 	}
 
-	// 親Compositeから削除する再帰関数
-	TFunction<bool(UBTCompositeNode*)> RemoveFromParent = [&](UBTCompositeNode* Parent) -> bool
+	// ★ デコレータ/サービスの場合は親ノードから削除 ★
+	UBehaviorTreeGraphNode_Decorator* DecoratorNode = Cast<UBehaviorTreeGraphNode_Decorator>(GraphNode);
+	UBehaviorTreeGraphNode_Service* ServiceNode = Cast<UBehaviorTreeGraphNode_Service>(GraphNode);
+
+	if (DecoratorNode && DecoratorNode->ParentNode)
 	{
-		if (!Parent) return false;
-
-		// デコレータから削除 (UE 5.6+: decorators are in Children[].Decorators)
-		for (FBTCompositeChild& Child : Parent->Children)
+		UBehaviorTreeGraphNode* ParentBTNode = Cast<UBehaviorTreeGraphNode>(DecoratorNode->ParentNode);
+		if (ParentBTNode)
 		{
-			for (int32 i = Child.Decorators.Num() - 1; i >= 0; --i)
-			{
-				if (Child.Decorators[i] == TargetNode)
-				{
-					Child.Decorators.RemoveAt(i);
-					return true;
-				}
-			}
+			ParentBTNode->Decorators.Remove(DecoratorNode);
 		}
-
-		// サービスから削除
-		for (int32 i = Parent->Services.Num() - 1; i >= 0; --i)
+	}
+	else if (ServiceNode && ServiceNode->ParentNode)
+	{
+		UBehaviorTreeGraphNode_Composite* ParentComposite = Cast<UBehaviorTreeGraphNode_Composite>(ServiceNode->ParentNode);
+		if (ParentComposite)
 		{
-			if (Parent->Services[i] == TargetNode)
-			{
-				Parent->Services.RemoveAt(i);
-				return true;
-			}
+			ParentComposite->Services.Remove(ServiceNode);
 		}
+	}
 
-		// 子から削除
-		for (int32 i = Parent->Children.Num() - 1; i >= 0; --i)
-		{
-			FBTCompositeChild& Child = Parent->Children[i];
-			if (Child.ChildComposite == TargetNode || Child.ChildTask == TargetNode)
-			{
-				Parent->Children.RemoveAt(i);
-				return true;
-			}
+	// ★ グラフからノードを削除 ★
+	BTGraph->RemoveNode(GraphNode);
 
-			// タスクのデコレータ (decorators are in Child.Decorators, not on the task itself)
-			// Already checked above in the Child.Decorators loop
-
-			// 再帰的に子Compositeを検索
-			if (Child.ChildComposite && RemoveFromParent(Child.ChildComposite))
-			{
-				return true;
-			}
-		}
-
-		return false;
-	};
-
-	RemoveFromParent(BehaviorTree->RootNode);
-
-	// 保存
-	BehaviorTree->MarkPackageDirty();
-	UPackage* Package = BehaviorTree->GetOutermost();
-	FString PackageFileName = FPackageName::LongPackageNameToFilename(
-		Package->GetName(), FPackageName::GetAssetPackageExtension());
-	FSavePackageArgs SaveArgs;
-	SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
-	UPackage::SavePackage(Package, BehaviorTree, *PackageFileName, SaveArgs);
+	// ★ グラフ更新と保存 ★
+	FinalizeAndSaveBTGraphInternal(BTGraph, BehaviorTree);
 
 	// レスポンス
 	TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject());

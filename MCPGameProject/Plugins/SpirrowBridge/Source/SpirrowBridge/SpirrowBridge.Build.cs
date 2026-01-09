@@ -60,7 +60,10 @@ public class SpirrowBridge : ModuleRules
 				"AssetTools",
 				"GameplayAbilities",
 				"GameplayTags",
-				"GameplayTasks"
+				"GameplayTasks",
+				// BehaviorTree Graph support (グラフベースノード作成用)
+				"AIGraph",
+				"BehaviorTreeEditor"
 			}
 		);
 		

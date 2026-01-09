@@ -230,42 +230,21 @@ UBTNode* FSpirrowBridgeAICommands::FindBTNodeById(UBehaviorTree* BehaviorTree, c
 {
 	if (!BehaviorTree) return nullptr;
 
-	// First, check the pending nodes cache (nodes created but not yet connected to tree)
-	FString BTAssetPath = BehaviorTree->GetPathName();
-	if (TMap<FString, UBTNode*>* NodeMap = PendingBTNodes.Find(BTAssetPath))
-	{
-		if (UBTNode** FoundNode = NodeMap->Find(NodeId))
-		{
-			return *FoundNode;
-		}
-	}
-
-	// If not in cache, search the connected tree
+	// ツリー内を検索
 	if (!BehaviorTree->RootNode) return nullptr;
 
-	// Recursive node search
+	// RootNode自体をチェック
+	if (BehaviorTree->RootNode->GetName() == NodeId)
+	{
+		return BehaviorTree->RootNode;
+	}
+
+	// 再帰的に検索
 	TFunction<UBTNode*(UBTCompositeNode*)> SearchInComposite = [&](UBTCompositeNode* Composite) -> UBTNode*
 	{
 		if (!Composite) return nullptr;
 
-		if (Composite->GetName() == NodeId)
-		{
-			return Composite;
-		}
-
-		// Search decorators (in children, since UE 5.6+ stores decorators per child)
-		for (const FBTCompositeChild& Child : Composite->Children)
-		{
-			for (UBTDecorator* Decorator : Child.Decorators)
-			{
-				if (Decorator && Decorator->GetName() == NodeId)
-				{
-					return Decorator;
-				}
-			}
-		}
-
-		// Search services
+		// サービスを検索
 		for (UBTService* Service : Composite->Services)
 		{
 			if (Service && Service->GetName() == NodeId)
@@ -274,30 +253,35 @@ UBTNode* FSpirrowBridgeAICommands::FindBTNodeById(UBehaviorTree* BehaviorTree, c
 			}
 		}
 
-		// Search child nodes
+		// 子を検索
 		for (const FBTCompositeChild& Child : Composite->Children)
 		{
+			// デコレータを検索
+			for (UBTDecorator* Decorator : Child.Decorators)
+			{
+				if (Decorator && Decorator->GetName() == NodeId)
+				{
+					return Decorator;
+				}
+			}
+
+			// 子Compositeを検索
 			if (Child.ChildComposite)
 			{
+				if (Child.ChildComposite->GetName() == NodeId)
+				{
+					return Child.ChildComposite;
+				}
 				if (UBTNode* Found = SearchInComposite(Child.ChildComposite))
 				{
 					return Found;
 				}
 			}
-			if (Child.ChildTask)
+
+			// 子Taskを検索
+			if (Child.ChildTask && Child.ChildTask->GetName() == NodeId)
 			{
-				if (Child.ChildTask->GetName() == NodeId)
-				{
-					return Child.ChildTask;
-				}
-				// Task decorators (stored in FBTCompositeChild, not on the task itself)
-				for (UBTDecorator* Decorator : Child.Decorators)
-				{
-					if (Decorator && Decorator->GetName() == NodeId)
-					{
-						return Decorator;
-					}
-				}
+				return Child.ChildTask;
 			}
 		}
 
@@ -305,6 +289,38 @@ UBTNode* FSpirrowBridgeAICommands::FindBTNodeById(UBehaviorTree* BehaviorTree, c
 	};
 
 	return SearchInComposite(BehaviorTree->RootNode);
+}
+
+void FSpirrowBridgeAICommands::RemoveNodeFromParent(UBehaviorTree* BehaviorTree, UBTNode* TargetNode)
+{
+	if (!BehaviorTree || !BehaviorTree->RootNode || !TargetNode)
+	{
+		return;
+	}
+
+	TFunction<bool(UBTCompositeNode*)> RemoveFromComposite = [&](UBTCompositeNode* Parent) -> bool
+	{
+		if (!Parent) return false;
+
+		for (int32 i = Parent->Children.Num() - 1; i >= 0; --i)
+		{
+			FBTCompositeChild& Child = Parent->Children[i];
+			if (Child.ChildComposite == TargetNode || Child.ChildTask == TargetNode)
+			{
+				Parent->Children.RemoveAt(i);
+				return true;
+			}
+
+			// 再帰的に検索
+			if (Child.ChildComposite && RemoveFromComposite(Child.ChildComposite))
+			{
+				return true;
+			}
+		}
+		return false;
+	};
+
+	RemoveFromComposite(BehaviorTree->RootNode);
 }
 
 FString FSpirrowBridgeAICommands::GetCompositeDescription(const FString& Type)

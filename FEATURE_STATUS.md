@@ -1,8 +1,8 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: Phase H (v0.8.2)
+> **バージョン**: Phase H (v0.8.3)
 > **ステータス**: Beta
-> **最終更新**: 2026-01-07
+> **最終更新**: 2026-01-08
 
 ---
 
@@ -79,6 +79,16 @@
 ---
 
 ## 最新の更新
+
+### 2026-01-08: BehaviorTree Graph-Based Node Creation (v0.8.3)
+- **Graph-Based実装に全面移行**: BTノード作成をUE Editor Graph APIベースに変更
+  - `FGraphNodeCreator`パターンを使用してグラフノードを作成
+  - ノードがエディタ上で正しく表示・保存されるように
+  - `BTGraph->UpdateAsset()`でランタイムツリーを自動生成
+- **ノード作成**: `add_bt_composite_node`, `add_bt_task_node` - ノード作成後に`connect_bt_nodes`で接続
+- **接続API**: `connect_bt_nodes`でピンベースの接続（Root/Composite→Child）
+- **Decorator/Service**: ターゲットノードの`Decorators`/`Services`配列に追加
+- **Python API更新**: `parent_node_id`, `child_index`パラメータ追加
 
 ### 2026-01-07: Volume Actor対応 (v0.8.2)
 - **spawn_actor Volume対応**: 8種類のVolumeアクターをspawn_actorで生成可能に

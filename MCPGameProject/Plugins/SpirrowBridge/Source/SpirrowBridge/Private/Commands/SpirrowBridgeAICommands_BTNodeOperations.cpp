@@ -38,6 +38,7 @@ static UBehaviorTreeGraph* GetBTGraph(UBehaviorTree* BehaviorTree)
 
 /**
  * Find a graph node by its runtime node ID
+ * ★ Decorator/Serviceも検索対象に含める（BTGraph->Nodesには含まれない）★
  */
 static UBehaviorTreeGraphNode* FindGraphNodeByIdInternal(UBehaviorTreeGraph* BTGraph, const FString& NodeId)
 {
@@ -46,9 +47,37 @@ static UBehaviorTreeGraphNode* FindGraphNodeByIdInternal(UBehaviorTreeGraph* BTG
 		UBehaviorTreeGraphNode* BTGraphNode = Cast<UBehaviorTreeGraphNode>(Node);
 		if (BTGraphNode && BTGraphNode->NodeInstance)
 		{
+			// ★ 通常ノード（Root/Composite/Task）のチェック ★
 			if (BTGraphNode->NodeInstance->GetName() == NodeId)
 			{
 				return BTGraphNode;
+			}
+
+			// ★ Decorators配列を検索 ★
+			for (UBehaviorTreeGraphNode* DecoratorNode : BTGraphNode->Decorators)
+			{
+				if (DecoratorNode && DecoratorNode->NodeInstance)
+				{
+					if (DecoratorNode->NodeInstance->GetName() == NodeId)
+					{
+						return DecoratorNode;
+					}
+				}
+			}
+
+			// ★ Services配列を検索（Compositeノードのみ）★
+			if (UBehaviorTreeGraphNode_Composite* CompositeNode = Cast<UBehaviorTreeGraphNode_Composite>(BTGraphNode))
+			{
+				for (UBehaviorTreeGraphNode* ServiceNode : CompositeNode->Services)
+				{
+					if (ServiceNode && ServiceNode->NodeInstance)
+					{
+						if (ServiceNode->NodeInstance->GetName() == NodeId)
+						{
+							return ServiceNode;
+						}
+					}
+				}
 			}
 		}
 	}
@@ -1132,12 +1161,16 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleListBTNodes(
 		// Rootノードはスキップ（別途出力済み）
 		if (Cast<UBehaviorTreeGraphNode_Root>(BTNode)) continue;
 
+		// ★ Decorator/Serviceはスキップ（親ノードのDecorators/Services配列から追加するため）★
+		if (Cast<UBehaviorTreeGraphNode_Decorator>(BTNode)) continue;
+		if (Cast<UBehaviorTreeGraphNode_Service>(BTNode)) continue;
+
 		FString ParentId = NodeParentMap.FindRef(BTNode);
 		TSharedPtr<FJsonObject> NodeInfo = BuildNodeInfoJson(BTNode, ParentId);
 		NodesArray.Add(MakeShareable(new FJsonValueObject(NodeInfo)));
 		TotalNodes++;
 
-		// Decoratorも追加
+		// Decoratorも追加（親ノードのDecorators配列から）
 		for (UBehaviorTreeGraphNode* Decorator : BTNode->Decorators)
 		{
 			if (Decorator && Decorator->NodeInstance)
@@ -1148,7 +1181,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleListBTNodes(
 			}
 		}
 
-		// Serviceも追加（Compositeノードの場合）
+		// Serviceも追加（Compositeノードの場合、Services配列から）
 		UBehaviorTreeGraphNode_Composite* CompositeNode =
 			Cast<UBehaviorTreeGraphNode_Composite>(BTNode);
 		if (CompositeNode)

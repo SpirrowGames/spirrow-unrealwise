@@ -757,9 +757,15 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTDecoratorNode(
 			FString::Printf(TEXT("Target graph node not found: %s"), *TargetNodeId));
 	}
 
-	// ★ デコレータグラフノード作成 ★
-	FGraphNodeCreator<UBehaviorTreeGraphNode_Decorator> NodeCreator(*BTGraph);
-	UBehaviorTreeGraphNode_Decorator* DecoratorGraphNode = NodeCreator.CreateNode();
+	// ★ デコレータグラフノード作成（FGraphNodeCreator不使用 - 重複防止）★
+	// FGraphNodeCreator::Finalize()はBTGraph->Nodesに追加するが、
+	// DecoratorはTargetGraphNode->Decorators配列にのみ存在すべき
+	UBehaviorTreeGraphNode_Decorator* DecoratorGraphNode = NewObject<UBehaviorTreeGraphNode_Decorator>(
+		BTGraph,
+		UBehaviorTreeGraphNode_Decorator::StaticClass(),
+		NAME_None,
+		RF_Transactional
+	);
 
 	// ★ ユニークな名前を生成（問題3修正）★
 	FName UniqueName = GenerateUniqueNodeName(BTGraph, DecoratorClass);
@@ -780,9 +786,12 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTDecoratorNode(
 		RuntimeDecorator->NodeName = NodeName;
 	}
 
-	NodeCreator.Finalize();
+	// グラフノードのピン作成（エディタ表示用）
+	DecoratorGraphNode->CreateNewGuid();
+	DecoratorGraphNode->PostPlacedNewNode();
+	DecoratorGraphNode->AllocateDefaultPins();
 
-	// ★ ターゲットノードのDecorators配列に追加 ★
+	// ★ ターゲットノードのDecorators配列にのみ追加（BTGraph->Nodesには追加しない）★
 	TargetGraphNode->Decorators.Add(DecoratorGraphNode);
 	DecoratorGraphNode->ParentNode = Cast<UAIGraphNode>(TargetGraphNode);
 
@@ -881,9 +890,15 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTServiceNode(
 			FString::Printf(TEXT("Services can only be added to composite nodes. Target: %s"), *TargetNodeId));
 	}
 
-	// ★ サービスグラフノード作成 ★
-	FGraphNodeCreator<UBehaviorTreeGraphNode_Service> NodeCreator(*BTGraph);
-	UBehaviorTreeGraphNode_Service* ServiceGraphNode = NodeCreator.CreateNode();
+	// ★ サービスグラフノード作成（FGraphNodeCreator不使用 - 重複防止）★
+	// FGraphNodeCreator::Finalize()はBTGraph->Nodesに追加するが、
+	// ServiceはTargetGraphNode->Services配列にのみ存在すべき
+	UBehaviorTreeGraphNode_Service* ServiceGraphNode = NewObject<UBehaviorTreeGraphNode_Service>(
+		BTGraph,
+		UBehaviorTreeGraphNode_Service::StaticClass(),
+		NAME_None,
+		RF_Transactional
+	);
 
 	// ★ ユニークな名前を生成（問題3修正）★
 	FName UniqueName = GenerateUniqueNodeName(BTGraph, ServiceClass);
@@ -904,9 +919,12 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTServiceNode(
 		RuntimeService->NodeName = NodeName;
 	}
 
-	NodeCreator.Finalize();
+	// グラフノードのピン作成（エディタ表示用）
+	ServiceGraphNode->CreateNewGuid();
+	ServiceGraphNode->PostPlacedNewNode();
+	ServiceGraphNode->AllocateDefaultPins();
 
-	// ★ ターゲットノードのServices配列に追加 ★
+	// ★ ターゲットノードのServices配列にのみ追加（BTGraph->Nodesには追加しない）★
 	TargetCompositeGraphNode->Services.Add(ServiceGraphNode);
 	ServiceGraphNode->ParentNode = Cast<UAIGraphNode>(TargetCompositeGraphNode);
 

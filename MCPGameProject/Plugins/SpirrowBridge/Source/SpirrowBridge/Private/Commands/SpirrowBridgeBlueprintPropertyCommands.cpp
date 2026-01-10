@@ -57,6 +57,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleCommand(c
     {
         return HandleSetStructProperty(Params);
     }
+    else if (CommandType == TEXT("set_data_asset_property"))
+    {
+        return HandleSetDataAssetProperty(Params);
+    }
 
     return nullptr;
 }
@@ -1181,5 +1185,77 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetStruct
         Result->SetArrayField(TEXT("errors"), ErrorsArray);
     }
 
+    return Result;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetDataAssetProperty(
+    const TSharedPtr<FJsonObject>& Params)
+{
+    // Validate required parameters
+    FString AssetName, PropertyName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("asset_name"), AssetName))
+    {
+        return Error;
+    }
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("property_name"), PropertyName))
+    {
+        return Error;
+    }
+
+    FString Path;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Data"));
+
+    // Load DataAsset
+    FString FullPath = Path / AssetName + TEXT(".") + AssetName;
+    UObject* LoadedAsset = UEditorAssetLibrary::LoadAsset(FullPath);
+
+    if (!LoadedAsset)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetNotFound,
+            FString::Printf(TEXT("DataAsset not found: %s"), *FullPath));
+    }
+
+    UDataAsset* DataAsset = Cast<UDataAsset>(LoadedAsset);
+    if (!DataAsset)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidParameter,
+            FString::Printf(TEXT("Asset is not a DataAsset: %s"), *FullPath));
+    }
+
+    // Set the property value
+    if (!Params->HasField(TEXT("property_value")))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::MissingRequiredParam,
+            TEXT("Missing 'property_value' parameter"));
+    }
+
+    TSharedPtr<FJsonValue> JsonValue = Params->Values.FindRef(TEXT("property_value"));
+
+    FString ErrorMessage;
+    if (!FSpirrowBridgeCommonUtils::SetObjectProperty(DataAsset, PropertyName, JsonValue, ErrorMessage))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::PropertySetFailed,
+            ErrorMessage);
+    }
+
+    // Save the DataAsset
+    DataAsset->MarkPackageDirty();
+
+    UPackage* Package = DataAsset->GetOutermost();
+    FString PackageFileName = FPackageName::LongPackageNameToFilename(
+        Package->GetName(), FPackageName::GetAssetPackageExtension());
+    FSavePackageArgs SaveArgs;
+    SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
+    UPackage::SavePackage(Package, DataAsset, *PackageFileName, SaveArgs);
+
+    TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject());
+    Result->SetBoolField(TEXT("success"), true);
+    Result->SetStringField(TEXT("asset_name"), AssetName);
+    Result->SetStringField(TEXT("property_name"), PropertyName);
+    Result->SetStringField(TEXT("asset_path"), FullPath);
     return Result;
 }

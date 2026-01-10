@@ -1281,4 +1281,90 @@ def register_blueprint_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    @mcp.tool()
+    def set_data_asset_property(
+        ctx: Context,
+        asset_name: str,
+        property_name: str,
+        property_value,
+        path: str = "/Game/Data"
+    ) -> Dict[str, Any]:
+        """
+        Set a property on a DataAsset.
+
+        This tool sets properties on existing DataAsset instances, similar to
+        set_blueprint_property but for DataAssets.
+
+        Args:
+            asset_name: Name of the DataAsset (e.g., "DA_Pistol")
+            property_name: Name of the property to set
+            property_value: Value to set. Supports:
+                           - Basic types: int, float, bool, string
+                           - Class references: "/Game/BP.BP_C" for TSubclassOf
+                           - Object references: "/Game/Asset.Asset" for UObject*
+            path: Content browser path where the DataAsset is located (default: "/Game/Data")
+
+        Returns:
+            Dict containing success status and asset info
+
+        Example:
+            # Set a simple property
+            set_data_asset_property(
+                asset_name="DA_Pistol",
+                property_name="BaseDamage",
+                property_value=50,
+                path="/Game/Data/Weapons"
+            )
+
+            # Set a class reference (TSubclassOf)
+            set_data_asset_property(
+                asset_name="DA_Pistol",
+                property_name="ProjectileClass",
+                property_value="/Game/Blueprints/BP_Bullet.BP_Bullet_C"
+            )
+
+            # Set an object reference (UObject*)
+            set_data_asset_property(
+                asset_name="DA_Pistol",
+                property_name="FireSound",
+                property_value="/Game/Audio/SFX_Fire.SFX_Fire"
+            )
+
+            # Set a string property
+            set_data_asset_property(
+                asset_name="DA_Pistol",
+                property_name="WeaponName",
+                property_value="Standard Pistol"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "asset_name": asset_name,
+                "property_name": property_name,
+                "property_value": property_value,
+                "path": path
+            }
+
+            logger.info(f"Setting DataAsset property '{property_name}' on '{asset_name}'")
+            response = unreal.send_command("set_data_asset_property", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Set DataAsset property response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error setting DataAsset property: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("Blueprint tools registered successfully") 

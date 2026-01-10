@@ -11,7 +11,7 @@
 | カテゴリ | ツール数 | 状態 |
 |---------|---------|------|
 | Actor操作 | 10 | ✅ |
-| Blueprint操作 | 13 | ✅ |
+| Blueprint操作 | 14 | ✅ |
 | BPノードグラフ | 9 | ✅ |
 | UMG Widget | 30 | ✅ |
 | Enhanced Input | 8 | ✅ |
@@ -22,7 +22,7 @@
 | Material | 5 | ✅ |
 | Config | 3 | ✅ |
 | RAG | 4 | ✅ |
-| **合計** | **121** | |
+| **合計** | **122** | |
 
 ---
 
@@ -35,8 +35,8 @@
 - Basic: `StaticMeshActor`, `PointLight`, `SpotLight`, `DirectionalLight`, `CameraActor`
 - Volumes: `NavMeshBoundsVolume`, `TriggerVolume`, `BlockingVolume`, `KillZVolume`, `PhysicsVolume`, `PostProcessVolume`, `AudioVolume`, `LightmassImportanceVolume`
 
-### Blueprint操作 (13)
-`create_blueprint`, `spawn_blueprint_actor`, `add_component_to_blueprint`, `set_static_mesh_properties`, `set_component_property`, `set_physics_properties`, `compile_blueprint`, `set_blueprint_property`, `create_data_asset` 🆕, `set_class_property` 🆕, `set_object_property` 🆕, `get_blueprint_properties` 🆕, `set_struct_property` 🆕
+### Blueprint操作 (14)
+`create_blueprint`, `spawn_blueprint_actor`, `add_component_to_blueprint`, `set_static_mesh_properties`, `set_component_property`, `set_physics_properties`, `compile_blueprint`, `set_blueprint_property`, `create_data_asset` 🆕, `set_class_property` 🆕, `set_object_property` 🆕, `get_blueprint_properties` 🆕, `set_struct_property` 🆕, `set_data_asset_property` 🆕
 
 ### BPノードグラフ (9)
 `add_blueprint_event_node`, `add_blueprint_input_action_node`, `add_blueprint_function_node`, `connect_blueprint_nodes`, `disconnect_blueprint_nodes` 🆕, `add_blueprint_variable`, `add_blueprint_get_self_component_reference`, `add_blueprint_self_reference`, `find_blueprint_nodes`
@@ -91,7 +91,7 @@
 
 ### 2026-01-11: DataAsset & プロパティ操作強化 (v0.8.8) 🆕
 
-**新規ツール追加 (5ツール)**:
+**新規ツール追加 (6ツール)**:
 
 | ツール | 機能 | 優先度 |
 |--------|------|--------|
@@ -100,6 +100,7 @@
 | `set_object_property` | UObject*/TObjectPtrプロパティにアセット参照を設定 | 高 |
 | `get_blueprint_properties` | Blueprintの設定可能なプロパティと型を一覧取得 | 中 |
 | `set_struct_property` | 構造体配列の個別要素を部分更新 | 中 |
+| `set_data_asset_property` | DataAssetのプロパティを設定 | 高 |
 
 **使用例**:
 ```python
@@ -134,10 +135,19 @@ set_struct_property(
     index=0,
     values={"MaxCount": 10, "WeaponData": "/Game/Data/DA_Pistol.DA_Pistol"}
 )
+
+# DataAssetのプロパティ設定
+set_data_asset_property(
+    asset_name="DA_Pistol",
+    property_name="BaseDamage",
+    property_value=50,
+    path="/Game/Data/Weapons"
+)
 ```
 
 **解決する課題**:
 - DataAssetのMCP経由作成が可能に
+- DataAssetのプロパティ設定が可能に
 - TSubclassOf単体プロパティ設定（配列版は既存）
 - UObject*/TObjectPtr参照設定
 - 構造体配列の部分更新（全体置換ではなく）

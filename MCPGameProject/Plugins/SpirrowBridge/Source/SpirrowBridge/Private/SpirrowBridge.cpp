@@ -287,7 +287,8 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("set_class_property") ||
                      CommandType == TEXT("set_object_property") ||
                      CommandType == TEXT("get_blueprint_properties") ||
-                     CommandType == TEXT("set_struct_property"))
+                     CommandType == TEXT("set_struct_property") ||
+                     CommandType == TEXT("set_data_asset_property"))
             {
                 ResultJson = BlueprintCommands->HandleCommand(CommandType, Params);
             }

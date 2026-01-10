@@ -61,6 +61,8 @@ namespace ESpirrowErrorCode
     constexpr int32 InvalidComponent = 1214;
     constexpr int32 ConnectionFailed = 1215;
     constexpr int32 NotSupported = 1216;
+    constexpr int32 NodeAlreadyExists = 1217;
+    constexpr int32 PropertyTypeMismatch = 1218;
 
     // Widget errors (1300-1399)
     constexpr int32 WidgetNotFound = 1300;

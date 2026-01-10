@@ -1,8 +1,8 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: Phase H (v0.8.6)
+> **バージョン**: Phase H (v0.8.7)
 > **ステータス**: Beta
-> **最終更新**: 2026-01-09
+> **最終更新**: 2026-01-10
 
 ---
 
@@ -12,9 +12,9 @@
 |---------|---------|------|
 | Actor操作 | 10 | ✅ |
 | Blueprint操作 | 8 | ✅ |
-| BPノードグラフ | 8 | ✅ |
-| UMG Widget | 29 | ✅ |
-| Enhanced Input | 5 | ✅ |
+| BPノードグラフ | 9 | ✅ |
+| UMG Widget | 30 | ✅ |
+| Enhanced Input | 8 | ✅ |
 | GAS | 8 | ✅ |
 | AI (BT/BB) | 20 | ✅ |
 | AI Perception | 6 | ✅ |
@@ -22,7 +22,7 @@
 | Material | 5 | ✅ |
 | Config | 3 | ✅ |
 | RAG | 4 | ✅ |
-| **合計** | **111** | |
+| **合計** | **116** | |
 
 ---
 
@@ -38,19 +38,26 @@
 ### Blueprint操作 (8)
 `create_blueprint`, `spawn_blueprint_actor`, `add_component_to_blueprint`, `set_static_mesh_properties`, `set_component_property`, `set_physics_properties`, `compile_blueprint`, `set_blueprint_property`
 
-### BPノードグラフ (8)
-`add_blueprint_event_node`, `add_blueprint_input_action_node`, `add_blueprint_function_node`, `connect_blueprint_nodes`, `add_blueprint_variable`, `add_blueprint_get_self_component_reference`, `add_blueprint_self_reference`, `find_blueprint_nodes`
+### BPノードグラフ (9)
+`add_blueprint_event_node`, `add_blueprint_input_action_node`, `add_blueprint_function_node`, `connect_blueprint_nodes`, `disconnect_blueprint_nodes` 🆕, `add_blueprint_variable`, `add_blueprint_get_self_component_reference`, `add_blueprint_self_reference`, `find_blueprint_nodes`
 
-### UMG Widget (29)
+**add_blueprint_event_node**: BlueprintImplementableEvent オーバーライド対応 🆕
+
+### UMG Widget (30)
 - **Core (3)**: create, viewport, anchor
 - **Basic (4)**: text, image, progressbar
 - **Interactive (7)**: button, slider, checkbox, combobox, editabletext, spinbox, scrollbox
-- **Layout (7)**: vertical/horizontal box, slot, reparent, remove
+- **Layout (8)**: vertical/horizontal box, slot, reparent, remove, `get_widget_element_property` 🆕
 - **Variable/Function (5)**: variable, array, function, event, binding
 - **Animation (4)**: create, track, keyframe, list
 
-### Enhanced Input (5)
-`create_input_action`, `create_input_mapping_context`, `add_action_to_mapping_context`, `add_mapping_context_to_blueprint`, `set_default_mapping_context`
+**get_widget_elements強化**: `include_properties`, `class_filter`, `property_filter`, `exclude_default_values` オプション追加 🆕
+**set_widget_element_property強化**: ネストプロパティ対応（`Brush.TintColor` 形式） 🆕
+
+### Enhanced Input (8)
+`create_input_action`, `create_input_mapping_context`, `add_action_to_mapping_context`, `add_mapping_context_to_blueprint`, `set_default_mapping_context`, `get_input_mapping_context` 🆕, `get_input_action` 🆕, `remove_action_from_mapping_context` 🆕
+
+**add_action_to_mapping_context強化**: Scalarモディファイア（オブジェクト形式）対応 🆕
 
 ### GAS (8)
 `add_gameplay_tags`, `list_gameplay_tags`, `remove_gameplay_tag`, `list_gas_assets`, `create_gameplay_effect`, `create_gameplay_ability`, `create_gas_character`, `set_ability_system_defaults`
@@ -60,13 +67,13 @@
 - **BehaviorTree (3)**: `create_behavior_tree`, `set_behavior_tree_blackboard`, `get_behavior_tree_structure`
 - **BTノード操作 (8)**: `add_bt_composite_node`, `add_bt_task_node`, `add_bt_decorator_node`, `add_bt_service_node`, `connect_bt_nodes`, `set_bt_node_property`, `delete_bt_node`, `list_bt_node_types`
 - **BTノード位置 (2)**: `set_bt_node_position`, `auto_layout_bt`
-- **BTデバッグ (1)**: `list_bt_nodes` 🆕
+- **BTデバッグ (1)**: `list_bt_nodes`
 - **ユーティリティ (1)**: `list_ai_assets`
 
-### AI Perception (6) 🆕
+### AI Perception (6)
 `add_ai_perception_component`, `configure_sight_sense`, `configure_hearing_sense`, `configure_damage_sense`, `set_perception_dominant_sense`, `add_perception_stimuli_source`
 
-### EQS (5) 🆕
+### EQS (5)
 `create_eqs_query`, `add_eqs_generator`, `add_eqs_test`, `set_eqs_test_property`, `list_eqs_assets`
 
 ### Material (5)
@@ -82,12 +89,33 @@
 
 ## 最新の更新
 
-### 2026-01-09: BTノード自動位置計算 (v0.8.6) 🆕
-- **自動レイアウト機能**: `parent_node_id` 指定時に自動的に最適位置を計算
-  - 親ノードの下に自動配置（Y + 150px）
-  - 兄弟ノードがあれば横にオフセット（X + 300px × n）
-  - `node_position` 手動指定も引き続き可能
-- **対象ツール**: `add_bt_composite_node`, `add_bt_task_node`
+### 2026-01-10: MCP機能拡張 (v0.8.7) 🆕
+
+**UMG Widget機能強化**:
+- `get_widget_element_property`: Widget要素の任意プロパティ値を取得（ネストプロパティ対応）
+- `get_widget_elements`: オプション追加
+  - `include_properties`: プロパティ詳細を含める
+  - `class_filter`: クラスでフィルタ (`["Button", "TextBlock"]`)
+  - `property_filter`: 特定プロパティのみ取得
+  - `exclude_default_values`: デフォルト値と同じプロパティを省略
+- `set_widget_element_property`: ネストプロパティ対応 (`Brush.TintColor` 形式)
+
+**Blueprintノード機能強化**:
+- `disconnect_blueprint_nodes`: ノード間のピン接続を切断
+  - 特定接続、特定ピン、ノード全体の3モード
+- `add_blueprint_event_node`: BlueprintImplementableEvent オーバーライド対応
+  - 親クラスのBlueprintImplementableEventを自動検出
+  - 正しいEventReference設定でオーバーライドノード作成
+
+**Enhanced Input機能強化**:
+- `get_input_mapping_context`: IMC内容読み取り
+- `get_input_action`: InputAction詳細取得
+- `remove_action_from_mapping_context`: IMCからアクション削除
+- `add_action_to_mapping_context`: Scalarモディファイアのオブジェクト形式対応
+
+### 2026-01-09: BTノード自動位置計算 (v0.8.6)
+- 自動レイアウト機能: `parent_node_id` 指定時に自動的に最適位置を計算
+- 対象ツール: `add_bt_composite_node`, `add_bt_task_node`
 
 ### 2026-01-09: BT Bug Fixes & list_bt_nodes (v0.8.5)
 - **新ツール追加**:

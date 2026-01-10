@@ -763,6 +763,18 @@ bool FSpirrowBridgeCommonUtils::SetObjectProperty(UObject* Object, const FString
         if (Value->Type == EJson::String)
         {
             FString ClassPath = Value->AsString();
+
+            // ★ Handle None/empty/nullptr as null value ★
+            if (ClassPath.IsEmpty() ||
+                ClassPath.Equals(TEXT("None"), ESearchCase::IgnoreCase) ||
+                ClassPath.Equals(TEXT("nullptr"), ESearchCase::IgnoreCase) ||
+                ClassPath.Equals(TEXT("null"), ESearchCase::IgnoreCase))
+            {
+                ClassProp->SetObjectPropertyValue(PropertyAddr, nullptr);
+                UE_LOG(LogTemp, Display, TEXT("Set class property %s to null (value: '%s')"), *PropertyName, *ClassPath);
+                return true;
+            }
+
             UClass* LoadedClass = nullptr;
 
             // Method 1: Try LoadClass for C++ classes (e.g., "/Script/Engine.Character")
@@ -861,6 +873,18 @@ bool FSpirrowBridgeCommonUtils::SetObjectProperty(UObject* Object, const FString
         {
             FString AssetPath = Value->AsString();
 
+            // ★ Handle None/empty/nullptr as null value ★
+            if (AssetPath.IsEmpty() ||
+                AssetPath.Equals(TEXT("None"), ESearchCase::IgnoreCase) ||
+                AssetPath.Equals(TEXT("nullptr"), ESearchCase::IgnoreCase) ||
+                AssetPath.Equals(TEXT("null"), ESearchCase::IgnoreCase))
+            {
+                FSoftObjectPtr NullPtr;
+                SoftObjectProp->SetPropertyValue(PropertyAddr, NullPtr);
+                UE_LOG(LogTemp, Display, TEXT("Set soft object property %s to null (value: '%s')"), *PropertyName, *AssetPath);
+                return true;
+            }
+
             // Create soft object path and set it
             FSoftObjectPath TempPath(AssetPath);
             FSoftObjectPtr SoftPtr(TempPath);
@@ -893,11 +917,14 @@ bool FSpirrowBridgeCommonUtils::SetObjectProperty(UObject* Object, const FString
         {
             FString AssetPath = Value->AsString();
 
-            // Handle empty string as null
-            if (AssetPath.IsEmpty())
+            // ★ Handle None/empty/nullptr as null value ★
+            if (AssetPath.IsEmpty() ||
+                AssetPath.Equals(TEXT("None"), ESearchCase::IgnoreCase) ||
+                AssetPath.Equals(TEXT("nullptr"), ESearchCase::IgnoreCase) ||
+                AssetPath.Equals(TEXT("null"), ESearchCase::IgnoreCase))
             {
                 ObjectProp->SetObjectPropertyValue(PropertyAddr, nullptr);
-                UE_LOG(LogTemp, Display, TEXT("Set object property %s to null (empty path)"), *PropertyName);
+                UE_LOG(LogTemp, Display, TEXT("Set object property %s to null (value: '%s')"), *PropertyName, *AssetPath);
                 return true;
             }
 

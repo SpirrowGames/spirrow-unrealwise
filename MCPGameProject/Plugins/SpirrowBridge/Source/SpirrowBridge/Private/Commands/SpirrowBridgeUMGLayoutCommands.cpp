@@ -13,6 +13,8 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/PanelWidget.h"
 #include "Kismet2/KismetEditorUtilities.h"
+#include "Styling/SlateColor.h"
+#include "Layout/Margin.h"
 
 FSpirrowBridgeUMGLayoutCommands::FSpirrowBridgeUMGLayoutCommands()
 {
@@ -31,6 +33,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleCommand(const FSt
 	else if (CommandName == TEXT("get_widget_elements"))
 	{
 		return HandleGetWidgetElements(Params);
+	}
+	else if (CommandName == TEXT("get_widget_element_property"))
+	{
+		return HandleGetWidgetElementProperty(Params);
 	}
 	else if (CommandName == TEXT("set_widget_slot_property"))
 	{
@@ -65,6 +71,40 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleGetWidgetElements
 	FString Path;
 	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
 
+	// ★ New options ★
+	bool bIncludeProperties = false;
+	bool bExcludeDefaultValues = false;
+	FSpirrowBridgeCommonUtils::GetOptionalBool(Params, TEXT("include_properties"), bIncludeProperties, false);
+	FSpirrowBridgeCommonUtils::GetOptionalBool(Params, TEXT("exclude_default_values"), bExcludeDefaultValues, false);
+
+	// Get class_filter array
+	TArray<FString> ClassFilter;
+	if (Params->HasField(TEXT("class_filter")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* ClassFilterArray;
+		if (Params->TryGetArrayField(TEXT("class_filter"), ClassFilterArray))
+		{
+			for (const TSharedPtr<FJsonValue>& FilterValue : *ClassFilterArray)
+			{
+				ClassFilter.Add(FilterValue->AsString());
+			}
+		}
+	}
+
+	// Get property_filter array
+	TArray<FString> PropertyFilter;
+	if (Params->HasField(TEXT("property_filter")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* PropertyFilterArray;
+		if (Params->TryGetArrayField(TEXT("property_filter"), PropertyFilterArray))
+		{
+			for (const TSharedPtr<FJsonValue>& FilterValue : *PropertyFilterArray)
+			{
+				PropertyFilter.Add(FilterValue->AsString());
+			}
+		}
+	}
+
 	// Validate and load Widget Blueprint
 	UWidgetBlueprint* WidgetBP = nullptr;
 	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
@@ -89,6 +129,26 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleGetWidgetElements
 	for (UWidget* Widget : AllWidgets)
 	{
 		if (!Widget) continue;
+
+		// ★ Apply class_filter ★
+		if (ClassFilter.Num() > 0)
+		{
+			bool bMatchesFilter = false;
+			FString WidgetClassName = Widget->GetClass()->GetName();
+			for (const FString& FilterClass : ClassFilter)
+			{
+				if (WidgetClassName.Equals(FilterClass, ESearchCase::IgnoreCase) ||
+					WidgetClassName.Contains(FilterClass, ESearchCase::IgnoreCase))
+				{
+					bMatchesFilter = true;
+					break;
+				}
+			}
+			if (!bMatchesFilter)
+			{
+				continue; // Skip this widget
+			}
+		}
 
 		TSharedPtr<FJsonObject> ElementObj = MakeShared<FJsonObject>();
 		ElementObj->SetStringField(TEXT("name"), Widget->GetName());
@@ -157,6 +217,69 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleGetWidgetElements
 			ElementObj->SetObjectField(TEXT("slot"), SlotObj);
 		}
 
+		// ★ Include properties if requested ★
+		if (bIncludeProperties)
+		{
+			TSharedPtr<FJsonObject> PropsObj = MakeShared<FJsonObject>();
+			UClass* WidgetClass = Widget->GetClass();
+			UObject* DefaultWidget = WidgetClass->GetDefaultObject();
+
+			for (TFieldIterator<FProperty> PropIt(WidgetClass); PropIt; ++PropIt)
+			{
+				FProperty* Prop = *PropIt;
+
+				// Only include editable properties
+				if (!Prop->HasAnyPropertyFlags(CPF_Edit | CPF_EditConst))
+				{
+					continue;
+				}
+
+				// Skip deprecated or hidden properties
+				if (Prop->HasAnyPropertyFlags(CPF_Deprecated) || Prop->HasMetaData(TEXT("Hidden")))
+				{
+					continue;
+				}
+
+				FString PropName = Prop->GetName();
+
+				// Apply property_filter if specified
+				if (PropertyFilter.Num() > 0)
+				{
+					bool bMatchesFilter = false;
+					for (const FString& FilterProp : PropertyFilter)
+					{
+						if (PropName.Equals(FilterProp, ESearchCase::IgnoreCase))
+						{
+							bMatchesFilter = true;
+							break;
+						}
+					}
+					if (!bMatchesFilter)
+					{
+						continue;
+					}
+				}
+
+				void* ValuePtr = Prop->ContainerPtrToValuePtr<void>(Widget);
+
+				// ★ Exclude default values if requested ★
+				if (bExcludeDefaultValues && DefaultWidget)
+				{
+					void* DefaultValuePtr = Prop->ContainerPtrToValuePtr<void>(DefaultWidget);
+					if (Prop->Identical(ValuePtr, DefaultValuePtr))
+					{
+						continue; // Skip properties with default values
+					}
+				}
+
+				// Convert property to JSON
+				TSharedPtr<FJsonValue> PropValue = PropertyToJsonValue(Prop, ValuePtr);
+				PropsObj->SetField(PropName, PropValue);
+			}
+
+			ElementObj->SetObjectField(TEXT("properties"), PropsObj);
+		}
+
 		ElementsArray.Add(MakeShared<FJsonValueObject>(ElementObj));
 	}
 
@@ -165,6 +288,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleGetWidgetElements
 	ResultObj->SetBoolField(TEXT("success"), true);
 	ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
 	ResultObj->SetStringField(TEXT("root"), WidgetTree->RootWidget ? WidgetTree->RootWidget->GetName() : TEXT(""));
+	ResultObj->SetNumberField(TEXT("element_count"), ElementsArray.Num());
 	ResultObj->SetArrayField(TEXT("elements"), ElementsArray);
 	return ResultObj;
 }
@@ -363,8 +487,63 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetElementP
 
 	bool bSuccess = false;
 
-	// Handle special cases first
-	if (PropertyName == TEXT("Visibility"))
+	// ★ Check if this is a nested property path (e.g., "Brush.TintColor") ★
+	TArray<FString> PropertyPath;
+	PropertyName.ParseIntoArray(PropertyPath, TEXT("."));
+
+	if (PropertyPath.Num() > 1)
+	{
+		// Navigate through nested properties
+		void* CurrentContainer = Widget;
+		UStruct* CurrentStruct = Widget->GetClass();
+
+		for (int32 i = 0; i < PropertyPath.Num() - 1; ++i)
+		{
+			FProperty* Prop = CurrentStruct->FindPropertyByName(*PropertyPath[i]);
+			if (!Prop)
+			{
+				return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+					ESpirrowErrorCode::PropertyNotFound,
+					FString::Printf(TEXT("Property '%s' not found in path '%s'"), *PropertyPath[i], *PropertyName));
+			}
+
+			FStructProperty* StructProp = CastField<FStructProperty>(Prop);
+			if (!StructProp)
+			{
+				return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+					ESpirrowErrorCode::PropertyTypeMismatch,
+					FString::Printf(TEXT("Property '%s' is not a struct type in path '%s'"), *PropertyPath[i], *PropertyName));
+			}
+
+			CurrentContainer = StructProp->ContainerPtrToValuePtr<void>(CurrentContainer);
+			CurrentStruct = StructProp->Struct;
+		}
+
+		// Set the final property value
+		FString FinalPropertyName = PropertyPath.Last();
+		FProperty* FinalProp = CurrentStruct->FindPropertyByName(*FinalPropertyName);
+		if (!FinalProp)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::PropertyNotFound,
+				FString::Printf(TEXT("Final property '%s' not found in path '%s'"), *FinalPropertyName, *PropertyName));
+		}
+
+		// Try to set the property using ImportText
+		void* ValuePtr = FinalProp->ContainerPtrToValuePtr<void>(CurrentContainer);
+		if (FinalProp->ImportText_Direct(*PropertyValue, ValuePtr, nullptr, PPF_None))
+		{
+			bSuccess = true;
+		}
+		else
+		{
+			// Log the failure for debugging
+			UE_LOG(LogTemp, Warning, TEXT("ImportText_Direct failed for nested property '%s' with value '%s'"),
+				*PropertyName, *PropertyValue);
+		}
+	}
+	// Handle special cases first (non-nested properties)
+	else if (PropertyName == TEXT("Visibility"))
 	{
 		ESlateVisibility NewVisibility = ESlateVisibility::Visible;
 		if (PropertyValue == TEXT("Hidden"))
@@ -943,5 +1122,300 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleRemoveWidgetEleme
 	ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
 	ResultObj->SetStringField(TEXT("removed_element"), ElementName);
 	ResultObj->SetStringField(TEXT("former_parent"), ParentName);
+	return ResultObj;
+}
+
+// ============================================
+// get_widget_element_property implementation
+// ============================================
+
+TSharedPtr<FJsonValue> FSpirrowBridgeUMGLayoutCommands::StructToJsonValue(FStructProperty* StructProp, void* StructPtr)
+{
+	if (!StructProp || !StructPtr)
+	{
+		return MakeShared<FJsonValueNull>();
+	}
+
+	UScriptStruct* ScriptStruct = StructProp->Struct;
+	FString StructName = ScriptStruct->GetName();
+
+	// Handle known struct types with proper field expansion
+	if (StructName == TEXT("LinearColor"))
+	{
+		FLinearColor* Color = static_cast<FLinearColor*>(StructPtr);
+		TSharedPtr<FJsonObject> ColorObj = MakeShared<FJsonObject>();
+		ColorObj->SetNumberField(TEXT("r"), Color->R);
+		ColorObj->SetNumberField(TEXT("g"), Color->G);
+		ColorObj->SetNumberField(TEXT("b"), Color->B);
+		ColorObj->SetNumberField(TEXT("a"), Color->A);
+		return MakeShared<FJsonValueObject>(ColorObj);
+	}
+	else if (StructName == TEXT("Color"))
+	{
+		FColor* Color = static_cast<FColor*>(StructPtr);
+		TSharedPtr<FJsonObject> ColorObj = MakeShared<FJsonObject>();
+		ColorObj->SetNumberField(TEXT("r"), Color->R);
+		ColorObj->SetNumberField(TEXT("g"), Color->G);
+		ColorObj->SetNumberField(TEXT("b"), Color->B);
+		ColorObj->SetNumberField(TEXT("a"), Color->A);
+		return MakeShared<FJsonValueObject>(ColorObj);
+	}
+	else if (StructName == TEXT("Vector"))
+	{
+		FVector* Vec = static_cast<FVector*>(StructPtr);
+		TSharedPtr<FJsonObject> VecObj = MakeShared<FJsonObject>();
+		VecObj->SetNumberField(TEXT("x"), Vec->X);
+		VecObj->SetNumberField(TEXT("y"), Vec->Y);
+		VecObj->SetNumberField(TEXT("z"), Vec->Z);
+		return MakeShared<FJsonValueObject>(VecObj);
+	}
+	else if (StructName == TEXT("Vector2D"))
+	{
+		FVector2D* Vec = static_cast<FVector2D*>(StructPtr);
+		TSharedPtr<FJsonObject> VecObj = MakeShared<FJsonObject>();
+		VecObj->SetNumberField(TEXT("x"), Vec->X);
+		VecObj->SetNumberField(TEXT("y"), Vec->Y);
+		return MakeShared<FJsonValueObject>(VecObj);
+	}
+	else if (StructName == TEXT("Rotator"))
+	{
+		FRotator* Rot = static_cast<FRotator*>(StructPtr);
+		TSharedPtr<FJsonObject> RotObj = MakeShared<FJsonObject>();
+		RotObj->SetNumberField(TEXT("pitch"), Rot->Pitch);
+		RotObj->SetNumberField(TEXT("yaw"), Rot->Yaw);
+		RotObj->SetNumberField(TEXT("roll"), Rot->Roll);
+		return MakeShared<FJsonValueObject>(RotObj);
+	}
+	else if (StructName == TEXT("Margin"))
+	{
+		FMargin* Margin = static_cast<FMargin*>(StructPtr);
+		TSharedPtr<FJsonObject> MarginObj = MakeShared<FJsonObject>();
+		MarginObj->SetNumberField(TEXT("left"), Margin->Left);
+		MarginObj->SetNumberField(TEXT("top"), Margin->Top);
+		MarginObj->SetNumberField(TEXT("right"), Margin->Right);
+		MarginObj->SetNumberField(TEXT("bottom"), Margin->Bottom);
+		return MakeShared<FJsonValueObject>(MarginObj);
+	}
+	else if (StructName == TEXT("SlateColor"))
+	{
+		FSlateColor* SlateColor = static_cast<FSlateColor*>(StructPtr);
+		FLinearColor LinearColor = SlateColor->GetSpecifiedColor();
+		TSharedPtr<FJsonObject> ColorObj = MakeShared<FJsonObject>();
+		ColorObj->SetNumberField(TEXT("r"), LinearColor.R);
+		ColorObj->SetNumberField(TEXT("g"), LinearColor.G);
+		ColorObj->SetNumberField(TEXT("b"), LinearColor.B);
+		ColorObj->SetNumberField(TEXT("a"), LinearColor.A);
+		return MakeShared<FJsonValueObject>(ColorObj);
+	}
+
+	// For unknown structs, use ExportText
+	FString ExportedValue;
+	StructProp->ExportTextItem_Direct(ExportedValue, StructPtr, nullptr, nullptr, PPF_None);
+	return MakeShared<FJsonValueString>(ExportedValue);
+}
+
+TSharedPtr<FJsonValue> FSpirrowBridgeUMGLayoutCommands::PropertyToJsonValue(FProperty* Property, void* ValuePtr)
+{
+	if (!Property || !ValuePtr)
+	{
+		return MakeShared<FJsonValueNull>();
+	}
+
+	// Boolean
+	if (FBoolProperty* BoolProp = CastField<FBoolProperty>(Property))
+	{
+		return MakeShared<FJsonValueBoolean>(BoolProp->GetPropertyValue(ValuePtr));
+	}
+	// Integer
+	else if (FIntProperty* IntProp = CastField<FIntProperty>(Property))
+	{
+		return MakeShared<FJsonValueNumber>(IntProp->GetPropertyValue(ValuePtr));
+	}
+	// Float
+	else if (FFloatProperty* FloatProp = CastField<FFloatProperty>(Property))
+	{
+		return MakeShared<FJsonValueNumber>(FloatProp->GetPropertyValue(ValuePtr));
+	}
+	// Double
+	else if (FDoubleProperty* DoubleProp = CastField<FDoubleProperty>(Property))
+	{
+		return MakeShared<FJsonValueNumber>(DoubleProp->GetPropertyValue(ValuePtr));
+	}
+	// String
+	else if (FStrProperty* StrProp = CastField<FStrProperty>(Property))
+	{
+		return MakeShared<FJsonValueString>(StrProp->GetPropertyValue(ValuePtr));
+	}
+	// Name
+	else if (FNameProperty* NameProp = CastField<FNameProperty>(Property))
+	{
+		return MakeShared<FJsonValueString>(NameProp->GetPropertyValue(ValuePtr).ToString());
+	}
+	// Text
+	else if (FTextProperty* TextProp = CastField<FTextProperty>(Property))
+	{
+		return MakeShared<FJsonValueString>(TextProp->GetPropertyValue(ValuePtr).ToString());
+	}
+	// Byte/Enum
+	else if (FByteProperty* ByteProp = CastField<FByteProperty>(Property))
+	{
+		UEnum* EnumDef = ByteProp->GetIntPropertyEnum();
+		if (EnumDef)
+		{
+			uint8 ByteValue = ByteProp->GetPropertyValue(ValuePtr);
+			return MakeShared<FJsonValueString>(EnumDef->GetNameStringByValue(ByteValue));
+		}
+		return MakeShared<FJsonValueNumber>(ByteProp->GetPropertyValue(ValuePtr));
+	}
+	// Enum
+	else if (FEnumProperty* EnumProp = CastField<FEnumProperty>(Property))
+	{
+		UEnum* EnumDef = EnumProp->GetEnum();
+		FNumericProperty* UnderlyingProp = EnumProp->GetUnderlyingProperty();
+		if (EnumDef && UnderlyingProp)
+		{
+			int64 Value = UnderlyingProp->GetSignedIntPropertyValue(ValuePtr);
+			return MakeShared<FJsonValueString>(EnumDef->GetNameStringByValue(Value));
+		}
+	}
+	// Struct
+	else if (FStructProperty* StructProp = CastField<FStructProperty>(Property))
+	{
+		return StructToJsonValue(StructProp, ValuePtr);
+	}
+	// Object reference
+	else if (FObjectProperty* ObjProp = CastField<FObjectProperty>(Property))
+	{
+		UObject* Obj = ObjProp->GetObjectPropertyValue(ValuePtr);
+		if (Obj)
+		{
+			return MakeShared<FJsonValueString>(Obj->GetPathName());
+		}
+		return MakeShared<FJsonValueNull>();
+	}
+	// Class reference
+	else if (FClassProperty* ClassProp = CastField<FClassProperty>(Property))
+	{
+		UClass* Class = Cast<UClass>(ClassProp->GetObjectPropertyValue(ValuePtr));
+		if (Class)
+		{
+			return MakeShared<FJsonValueString>(Class->GetPathName());
+		}
+		return MakeShared<FJsonValueNull>();
+	}
+	// Array
+	else if (FArrayProperty* ArrayProp = CastField<FArrayProperty>(Property))
+	{
+		FScriptArrayHelper ArrayHelper(ArrayProp, ValuePtr);
+		TArray<TSharedPtr<FJsonValue>> JsonArray;
+		for (int32 i = 0; i < ArrayHelper.Num(); ++i)
+		{
+			TSharedPtr<FJsonValue> ElementValue = PropertyToJsonValue(ArrayProp->Inner, ArrayHelper.GetRawPtr(i));
+			JsonArray.Add(ElementValue);
+		}
+		return MakeShared<FJsonValueArray>(JsonArray);
+	}
+
+	// Fallback: use ExportText
+	FString ExportedValue;
+	Property->ExportTextItem_Direct(ExportedValue, ValuePtr, nullptr, nullptr, PPF_None);
+	return MakeShared<FJsonValueString>(ExportedValue);
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleGetWidgetElementProperty(const TSharedPtr<FJsonObject>& Params)
+{
+	// Validate required parameters
+	FString WidgetName, ElementName, PropertyName;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
+	{
+		return Error;
+	}
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("element_name"), ElementName))
+	{
+		return Error;
+	}
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("property_name"), PropertyName))
+	{
+		return Error;
+	}
+
+	// Get optional parameters
+	FString Path;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
+
+	// Validate and load Widget Blueprint
+	UWidgetBlueprint* WidgetBP = nullptr;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
+	{
+		return Error;
+	}
+
+	// Find the widget element
+	UWidget* Widget = WidgetBP->WidgetTree->FindWidget(FName(*ElementName));
+	if (!Widget)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetElementNotFound,
+			FString::Printf(TEXT("Widget element '%s' not found"), *ElementName));
+	}
+
+	// Parse property path for nested properties
+	TArray<FString> PropertyPath;
+	PropertyName.ParseIntoArray(PropertyPath, TEXT("."));
+
+	void* CurrentContainer = Widget;
+	UStruct* CurrentStruct = Widget->GetClass();
+	FProperty* TargetProperty = nullptr;
+
+	// Navigate through nested properties
+	for (int32 i = 0; i < PropertyPath.Num(); ++i)
+	{
+		FProperty* Prop = CurrentStruct->FindPropertyByName(*PropertyPath[i]);
+		if (!Prop)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::PropertyNotFound,
+				FString::Printf(TEXT("Property '%s' not found in path '%s'"), *PropertyPath[i], *PropertyName));
+		}
+
+		if (i == PropertyPath.Num() - 1)
+		{
+			// This is the target property
+			TargetProperty = Prop;
+		}
+		else
+		{
+			// Navigate to nested struct
+			FStructProperty* StructProp = CastField<FStructProperty>(Prop);
+			if (!StructProp)
+			{
+				return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+					ESpirrowErrorCode::PropertyTypeMismatch,
+					FString::Printf(TEXT("Property '%s' is not a struct type in path '%s'"), *PropertyPath[i], *PropertyName));
+			}
+			CurrentContainer = StructProp->ContainerPtrToValuePtr<void>(CurrentContainer);
+			CurrentStruct = StructProp->Struct;
+		}
+	}
+
+	if (!TargetProperty)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::PropertyNotFound,
+			FString::Printf(TEXT("Property '%s' not found"), *PropertyName));
+	}
+
+	// Get property value
+	void* ValuePtr = TargetProperty->ContainerPtrToValuePtr<void>(CurrentContainer);
+	TSharedPtr<FJsonValue> JsonValue = PropertyToJsonValue(TargetProperty, ValuePtr);
+
+	// Create success response
+	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetBoolField(TEXT("success"), true);
+	ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
+	ResultObj->SetStringField(TEXT("element_name"), ElementName);
+	ResultObj->SetStringField(TEXT("property_name"), PropertyName);
+	ResultObj->SetStringField(TEXT("property_type"), TargetProperty->GetCPPType());
+	ResultObj->SetField(TEXT("value"), JsonValue);
 	return ResultObj;
 }

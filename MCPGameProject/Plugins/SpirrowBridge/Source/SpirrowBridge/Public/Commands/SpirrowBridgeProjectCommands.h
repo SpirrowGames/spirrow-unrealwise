@@ -22,6 +22,9 @@ private:
     TSharedPtr<FJsonObject> HandleCreateInputAction(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleCreateInputMappingContext(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleAddActionToMappingContext(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleGetInputMappingContext(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleGetInputAction(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleRemoveActionFromMappingContext(const TSharedPtr<FJsonObject>& Params);
 
     // Asset management handlers
     TSharedPtr<FJsonObject> HandleDeleteAsset(const TSharedPtr<FJsonObject>& Params);

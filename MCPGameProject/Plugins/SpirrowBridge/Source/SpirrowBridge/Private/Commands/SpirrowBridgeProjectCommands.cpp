@@ -42,6 +42,18 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleCommand(const FStri
     {
         return HandleAddActionToMappingContext(Params);
     }
+    else if (CommandType == TEXT("get_input_mapping_context"))
+    {
+        return HandleGetInputMappingContext(Params);
+    }
+    else if (CommandType == TEXT("get_input_action"))
+    {
+        return HandleGetInputAction(Params);
+    }
+    else if (CommandType == TEXT("remove_action_from_mapping_context"))
+    {
+        return HandleRemoveActionFromMappingContext(Params);
+    }
     else if (CommandType == TEXT("delete_asset"))
     {
         return HandleDeleteAsset(Params);
@@ -287,28 +299,91 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleAddActionToMappingC
         Mapping.Triggers.Add(Trigger);
     }
 
+    // ★ Modifiers処理（文字列またはオブジェクト形式に対応）★
+    TArray<FString> AppliedModifiers;
     const TArray<TSharedPtr<FJsonValue>>* ModifiersArray;
     if (Params->TryGetArrayField(TEXT("modifiers"), ModifiersArray))
     {
         for (const auto& ModValue : *ModifiersArray)
         {
-            FString ModName = ModValue->AsString();
+            FString ModName;
+            TSharedPtr<FJsonObject> ModObj;
+
+            // オブジェクト形式: {"type": "Scalar", "scale": 2.0}
+            if (ModValue->Type == EJson::Object)
+            {
+                ModObj = ModValue->AsObject();
+                ModObj->TryGetStringField(TEXT("type"), ModName);
+            }
+            // 文字列形式: "Negate"
+            else if (ModValue->Type == EJson::String)
+            {
+                ModName = ModValue->AsString();
+            }
 
             if (ModName == TEXT("Negate"))
             {
                 UInputModifierNegate* Mod = NewObject<UInputModifierNegate>(Context);
                 Mapping.Modifiers.Add(Mod);
+                AppliedModifiers.Add(TEXT("Negate"));
             }
-            else if (ModName == TEXT("SwizzleYXZ"))
+            else if (ModName == TEXT("Scalar"))
+            {
+                UInputModifierScalar* Mod = NewObject<UInputModifierScalar>(Context);
+                if (ModObj)
+                {
+                    double ScaleValue = 1.0;
+                    if (ModObj->TryGetNumberField(TEXT("scale"), ScaleValue))
+                    {
+                        Mod->Scalar = FVector(ScaleValue, ScaleValue, ScaleValue);
+                    }
+                    // 個別軸指定: {"type": "Scalar", "x": 1.0, "y": 2.0, "z": 0.0}
+                    double X = ScaleValue, Y = ScaleValue, Z = ScaleValue;
+                    ModObj->TryGetNumberField(TEXT("x"), X);
+                    ModObj->TryGetNumberField(TEXT("y"), Y);
+                    ModObj->TryGetNumberField(TEXT("z"), Z);
+                    Mod->Scalar = FVector(X, Y, Z);
+                }
+                Mapping.Modifiers.Add(Mod);
+                AppliedModifiers.Add(FString::Printf(TEXT("Scalar(%.2f,%.2f,%.2f)"),
+                    Mod->Scalar.X, Mod->Scalar.Y, Mod->Scalar.Z));
+            }
+            else if (ModName == TEXT("SwizzleYXZ") || ModName == TEXT("Swizzle"))
             {
                 UInputModifierSwizzleAxis* Mod = NewObject<UInputModifierSwizzleAxis>(Context);
                 Mod->Order = EInputAxisSwizzle::YXZ;
+                if (ModObj)
+                {
+                    FString OrderStr;
+                    if (ModObj->TryGetStringField(TEXT("order"), OrderStr))
+                    {
+                        if (OrderStr == TEXT("YXZ")) Mod->Order = EInputAxisSwizzle::YXZ;
+                        else if (OrderStr == TEXT("ZYX")) Mod->Order = EInputAxisSwizzle::ZYX;
+                        else if (OrderStr == TEXT("XZY")) Mod->Order = EInputAxisSwizzle::XZY;
+                        else if (OrderStr == TEXT("YZX")) Mod->Order = EInputAxisSwizzle::YZX;
+                        else if (OrderStr == TEXT("ZXY")) Mod->Order = EInputAxisSwizzle::ZXY;
+                    }
+                }
                 Mapping.Modifiers.Add(Mod);
+                AppliedModifiers.Add(TEXT("Swizzle"));
             }
             else if (ModName == TEXT("DeadZone"))
             {
                 UInputModifierDeadZone* Mod = NewObject<UInputModifierDeadZone>(Context);
+                if (ModObj)
+                {
+                    double LowerThreshold = 0.2, UpperThreshold = 1.0;
+                    ModObj->TryGetNumberField(TEXT("lower_threshold"), LowerThreshold);
+                    ModObj->TryGetNumberField(TEXT("upper_threshold"), UpperThreshold);
+                    Mod->LowerThreshold = LowerThreshold;
+                    Mod->UpperThreshold = UpperThreshold;
+                }
                 Mapping.Modifiers.Add(Mod);
+                AppliedModifiers.Add(TEXT("DeadZone"));
+            }
+            else if (!ModName.IsEmpty())
+            {
+                UE_LOG(LogTemp, Warning, TEXT("Unknown modifier type: %s"), *ModName);
             }
         }
     }
@@ -326,6 +401,18 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleAddActionToMappingC
     ResultObj->SetStringField(TEXT("action"), ActionName);
     ResultObj->SetStringField(TEXT("key"), KeyName);
     ResultObj->SetStringField(TEXT("trigger"), TriggerType);
+
+    // ★ 適用されたモディファイアをレスポンスに含める ★
+    if (AppliedModifiers.Num() > 0)
+    {
+        TArray<TSharedPtr<FJsonValue>> ModArray;
+        for (const FString& ModStr : AppliedModifiers)
+        {
+            ModArray.Add(MakeShared<FJsonValueString>(ModStr));
+        }
+        ResultObj->SetArrayField(TEXT("modifiers_applied"), ModArray);
+    }
+
     return ResultObj;
 }
 
@@ -592,4 +679,276 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleSetDefaultMappingCo
     }
 
     return HandleAddMappingContextToBlueprint(Params);
+}
+
+// ===== Get Input Mapping Context =====
+TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleGetInputMappingContext(const TSharedPtr<FJsonObject>& Params)
+{
+    FString ContextName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("context_name"), ContextName))
+    {
+        return Error;
+    }
+
+    FString Path;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Input"));
+
+    FString FullPath = FString::Printf(TEXT("%s/%s.%s"), *Path, *ContextName, *ContextName);
+    UInputMappingContext* Context = LoadObject<UInputMappingContext>(nullptr, *FullPath);
+    if (!Context)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetNotFound,
+            FString::Printf(TEXT("Input Mapping Context not found: %s"), *FullPath));
+    }
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
+    ResultObj->SetStringField(TEXT("context_name"), ContextName);
+    ResultObj->SetStringField(TEXT("path"), Path);
+
+    // マッピング一覧を取得
+    TArray<TSharedPtr<FJsonValue>> MappingsArray;
+    const TArray<FEnhancedActionKeyMapping>& Mappings = Context->GetMappings();
+
+    for (const FEnhancedActionKeyMapping& Mapping : Mappings)
+    {
+        TSharedPtr<FJsonObject> MappingObj = MakeShared<FJsonObject>();
+
+        // アクション名
+        if (Mapping.Action)
+        {
+            MappingObj->SetStringField(TEXT("action"), Mapping.Action->GetName());
+        }
+
+        // キー
+        MappingObj->SetStringField(TEXT("key"), Mapping.Key.GetFName().ToString());
+
+        // トリガー
+        TArray<TSharedPtr<FJsonValue>> TriggersArray;
+        for (UInputTrigger* Trigger : Mapping.Triggers)
+        {
+            if (Trigger)
+            {
+                TriggersArray.Add(MakeShared<FJsonValueString>(Trigger->GetClass()->GetName()));
+            }
+        }
+        if (TriggersArray.Num() > 0)
+        {
+            MappingObj->SetArrayField(TEXT("triggers"), TriggersArray);
+        }
+
+        // モディファイア
+        TArray<TSharedPtr<FJsonValue>> ModifiersArray;
+        for (UInputModifier* Modifier : Mapping.Modifiers)
+        {
+            if (Modifier)
+            {
+                TSharedPtr<FJsonObject> ModObj = MakeShared<FJsonObject>();
+                ModObj->SetStringField(TEXT("type"), Modifier->GetClass()->GetName());
+
+                // Scalar の場合は値も出力
+                if (UInputModifierScalar* ScalarMod = Cast<UInputModifierScalar>(Modifier))
+                {
+                    ModObj->SetNumberField(TEXT("x"), ScalarMod->Scalar.X);
+                    ModObj->SetNumberField(TEXT("y"), ScalarMod->Scalar.Y);
+                    ModObj->SetNumberField(TEXT("z"), ScalarMod->Scalar.Z);
+                }
+                // DeadZone の場合
+                else if (UInputModifierDeadZone* DeadZoneMod = Cast<UInputModifierDeadZone>(Modifier))
+                {
+                    ModObj->SetNumberField(TEXT("lower_threshold"), DeadZoneMod->LowerThreshold);
+                    ModObj->SetNumberField(TEXT("upper_threshold"), DeadZoneMod->UpperThreshold);
+                }
+
+                ModifiersArray.Add(MakeShared<FJsonValueObject>(ModObj));
+            }
+        }
+        if (ModifiersArray.Num() > 0)
+        {
+            MappingObj->SetArrayField(TEXT("modifiers"), ModifiersArray);
+        }
+
+        MappingsArray.Add(MakeShared<FJsonValueObject>(MappingObj));
+    }
+
+    ResultObj->SetArrayField(TEXT("mappings"), MappingsArray);
+    ResultObj->SetNumberField(TEXT("mapping_count"), Mappings.Num());
+
+    return ResultObj;
+}
+
+// ===== Get Input Action =====
+TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleGetInputAction(const TSharedPtr<FJsonObject>& Params)
+{
+    FString ActionName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("action_name"), ActionName))
+    {
+        return Error;
+    }
+
+    FString Path;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Input"));
+
+    FString FullPath = FString::Printf(TEXT("%s/%s.%s"), *Path, *ActionName, *ActionName);
+    UInputAction* Action = LoadObject<UInputAction>(nullptr, *FullPath);
+    if (!Action)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetNotFound,
+            FString::Printf(TEXT("Input Action not found: %s"), *FullPath));
+    }
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
+    ResultObj->SetStringField(TEXT("action_name"), ActionName);
+    ResultObj->SetStringField(TEXT("path"), Path);
+
+    // ValueType
+    FString ValueTypeStr;
+    switch (Action->ValueType)
+    {
+        case EInputActionValueType::Boolean: ValueTypeStr = TEXT("Boolean"); break;
+        case EInputActionValueType::Axis1D: ValueTypeStr = TEXT("Axis1D"); break;
+        case EInputActionValueType::Axis2D: ValueTypeStr = TEXT("Axis2D"); break;
+        case EInputActionValueType::Axis3D: ValueTypeStr = TEXT("Axis3D"); break;
+        default: ValueTypeStr = TEXT("Unknown"); break;
+    }
+    ResultObj->SetStringField(TEXT("value_type"), ValueTypeStr);
+
+    // ConsumeInput
+    ResultObj->SetBoolField(TEXT("consume_input"), Action->bConsumeInput);
+
+    // Triggers
+    TArray<TSharedPtr<FJsonValue>> TriggersArray;
+    for (UInputTrigger* Trigger : Action->Triggers)
+    {
+        if (Trigger)
+        {
+            TriggersArray.Add(MakeShared<FJsonValueString>(Trigger->GetClass()->GetName()));
+        }
+    }
+    if (TriggersArray.Num() > 0)
+    {
+        ResultObj->SetArrayField(TEXT("triggers"), TriggersArray);
+    }
+
+    // Modifiers
+    TArray<TSharedPtr<FJsonValue>> ModifiersArray;
+    for (UInputModifier* Modifier : Action->Modifiers)
+    {
+        if (Modifier)
+        {
+            ModifiersArray.Add(MakeShared<FJsonValueString>(Modifier->GetClass()->GetName()));
+        }
+    }
+    if (ModifiersArray.Num() > 0)
+    {
+        ResultObj->SetArrayField(TEXT("modifiers"), ModifiersArray);
+    }
+
+    return ResultObj;
+}
+
+// ===== Remove Action From Mapping Context =====
+TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleRemoveActionFromMappingContext(const TSharedPtr<FJsonObject>& Params)
+{
+    FString ContextName, ActionName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("context_name"), ContextName))
+    {
+        return Error;
+    }
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("action_name"), ActionName))
+    {
+        return Error;
+    }
+
+    FString KeyName;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("key"), KeyName, TEXT(""));
+
+    FString ContextPath, ActionPath;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("context_path"), ContextPath, TEXT("/Game/Input"));
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("action_path"), ActionPath, TEXT("/Game/Input"));
+
+    FString FullContextPath = FString::Printf(TEXT("%s/%s.%s"), *ContextPath, *ContextName, *ContextName);
+    UInputMappingContext* Context = LoadObject<UInputMappingContext>(nullptr, *FullContextPath);
+    if (!Context)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetNotFound,
+            FString::Printf(TEXT("Input Mapping Context not found: %s"), *FullContextPath));
+    }
+
+    FString FullActionPath = FString::Printf(TEXT("%s/%s.%s"), *ActionPath, *ActionName, *ActionName);
+    UInputAction* Action = LoadObject<UInputAction>(nullptr, *FullActionPath);
+    if (!Action)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetNotFound,
+            FString::Printf(TEXT("Input Action not found: %s"), *FullActionPath));
+    }
+
+    int32 RemovedCount = 0;
+
+    // マッピングを検索して削除対象のキーを収集
+    TArray<FKey> KeysToRemove;
+    const TArray<FEnhancedActionKeyMapping>& Mappings = Context->GetMappings();
+
+    if (KeyName.IsEmpty())
+    {
+        // すべてのマッピングを削除（該当Actionの全キー）
+        for (const FEnhancedActionKeyMapping& Mapping : Mappings)
+        {
+            if (Mapping.Action == Action)
+            {
+                KeysToRemove.Add(Mapping.Key);
+            }
+        }
+    }
+    else
+    {
+        // 特定のキーのマッピングのみ削除
+        FKey Key(*KeyName);
+        if (!Key.IsValid())
+        {
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::InvalidParameter,
+                FString::Printf(TEXT("Invalid key: %s"), *KeyName));
+        }
+
+        for (const FEnhancedActionKeyMapping& Mapping : Mappings)
+        {
+            if (Mapping.Action == Action && Mapping.Key == Key)
+            {
+                KeysToRemove.Add(Mapping.Key);
+            }
+        }
+    }
+
+    // 収集したキーを削除
+    for (const FKey& KeyToRemove : KeysToRemove)
+    {
+        Context->UnmapKey(Action, KeyToRemove);
+        RemovedCount++;
+    }
+
+    // 保存
+    Context->MarkPackageDirty();
+    FString PackagePath = FString::Printf(TEXT("%s/%s"), *ContextPath, *ContextName);
+    FString PackageFileName = FPackageName::LongPackageNameToFilename(PackagePath, FPackageName::GetAssetPackageExtension());
+    FSavePackageArgs SaveArgs;
+    SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
+    UPackage::SavePackage(Context->GetOutermost(), Context, *PackageFileName, SaveArgs);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
+    ResultObj->SetStringField(TEXT("context"), ContextName);
+    ResultObj->SetStringField(TEXT("action"), ActionName);
+    if (!KeyName.IsEmpty())
+    {
+        ResultObj->SetStringField(TEXT("key"), KeyName);
+    }
+    ResultObj->SetNumberField(TEXT("removed_count"), RemovedCount);
+
+    return ResultObj;
 }

@@ -2,7 +2,7 @@
 
 C++ 実装の全体像。新しいセッション開始時の参照用。
 
-> **最終更新**: 2026-01-09 | **バージョン**: Phase H (v0.8.6)
+> **最終更新**: 2026-01-10 | **バージョン**: Phase H (v0.8.7)
 
 ---
 
@@ -37,7 +37,7 @@ C++ 実装の全体像。新しいセッション開始時の参照用。
 | `UMGWidgetInteractiveCommands` | 30 KB | Button/Slider/CheckBox等 |
 | `UMGWidgetCommands` | 1.5 KB | ルーター |
 | `UMGVariableCommands` | 40 KB | 変数/バインディング |
-| `UMGLayoutCommands` | 32 KB | レイアウト |
+| `UMGLayoutCommands` | 40 KB | レイアウト + プロパティ取得 |
 | `UMGAnimationCommands` | 23 KB | アニメーション |
 
 #### AI 系 (5分割 + ルーター)
@@ -154,6 +154,29 @@ Blueprint/BlueprintNode/UMGWidget/AICommands は内部で更に分割ファイ�
 - `FindPin` - ピン検索
 
 > エラーコード一覧: [ERROR_CODES.md](ERROR_CODES.md)
+
+---
+
+## v0.8.7 新機能 (2026-01-10)
+
+### UMGLayoutCommands 拡張
+- `get_widget_element_property`: プロパティ値取得（ネストプロパティ対応）
+- `set_widget_element_property`: ネストプロパティ対応（`Brush.TintColor` 形式）
+- `get_widget_elements`: オプション追加（`include_properties`, `class_filter`, `property_filter`, `exclude_default_values`）
+
+### BlueprintNodeCoreCommands 拡張
+- `disconnect_blueprint_nodes`: ピン接続切断（3モード対応）
+- `add_blueprint_event_node`: BlueprintImplementableEvent オーバーライド対応
+
+### ProjectCommands 拡張 (Enhanced Input)
+- `get_input_mapping_context`: IMC内容読み取り
+- `get_input_action`: InputAction詳細取得
+- `remove_action_from_mapping_context`: IMCからアクション削除
+- `add_action_to_mapping_context`: Scalarモディファイア オブジェクト形式対応
+
+### 新エラーコード
+- `NodeAlreadyExists` (1217)
+- `PropertyTypeMismatch` (1218)
 
 ---
 

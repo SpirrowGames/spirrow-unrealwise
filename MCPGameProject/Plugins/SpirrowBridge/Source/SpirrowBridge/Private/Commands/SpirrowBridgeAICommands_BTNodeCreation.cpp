@@ -219,20 +219,74 @@ static void CalculateChildNodePosition(
 }
 
 /**
+ * ランタイムツリーのDecorator状態をログ出力（デバッグ用）
+ * ★注意: ランタイムでは、DecoratorはFBTCompositeChild::Decoratorsに格納される★
+ */
+static void LogRuntimeTreeDecorators(UBTCompositeNode* CompositeNode, int32 Depth = 0)
+{
+	if (!CompositeNode) return;
+
+	FString Indent = FString::ChrN(Depth * 2, TEXT(' '));
+
+	// このCompositeノードの情報
+	UE_LOG(LogTemp, Warning, TEXT("%s[Runtime] %s: Children=%d"),
+		*Indent,
+		*CompositeNode->GetName(),
+		CompositeNode->Children.Num());
+
+	// 子ノードを再帰的に処理
+	for (int32 i = 0; i < CompositeNode->Children.Num(); i++)
+	{
+		const FBTCompositeChild& Child = CompositeNode->Children[i];
+
+		// 子ノードにアタッチされたDecorators（★ランタイムではここに格納される★）
+		UE_LOG(LogTemp, Warning, TEXT("%s  Child[%d]: ChildNode=%s, Decorators=%d"),
+			*Indent, i,
+			Child.ChildTask ? *Child.ChildTask->GetName() :
+			(Child.ChildComposite ? *Child.ChildComposite->GetName() : TEXT("NULL")),
+			Child.Decorators.Num());
+
+		for (int32 j = 0; j < Child.Decorators.Num(); j++)
+		{
+			UBTDecorator* Dec = Child.Decorators[j];
+			UE_LOG(LogTemp, Warning, TEXT("%s    Decorator[%d]: %s"),
+				*Indent, j,
+				Dec ? *Dec->GetName() : TEXT("NULL"));
+		}
+
+		// 子がCompositeなら再帰
+		if (Child.ChildComposite)
+		{
+			LogRuntimeTreeDecorators(Child.ChildComposite, Depth + 2);
+		}
+	}
+}
+
+/**
  * Finalize and save the BehaviorTree graph
  */
 static void FinalizeAndSaveBTGraph(UBehaviorTreeGraph* BTGraph, UBehaviorTree* BehaviorTree)
 {
-	// ★ デバッグログ: UpdateAsset前の状態 ★
-	UE_LOG(LogTemp, Verbose, TEXT("=== Before UpdateAsset ==="));
+	// ★ デバッグログ: UpdateAsset前のグラフ状態 ★
+	UE_LOG(LogTemp, Warning, TEXT("=== Before UpdateAsset (Graph) ==="));
 	for (UEdGraphNode* Node : BTGraph->Nodes)
 	{
 		UBehaviorTreeGraphNode* BTNode = Cast<UBehaviorTreeGraphNode>(Node);
 		if (BTNode)
 		{
-			UE_LOG(LogTemp, Verbose, TEXT("Node: %s, Decorators: %d"),
+			UE_LOG(LogTemp, Warning, TEXT("GraphNode: %s, Decorators: %d"),
 				BTNode->NodeInstance ? *BTNode->NodeInstance->GetName() : TEXT("null"),
 				BTNode->Decorators.Num());
+
+			// 各Decoratorの詳細
+			for (int32 i = 0; i < BTNode->Decorators.Num(); i++)
+			{
+				UBehaviorTreeGraphNode* DecGraphNode = BTNode->Decorators[i];
+				UE_LOG(LogTemp, Warning, TEXT("  Decorator[%d]: GraphNode=%s, NodeInstance=%s"),
+					i,
+					DecGraphNode ? *DecGraphNode->GetName() : TEXT("NULL"),
+					(DecGraphNode && DecGraphNode->NodeInstance) ? *DecGraphNode->NodeInstance->GetName() : TEXT("NULL"));
+			}
 		}
 	}
 
@@ -242,17 +296,38 @@ static void FinalizeAndSaveBTGraph(UBehaviorTreeGraph* BTGraph, UBehaviorTree* B
 	// Rebuild runtime tree
 	BTGraph->UpdateAsset();
 
-	// ★ デバッグログ: UpdateAsset後の状態 ★
-	UE_LOG(LogTemp, Verbose, TEXT("=== After UpdateAsset ==="));
+	// ★ デバッグログ: UpdateAsset後のグラフ状態 ★
+	UE_LOG(LogTemp, Warning, TEXT("=== After UpdateAsset (Graph) ==="));
 	for (UEdGraphNode* Node : BTGraph->Nodes)
 	{
 		UBehaviorTreeGraphNode* BTNode = Cast<UBehaviorTreeGraphNode>(Node);
 		if (BTNode)
 		{
-			UE_LOG(LogTemp, Verbose, TEXT("Node: %s, Decorators: %d"),
+			UE_LOG(LogTemp, Warning, TEXT("GraphNode: %s, Decorators: %d"),
 				BTNode->NodeInstance ? *BTNode->NodeInstance->GetName() : TEXT("null"),
 				BTNode->Decorators.Num());
+
+			// 各Decoratorの詳細
+			for (int32 i = 0; i < BTNode->Decorators.Num(); i++)
+			{
+				UBehaviorTreeGraphNode* DecGraphNode = BTNode->Decorators[i];
+				UE_LOG(LogTemp, Warning, TEXT("  Decorator[%d]: GraphNode=%s, NodeInstance=%s"),
+					i,
+					DecGraphNode ? *DecGraphNode->GetName() : TEXT("NULL"),
+					(DecGraphNode && DecGraphNode->NodeInstance) ? *DecGraphNode->NodeInstance->GetName() : TEXT("NULL"));
+			}
 		}
+	}
+
+	// ★ デバッグログ: ランタイムツリーの状態 ★
+	UE_LOG(LogTemp, Warning, TEXT("=== Runtime Tree Structure ==="));
+	if (BehaviorTree->RootNode)
+	{
+		LogRuntimeTreeDecorators(BehaviorTree->RootNode);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("BehaviorTree->RootNode is NULL!"));
 	}
 
 	// Mark package dirty
@@ -757,9 +832,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTDecoratorNode(
 			FString::Printf(TEXT("Target graph node not found: %s"), *TargetNodeId));
 	}
 
-	// ★ デコレータグラフノード作成（FGraphNodeCreator不使用 - 重複防止）★
-	// FGraphNodeCreator::Finalize()はBTGraph->Nodesに追加するが、
+	// ★ デコレータグラフノード作成（FGraphNodeCreator不使用）★
 	// DecoratorはTargetGraphNode->Decorators配列にのみ存在すべき
+	// BTGraph->Nodesに追加するとUpdateAsset()で重複処理される
 	UBehaviorTreeGraphNode_Decorator* DecoratorGraphNode = NewObject<UBehaviorTreeGraphNode_Decorator>(
 		BTGraph,
 		UBehaviorTreeGraphNode_Decorator::StaticClass(),
@@ -770,11 +845,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTDecoratorNode(
 	// ★ ユニークな名前を生成（問題3修正）★
 	FName UniqueName = GenerateUniqueNodeName(BTGraph, DecoratorClass);
 
-	// ランタイムノード作成
+	// ★ ランタイムノード作成（OuterはBehaviorTree - UpdateAsset互換性のため）★
 	UBTDecorator* RuntimeDecorator = NewObject<UBTDecorator>(
-		DecoratorGraphNode,
+		BehaviorTree,           // ★重要: BehaviorTreeをOuterに（UpdateAsset互換性）★
 		DecoratorClass,
-		UniqueName,             // ★ユニークな名前を使用★
+		UniqueName,
 		RF_Transactional
 	);
 
@@ -786,7 +861,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTDecoratorNode(
 		RuntimeDecorator->NodeName = NodeName;
 	}
 
-	// グラフノードのピン作成（エディタ表示用）
+	// ★ グラフノードの初期化（FGraphNodeCreatorのFinalize相当）★
 	DecoratorGraphNode->CreateNewGuid();
 	DecoratorGraphNode->PostPlacedNewNode();
 	DecoratorGraphNode->AllocateDefaultPins();
@@ -890,9 +965,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTServiceNode(
 			FString::Printf(TEXT("Services can only be added to composite nodes. Target: %s"), *TargetNodeId));
 	}
 
-	// ★ サービスグラフノード作成（FGraphNodeCreator不使用 - 重複防止）★
-	// FGraphNodeCreator::Finalize()はBTGraph->Nodesに追加するが、
-	// ServiceはTargetGraphNode->Services配列にのみ存在すべき
+	// ★ サービスグラフノード作成（FGraphNodeCreator不使用）★
+	// ServiceはTargetCompositeGraphNode->Services配列にのみ存在すべき
+	// BTGraph->Nodesに追加するとUpdateAsset()で重複処理される
 	UBehaviorTreeGraphNode_Service* ServiceGraphNode = NewObject<UBehaviorTreeGraphNode_Service>(
 		BTGraph,
 		UBehaviorTreeGraphNode_Service::StaticClass(),
@@ -903,11 +978,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTServiceNode(
 	// ★ ユニークな名前を生成（問題3修正）★
 	FName UniqueName = GenerateUniqueNodeName(BTGraph, ServiceClass);
 
-	// ランタイムノード作成
+	// ★ ランタイムノード作成（OuterはBehaviorTree - UpdateAsset互換性のため）★
 	UBTService* RuntimeService = NewObject<UBTService>(
-		ServiceGraphNode,
+		BehaviorTree,           // ★重要: BehaviorTreeをOuterに（UpdateAsset互換性）★
 		ServiceClass,
-		UniqueName,             // ★ユニークな名前を使用★
+		UniqueName,
 		RF_Transactional
 	);
 
@@ -919,7 +994,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTServiceNode(
 		RuntimeService->NodeName = NodeName;
 	}
 
-	// グラフノードのピン作成（エディタ表示用）
+	// ★ グラフノードの初期化（FGraphNodeCreatorのFinalize相当）★
 	ServiceGraphNode->CreateNewGuid();
 	ServiceGraphNode->PostPlacedNewNode();
 	ServiceGraphNode->AllocateDefaultPins();

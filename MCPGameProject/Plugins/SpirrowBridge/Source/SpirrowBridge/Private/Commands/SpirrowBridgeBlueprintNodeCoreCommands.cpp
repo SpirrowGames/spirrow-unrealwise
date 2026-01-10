@@ -30,6 +30,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleCommand(c
     {
         return HandleConnectBlueprintNodes(Params);
     }
+    else if (CommandType == TEXT("disconnect_blueprint_nodes"))
+    {
+        return HandleDisconnectBlueprintNodes(Params);
+    }
     else if (CommandType == TEXT("find_blueprint_nodes"))
     {
         return HandleFindBlueprintNodes(Params);
@@ -136,6 +140,164 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleConnectBl
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(
         ESpirrowErrorCode::ConnectionFailed,
         TEXT("Failed to connect nodes"));
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleDisconnectBlueprintNodes(const TSharedPtr<FJsonObject>& Params)
+{
+    // Validate required parameters - at minimum need blueprint and one node
+    FString BlueprintName, NodeId, PinName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
+    {
+        return Error;
+    }
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("node_id"), NodeId))
+    {
+        return Error;
+    }
+
+    // Optional: specific pin to disconnect
+    Params->TryGetStringField(TEXT("pin_name"), PinName);
+
+    // Optional: target node/pin for breaking specific connection
+    FString TargetNodeId, TargetPinName;
+    Params->TryGetStringField(TEXT("target_node_id"), TargetNodeId);
+    Params->TryGetStringField(TEXT("target_pin"), TargetPinName);
+
+    // Get optional parameters
+    FString Path;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
+
+    // Validate and load Blueprint
+    UBlueprint* Blueprint = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    {
+        return Error;
+    }
+
+    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
+    if (!EventGraph)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::GraphNotFound,
+            TEXT("Failed to get event graph"));
+    }
+
+    // Find the source node
+    UEdGraphNode* SourceNode = nullptr;
+    for (UEdGraphNode* Node : EventGraph->Nodes)
+    {
+        if (Node->NodeGuid.ToString() == NodeId)
+        {
+            SourceNode = Node;
+            break;
+        }
+    }
+
+    if (!SourceNode)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::NodeNotFound,
+            FString::Printf(TEXT("Node not found: %s"), *NodeId));
+    }
+
+    int32 DisconnectedCount = 0;
+    TArray<FString> DisconnectedPins;
+
+    // Case 1: Disconnect specific pin-to-pin connection
+    if (!PinName.IsEmpty() && !TargetNodeId.IsEmpty() && !TargetPinName.IsEmpty())
+    {
+        UEdGraphNode* TargetNode = nullptr;
+        for (UEdGraphNode* Node : EventGraph->Nodes)
+        {
+            if (Node->NodeGuid.ToString() == TargetNodeId)
+            {
+                TargetNode = Node;
+                break;
+            }
+        }
+
+        if (!TargetNode)
+        {
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::NodeNotFound,
+                FString::Printf(TEXT("Target node not found: %s"), *TargetNodeId));
+        }
+
+        UEdGraphPin* SourcePin = FSpirrowBridgeCommonUtils::FindPin(SourceNode, PinName, EGPD_MAX);
+        UEdGraphPin* TargetPin = FSpirrowBridgeCommonUtils::FindPin(TargetNode, TargetPinName, EGPD_MAX);
+
+        if (!SourcePin)
+        {
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::PinNotFound,
+                FString::Printf(TEXT("Source pin not found: %s"), *PinName));
+        }
+        if (!TargetPin)
+        {
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::PinNotFound,
+                FString::Printf(TEXT("Target pin not found: %s"), *TargetPinName));
+        }
+
+        if (SourcePin->LinkedTo.Contains(TargetPin))
+        {
+            SourcePin->BreakLinkTo(TargetPin);
+            DisconnectedCount = 1;
+            DisconnectedPins.Add(FString::Printf(TEXT("%s -> %s"), *PinName, *TargetPinName));
+        }
+    }
+    // Case 2: Disconnect all connections from a specific pin
+    else if (!PinName.IsEmpty())
+    {
+        UEdGraphPin* SourcePin = FSpirrowBridgeCommonUtils::FindPin(SourceNode, PinName, EGPD_MAX);
+        if (!SourcePin)
+        {
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::PinNotFound,
+                FString::Printf(TEXT("Pin not found: %s"), *PinName));
+        }
+
+        DisconnectedCount = SourcePin->LinkedTo.Num();
+        for (UEdGraphPin* LinkedPin : SourcePin->LinkedTo)
+        {
+            DisconnectedPins.Add(FString::Printf(TEXT("%s -> %s.%s"),
+                *PinName,
+                *LinkedPin->GetOwningNode()->GetName(),
+                *LinkedPin->PinName.ToString()));
+        }
+        SourcePin->BreakAllPinLinks();
+    }
+    // Case 3: Disconnect all connections from the entire node
+    else
+    {
+        for (UEdGraphPin* Pin : SourceNode->Pins)
+        {
+            if (Pin->LinkedTo.Num() > 0)
+            {
+                DisconnectedCount += Pin->LinkedTo.Num();
+                DisconnectedPins.Add(FString::Printf(TEXT("%s (%d connections)"),
+                    *Pin->PinName.ToString(), Pin->LinkedTo.Num()));
+                Pin->BreakAllPinLinks();
+            }
+        }
+    }
+
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+    // Create success response
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
+    ResultObj->SetStringField(TEXT("node_id"), NodeId);
+    ResultObj->SetNumberField(TEXT("disconnected_count"), DisconnectedCount);
+
+    TArray<TSharedPtr<FJsonValue>> DisconnectedArray;
+    for (const FString& PinInfo : DisconnectedPins)
+    {
+        DisconnectedArray.Add(MakeShared<FJsonValueString>(PinInfo));
+    }
+    ResultObj->SetArrayField(TEXT("disconnected"), DisconnectedArray);
+
+    return ResultObj;
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleFindBlueprintNodes(const TSharedPtr<FJsonObject>& Params)
@@ -525,7 +687,64 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
             TEXT("Failed to get event graph"));
     }
 
-    UK2Node_Event* EventNode = FSpirrowBridgeCommonUtils::CreateEventNode(EventGraph, EventName, NodePosition);
+    UK2Node_Event* EventNode = nullptr;
+    bool bIsOverride = false;
+
+    // ★ Check if event is a BlueprintImplementableEvent in parent class ★
+    UClass* ParentClass = Blueprint->ParentClass;
+    UFunction* ParentFunction = nullptr;
+
+    while (ParentClass)
+    {
+        ParentFunction = ParentClass->FindFunctionByName(*EventName);
+        if (ParentFunction && ParentFunction->HasAnyFunctionFlags(FUNC_BlueprintEvent))
+        {
+            break;
+        }
+        ParentFunction = nullptr;
+        ParentClass = ParentClass->GetSuperClass();
+    }
+
+    if (ParentFunction)
+    {
+        // ★ This is a BlueprintImplementableEvent override ★
+        bIsOverride = true;
+
+        // Check if already overridden
+        for (UEdGraphNode* Node : EventGraph->Nodes)
+        {
+            if (UK2Node_Event* ExistingEvent = Cast<UK2Node_Event>(Node))
+            {
+                if (ExistingEvent->bOverrideFunction &&
+                    ExistingEvent->EventReference.GetMemberName() == ParentFunction->GetFName())
+                {
+                    return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                        ESpirrowErrorCode::NodeAlreadyExists,
+                        FString::Printf(TEXT("Event '%s' is already overridden"), *EventName));
+                }
+            }
+        }
+
+        // Create override event node
+        EventNode = NewObject<UK2Node_Event>(EventGraph);
+        EventGraph->AddNode(EventNode, false, false);
+
+        EventNode->EventReference.SetFromField<UFunction>(ParentFunction, false);
+        EventNode->bOverrideFunction = true;
+        EventNode->NodePosX = NodePosition.X;
+        EventNode->NodePosY = NodePosition.Y;
+        EventNode->CreateNewGuid();
+        EventNode->AllocateDefaultPins();
+        EventNode->PostPlacedNewNode();
+
+        UE_LOG(LogSpirrowBridgeNodeCore, Log, TEXT("Created override event node for BlueprintImplementableEvent: %s"), *EventName);
+    }
+    else
+    {
+        // ★ Custom event (not an override) ★
+        EventNode = FSpirrowBridgeCommonUtils::CreateEventNode(EventGraph, EventName, NodePosition);
+    }
+
     if (!EventNode)
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(
@@ -538,6 +757,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
     ResultObj->SetBoolField(TEXT("success"), true);
     ResultObj->SetStringField(TEXT("node_id"), EventNode->NodeGuid.ToString());
+    ResultObj->SetBoolField(TEXT("is_override"), bIsOverride);
+    if (bIsOverride && ParentClass)
+    {
+        ResultObj->SetStringField(TEXT("parent_class"), ParentClass->GetName());
+    }
     return ResultObj;
 }
 

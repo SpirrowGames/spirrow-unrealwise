@@ -1,6 +1,6 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: Phase I (v0.8.9)
+> **バージョン**: Phase I (v0.8.10)
 > **ステータス**: Beta
 > **最終更新**: 2026-01-12
 
@@ -23,7 +23,8 @@
 | Config | 3 | ✅ |
 | Asset Utility | 7 | ✅ 🆕 |
 | RAG | 4 | ✅ |
-| **合計** | **130** | |
+| AI Image Generation | 3 | ✅ 🆕 |
+| **合計** | **133** | |
 
 ---
 
@@ -94,11 +95,75 @@
 ### RAG知識ベース (4)
 `search_knowledge`, `add_knowledge`, `list_knowledge`, `delete_knowledge`
 
+### AI Image Generation (3) 🆕
+`get_ai_image_server_status`, `generate_image`, `generate_and_import_texture`
+
+**機能:**
+- Stable Diffusion Forge API連携
+- Base64画像生成
+- Unrealテクスチャ直接インポート
+- プリセット: `game_icon`, `texture_tileable`, `concept_art`, `character_portrait`
+
+**設定:**
+- 環境変数: `AI_IMAGE_SERVER_URL` (デフォルト: `http://localhost:7860`)
+
+**使用例:**
+```python
+# サーバー状態確認
+get_ai_image_server_status()
+
+# 画像生成のみ
+generate_image(
+    prompt="sword icon, fantasy RPG, golden handle",
+    preset="game_icon"
+)
+
+# 生成 + Unrealインポート
+generate_and_import_texture(
+    prompt="health potion icon, red liquid, glass bottle",
+    asset_name="T_Icon_HealthPotion",
+    destination_path="/Game/UI/Icons",
+    preset="game_icon",
+    compression="UI"
+)
+```
+
 ---
 
 ## 最新の更新
 
-### 2026-01-12: Asset Utility & Batch Operations (v0.8.9) 🆕
+### 2026-01-12: AI Image Generation Integration (v0.8.10) 🆕
+
+**新規ツール追加 (3ツール)**:
+
+| ツール | 機能 | 優先度 |
+|--------|------|--------|
+| `get_ai_image_server_status` | AIサーバー疎通確認、モデル/サンプラー一覧取得 | 高 |
+| `generate_image` | Stable Diffusion Forgeで画像生成（Base64返却） | 最優先 |
+| `generate_and_import_texture` | 画像生成 + Unrealテクスチャインポート統合 | 最優先 |
+
+**プリセット対応**:
+- `game_icon`: 512x512, UIアイコン用
+- `texture_tileable`: 1024x1024, シームレステクスチャ用
+- `concept_art`: 768x512, コンセプトアート用
+- `character_portrait`: 512x768, キャラクターポートレート用
+
+**設定方法**:
+- 環境変数 `AI_IMAGE_SERVER_URL` でエンドポイント変更可能
+- `.env.example` に設定例追加
+
+**バグ修正**:
+- `import_texture`: TaskGraph RecursionGuard クラッシュ修正
+  - 原因: `AsyncTask(GameThread)` 内で InterchangeEngine がTaskGraph操作を再帰実行
+  - 解決: `FTSTicker` を使用してGameThread Tick外で実行（TaskGraphコンテキスト外）
+  - 動作: テクスチャは自動保存され、Content Browserに即座に表示される
+
+- `generate_and_import_texture`: ソケットバッファオーバーフロー修正
+  - 原因: Base64データ（225KB+）を直接ソケット送信、UE側でハング
+  - 解決: Python側で一時ファイル保存→ファイルパスのみ送信
+  - 動作: 生成画像を一時ファイルに保存、インポート後に自動削除
+
+### 2026-01-12: Asset Utility & Batch Operations (v0.8.9)
 
 **新規ツール追加 (8ツール)**:
 

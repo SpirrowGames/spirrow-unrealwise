@@ -22,6 +22,7 @@
 #include "Engine/Selection.h"
 #include "Kismet/GameplayStatics.h"
 #include "Async/Async.h"
+#include "Containers/Ticker.h"  // For FTSTicker (import operations that bypass TaskGraph)
 // Add Blueprint related includes
 #include "Engine/Blueprint.h"
 #include "Engine/BlueprintGeneratedClass.h"
@@ -231,12 +232,77 @@ void USpirrowBridge::StopServer()
 FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params)
 {
     UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Executing command: %s"), *CommandType);
-    
-    // Create a promise to wait for the result
+
+    // Import operations use InterchangeEngine internally which also uses TaskGraph.
+    // Using AsyncTask(GameThread) + InterchangeEngine causes TaskGraph RecursionGuard assertion failure.
+    // So we use FTSTicker for import operations instead, which runs on GameThread tick without TaskGraph.
+    bool bIsImportOperation = (CommandType == TEXT("import_texture"));
+
+    if (bIsImportOperation)
+    {
+        // Use TSharedPtr for Promise since FTickerDelegate needs copyable lambdas
+        TSharedPtr<TPromise<FString>> PromisePtr = MakeShared<TPromise<FString>>();
+        TFuture<FString> Future = PromisePtr->GetFuture();
+
+        // Use FTSTicker for import operations to avoid TaskGraph recursion
+        // FTSTicker runs on the engine tick, outside of TaskGraph context
+        FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda(
+            [this, CommandType, Params, PromisePtr](float DeltaTime) -> bool
+            {
+                UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Executing import via FTSTicker: %s"), *CommandType);
+
+                TSharedPtr<FJsonObject> ResponseJson = MakeShareable(new FJsonObject);
+
+                try
+                {
+                    TSharedPtr<FJsonObject> ResultJson = ProjectCommands->HandleCommand(CommandType, Params);
+
+                    bool bSuccess = true;
+                    FString ErrorMessage = TEXT("Unknown error");
+
+                    if (ResultJson->HasField(TEXT("success")))
+                    {
+                        bSuccess = ResultJson->GetBoolField(TEXT("success"));
+                        if (!bSuccess && ResultJson->HasField(TEXT("error")))
+                        {
+                            ErrorMessage = ResultJson->GetStringField(TEXT("error"));
+                        }
+                    }
+
+                    if (bSuccess)
+                    {
+                        ResponseJson->SetStringField(TEXT("status"), TEXT("success"));
+                        ResponseJson->SetObjectField(TEXT("result"), ResultJson);
+                    }
+                    else
+                    {
+                        ResponseJson->SetStringField(TEXT("status"), TEXT("error"));
+                        ResponseJson->SetStringField(TEXT("error"), ErrorMessage);
+                    }
+                }
+                catch (const std::exception& e)
+                {
+                    ResponseJson->SetStringField(TEXT("status"), TEXT("error"));
+                    ResponseJson->SetStringField(TEXT("error"), UTF8_TO_TCHAR(e.what()));
+                }
+
+                FString ResultString;
+                TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&ResultString);
+                FJsonSerializer::Serialize(ResponseJson.ToSharedRef(), Writer);
+                PromisePtr->SetValue(ResultString);
+
+                return false; // Don't continue ticking - one-shot execution
+            }
+        ));
+
+        return Future.Get();
+    }
+
+    // Create a promise to wait for the result (for non-import operations)
     TPromise<FString> Promise;
     TFuture<FString> Future = Promise.GetFuture();
-    
-    // Queue execution on Game Thread
+
+    // Queue execution on Game Thread (for non-import operations)
     AsyncTask(ENamedThreads::GameThread, [this, CommandType, Params, Promise = MoveTemp(Promise)]() mutable
     {
         TSharedPtr<FJsonObject> ResponseJson = MakeShareable(new FJsonObject);

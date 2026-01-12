@@ -25,6 +25,7 @@
 #include "Misc/FileHelper.h"
 #include "Misc/App.h"
 #include "HAL/PlatformFileManager.h"
+#include "Engine/Engine.h"  // For FlushAsyncLoading()
 
 FSpirrowBridgeProjectCommands::FSpirrowBridgeProjectCommands()
 {
@@ -1077,6 +1078,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleListAssetsInFolder(
 // ===== Import Texture =====
 TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleImportTexture(const TSharedPtr<FJsonObject>& Params)
 {
+    UE_LOG(LogTemp, Warning, TEXT("=== HandleImportTexture: START ==="));
+    UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: IsInGameThread = %s"), IsInGameThread() ? TEXT("YES") : TEXT("NO"));
+
     FString Source, AssetName;
     if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("source"), Source))
     {
@@ -1086,6 +1090,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleImportTexture(const
     {
         return Error;
     }
+    UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: AssetName = %s"), *AssetName);
 
     FString SourceType, DestinationPath, Compression, LodGroup;
     bool bSRGB = true;
@@ -1102,34 +1107,44 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleImportTexture(const
     // Handle Base64 input
     if (SourceType.Equals(TEXT("base64"), ESearchCase::IgnoreCase))
     {
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: Processing Base64 input (length=%d)"), Source.Len());
+
         TArray<uint8> DecodedData;
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: Starting Base64 decode..."));
         if (!FBase64::Decode(Source, DecodedData))
         {
             return FSpirrowBridgeCommonUtils::CreateErrorResponse(
                 ESpirrowErrorCode::InvalidParameter,
                 TEXT("Failed to decode Base64 data"));
         }
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: Base64 decode complete (decoded size=%d bytes)"), DecodedData.Num());
 
         // Create temp directory if it doesn't exist
         FString TempDir = FPaths::ProjectSavedDir() / TEXT("Temp");
         IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
         if (!PlatformFile.DirectoryExists(*TempDir))
         {
+            UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: Creating temp directory: %s"), *TempDir);
             PlatformFile.CreateDirectory(*TempDir);
         }
 
         // Write to temp file
         TempFilePath = TempDir / AssetName + TEXT(".png");
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: Writing temp file: %s"), *TempFilePath);
         if (!FFileHelper::SaveArrayToFile(DecodedData, *TempFilePath))
         {
             return FSpirrowBridgeCommonUtils::CreateErrorResponse(
                 ESpirrowErrorCode::OperationFailed,
                 TEXT("Failed to write temporary file for Base64 data"));
         }
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: Temp file written successfully"));
 
         SourceFilePath = TempFilePath;
         bDeleteTempFile = true;
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: Base64 processing complete, TempFile = %s"), *TempFilePath);
     }
+
+    UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: SourceFilePath = %s"), *SourceFilePath);
 
     // Check if source file exists
     if (!FPaths::FileExists(SourceFilePath))
@@ -1140,8 +1155,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleImportTexture(const
     }
 
     // Create package for the texture
+    UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: Creating package..."));
     FString PackagePath = DestinationPath / AssetName;
     UPackage* Package = CreatePackage(*PackagePath);
+    UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: Package created = %s"), Package ? TEXT("YES") : TEXT("NO"));
     if (!Package)
     {
         if (bDeleteTempFile && !TempFilePath.IsEmpty())
@@ -1156,10 +1173,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleImportTexture(const
     Package->FullyLoad();
 
     // Use UTextureFactory for direct import (GameThread-safe, no TaskGraph issues)
+    UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: Creating TextureFactory..."));
     UTextureFactory* TextureFactory = NewObject<UTextureFactory>();
     TextureFactory->AddToRoot(); // Prevent GC during import
     TextureFactory->SuppressImportOverwriteDialog();
+    UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: TextureFactory created"));
 
+    UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: Calling ImportObject..."));
     bool bCancelled = false;
     UTexture2D* ImportedTexture = Cast<UTexture2D>(
         TextureFactory->ImportObject(
@@ -1172,6 +1192,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleImportTexture(const
             bCancelled
         )
     );
+    UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: ImportObject completed, result = %s, cancelled = %s"),
+        ImportedTexture ? TEXT("SUCCESS") : TEXT("NULL"), bCancelled ? TEXT("YES") : TEXT("NO"));
 
     TextureFactory->RemoveFromRoot(); // Allow GC
 
@@ -1236,15 +1258,38 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleImportTexture(const
         }
         // Default is TEXTUREGROUP_World
 
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: Calling UpdateResource..."));
         ImportedTexture->UpdateResource();
-        ImportedTexture->MarkPackageDirty();
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: UpdateResource completed"));
 
-        // Save the texture (PackagePath already defined above)
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: Calling MarkPackageDirty..."));
+        ImportedTexture->MarkPackageDirty();
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: MarkPackageDirty completed"));
+
+        // Notify asset registry of the new asset
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: Calling AssetCreated..."));
+        FAssetRegistryModule::AssetCreated(ImportedTexture);
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: AssetCreated completed"));
+
+        // Flush async loading to prevent TaskGraph recursion guard crash
+        // when SavePackage internally dispatches async operations
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: Calling FlushAsyncLoading..."));
+        FlushAsyncLoading();
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: FlushAsyncLoading completed"));
+
+        // Save the texture
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: Preparing SavePackage..."));
         FString PackageFileName = FPackageName::LongPackageNameToFilename(PackagePath, FPackageName::GetAssetPackageExtension());
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: PackageFileName = %s"), *PackageFileName);
         FSavePackageArgs SaveArgs;
         SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
+        // Note: Do NOT use SAVE_Async flag to avoid TaskGraph recursion
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: Calling SavePackage..."));
         UPackage::SavePackage(ImportedTexture->GetOutermost(), ImportedTexture, *PackageFileName, SaveArgs);
+        UE_LOG(LogTemp, Warning, TEXT("HandleImportTexture: SavePackage completed"));
     }
+
+    UE_LOG(LogTemp, Warning, TEXT("=== HandleImportTexture: END ==="));
 
     FString AssetPath = DestinationPath / AssetName + TEXT(".") + AssetName;
 

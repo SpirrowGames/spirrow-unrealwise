@@ -585,15 +585,25 @@ def register_project_tools(mcp: FastMCP):
                 "lod_group": lod_group
             }
 
-            logger.info(f"Importing texture '{asset_name}' to '{destination_path}'")
+            logger.info(f"Importing texture '{asset_name}' to '{destination_path}' (source_type={source_type})")
+            logger.info(f"import_texture: Sending command to Unreal...")
             response = unreal.send_command("import_texture", params)
+            logger.info(f"import_texture: Received response: {response}")
 
             if not response:
-                return {"success": False, "message": "No response from Unreal Engine"}
+                return {"success": False, "message": "No response from Unreal Engine - Editor may have crashed"}
 
             logger.info(f"Import texture response: {response}")
             return response
 
+        except ConnectionResetError as e:
+            error_msg = f"Connection reset by Unreal Engine (Editor likely crashed): {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg, "hint": "Check Unreal Editor logs for crash details"}
+        except BrokenPipeError as e:
+            error_msg = f"Broken pipe to Unreal Engine (Editor likely crashed): {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg, "hint": "Check Unreal Editor logs for crash details"}
         except Exception as e:
             error_msg = f"Error importing texture: {e}"
             logger.error(error_msg)

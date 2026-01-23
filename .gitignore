@@ -168,3 +168,8 @@ Backup/
 UNREAL/Source/
 UNREAL/SOURCE/
 nul
+
+# Build logs and temporary markers
+MCPGameProject/build_output.txt
+phase4a_implementations.txt
+*_implementations.txt

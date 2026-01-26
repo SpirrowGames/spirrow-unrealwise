@@ -407,7 +407,8 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("list_assets_in_folder") ||
                      CommandType == TEXT("import_texture") ||
                      CommandType == TEXT("get_project_info") ||
-                     CommandType == TEXT("find_asset_references"))
+                     CommandType == TEXT("find_asset_references") ||
+                     CommandType == TEXT("find_function_callers"))
             {
                 ResultJson = ProjectCommands->HandleCommand(CommandType, Params);
             }

@@ -40,4 +40,5 @@ private:
     TSharedPtr<FJsonObject> HandleImportTexture(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleGetProjectInfo(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleFindAssetReferences(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleFindFunctionCallers(const TSharedPtr<FJsonObject>& Params);
 }; 

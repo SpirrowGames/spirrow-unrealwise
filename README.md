@@ -7,12 +7,12 @@
 
 AI（Claude）と Unreal Engine 5 を連携させる MCP サーバー。自然言語でBlueprint操作、レベルデザイン、UI作成を実現します。
 
-## ✨ 機能 (108ツール)
+## ✨ 機能 (109ツール)
 
 | カテゴリ | 説明 |
 |---------|------|
 | 🎮 **Actor** (10) | スポーン、Transform、プロパティ、コンポーネント |
-| 📘 **Blueprint** (16) | 作成、コンポーネント追加、ノードグラフ操作 |
+| 📘 **Blueprint** (17) | 作成、コンポーネント追加、ノードグラフ操作、関数参照検索 |
 | 🖼️ **UMG Widget** (29) | UI要素、レイアウト、アニメーション、バインディング |
 | 🎮 **Enhanced Input** (5) | Input Action、Mapping Context |
 | ⚔️ **GAS** (8) | GameplayTags、Effect、Ability |

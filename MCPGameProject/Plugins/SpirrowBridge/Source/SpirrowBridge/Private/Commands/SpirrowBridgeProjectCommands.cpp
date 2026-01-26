@@ -26,6 +26,8 @@
 #include "Misc/App.h"
 #include "HAL/PlatformFileManager.h"
 #include "Engine/Engine.h"  // For FlushAsyncLoading()
+#include "FindInBlueprintManager.h"  // For Blueprint search
+#include "Async/Async.h"  // For AsyncTask
 
 FSpirrowBridgeProjectCommands::FSpirrowBridgeProjectCommands()
 {
@@ -97,6 +99,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleCommand(const FStri
     else if (CommandType == TEXT("find_asset_references"))
     {
         return HandleFindAssetReferences(Params);
+    }
+    else if (CommandType == TEXT("find_function_callers"))
+    {
+        return HandleFindFunctionCallers(Params);
     }
 
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(
@@ -1357,5 +1363,167 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleFindAssetReferences
     ResultObj->SetNumberField(TEXT("referencers_count"), ReferencersArray.Num());
     ResultObj->SetArrayField(TEXT("dependencies"), DependenciesArray);
     ResultObj->SetNumberField(TEXT("dependencies_count"), DependenciesArray.Num());
+    return ResultObj;
+}
+
+// ===== Find Function Callers =====
+TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleFindFunctionCallers(const TSharedPtr<FJsonObject>& Params)
+{
+    // Start timing
+    double StartTime = FPlatformTime::Seconds();
+
+    // Validate required parameters
+    FString FunctionName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("function_name"), FunctionName))
+    {
+        return Error;
+    }
+
+    // Optional parameters
+    FString ClassName;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("class_name"), ClassName, TEXT(""));
+
+    FString PathFilter;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path_filter"), PathFilter, TEXT(""));
+
+    bool bIncludeBlueprintFunctions = true;
+    FSpirrowBridgeCommonUtils::GetOptionalBool(Params, TEXT("include_blueprint_functions"), bIncludeBlueprintFunctions, true);
+
+    // Get Asset Registry
+    FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+    IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+
+    // Get all Blueprint assets
+    TArray<FAssetData> BlueprintAssets;
+    AssetRegistry.GetAssetsByClass(UBlueprint::StaticClass()->GetClassPathName(), BlueprintAssets);
+
+    // Apply path filter if provided
+    if (!PathFilter.IsEmpty())
+    {
+        BlueprintAssets = BlueprintAssets.FilterByPredicate([&PathFilter](const FAssetData& Asset) {
+            return Asset.GetObjectPathString().Contains(PathFilter);
+        });
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("SpirrowBridge: Searching for function '%s' in %d Blueprints"), *FunctionName, BlueprintAssets.Num());
+
+    // Results array
+    TArray<TSharedPtr<FJsonValue>> UsagesArray;
+    int32 TotalCount = 0;
+
+    // Iterate through each Blueprint
+    for (const FAssetData& AssetData : BlueprintAssets)
+    {
+        // Load the Blueprint
+        UBlueprint* Blueprint = Cast<UBlueprint>(AssetData.GetAsset());
+        if (!Blueprint)
+        {
+            continue;
+        }
+
+        FString BlueprintName = Blueprint->GetName();
+        FString BlueprintPath = AssetData.GetObjectPathString();
+
+        // Get all graphs in the Blueprint
+        TArray<UEdGraph*> Graphs;
+        Blueprint->GetAllGraphs(Graphs);
+
+        // Search through each graph
+        for (UEdGraph* Graph : Graphs)
+        {
+            if (!Graph)
+            {
+                continue;
+            }
+
+            FString GraphName = Graph->GetName();
+
+            // Search through all nodes in the graph
+            for (UEdGraphNode* Node : Graph->Nodes)
+            {
+                UK2Node_CallFunction* CallNode = Cast<UK2Node_CallFunction>(Node);
+                if (!CallNode)
+                {
+                    continue;
+                }
+
+                // Get the function being called
+                UFunction* Function = CallNode->GetTargetFunction();
+                if (!Function)
+                {
+                    continue;
+                }
+
+                // Check if function name matches
+                FString NodeFunctionName = Function->GetName();
+                if (!NodeFunctionName.Equals(FunctionName, ESearchCase::IgnoreCase))
+                {
+                    continue;
+                }
+
+                // Check class filter if provided
+                if (!ClassName.IsEmpty())
+                {
+                    UClass* OwnerClass = Function->GetOwnerClass();
+                    if (!OwnerClass || !OwnerClass->GetName().Contains(ClassName))
+                    {
+                        continue;
+                    }
+                }
+
+                // Check if we should include Blueprint functions
+                if (!bIncludeBlueprintFunctions)
+                {
+                    // Skip if this is a Blueprint-defined function
+                    if (Function->GetOuter()->IsA<UBlueprint>() || Function->GetOuter()->IsA<UBlueprintGeneratedClass>())
+                    {
+                        continue;
+                    }
+                }
+
+                // Found a match! Collect information
+                TSharedPtr<FJsonObject> UsageObj = MakeShared<FJsonObject>();
+                UsageObj->SetStringField(TEXT("blueprint"), BlueprintName);
+                UsageObj->SetStringField(TEXT("blueprint_path"), BlueprintPath);
+                UsageObj->SetStringField(TEXT("graph"), GraphName);
+
+                // Node information
+                UsageObj->SetStringField(TEXT("node_title"), CallNode->GetNodeTitle(ENodeTitleType::ListView).ToString());
+
+                // Node position
+                TSharedPtr<FJsonObject> PositionObj = MakeShared<FJsonObject>();
+                PositionObj->SetNumberField(TEXT("x"), CallNode->NodePosX);
+                PositionObj->SetNumberField(TEXT("y"), CallNode->NodePosY);
+                UsageObj->SetObjectField(TEXT("node_position"), PositionObj);
+
+                // Function owner class
+                UClass* OwnerClass = Function->GetOwnerClass();
+                if (OwnerClass)
+                {
+                    UsageObj->SetStringField(TEXT("owning_class"), OwnerClass->GetName());
+                }
+
+                UsagesArray.Add(MakeShared<FJsonValueObject>(UsageObj));
+                TotalCount++;
+            }
+        }
+    }
+
+    // Calculate search time
+    double EndTime = FPlatformTime::Seconds();
+    double SearchTimeMs = (EndTime - StartTime) * 1000.0;
+
+    // Build result
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
+    ResultObj->SetStringField(TEXT("function_name"), FunctionName);
+    ResultObj->SetArrayField(TEXT("usages"), UsagesArray);
+    ResultObj->SetNumberField(TEXT("total_count"), TotalCount);
+    ResultObj->SetStringField(TEXT("search_method"), TEXT("DirectGraphTraversal"));
+    ResultObj->SetNumberField(TEXT("search_time_ms"), SearchTimeMs);
+    ResultObj->SetNumberField(TEXT("blueprints_searched"), BlueprintAssets.Num());
+
+    UE_LOG(LogTemp, Log, TEXT("SpirrowBridge: Found %d usages of function '%s' in %.2f ms"), TotalCount, *FunctionName, SearchTimeMs);
+
     return ResultObj;
 }

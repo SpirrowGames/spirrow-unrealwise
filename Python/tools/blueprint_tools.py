@@ -1456,4 +1456,124 @@ def register_blueprint_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    @mcp.tool()
+    def find_cpp_function_in_blueprints(
+        ctx: Context,
+        function_name: str,
+        class_name: Optional[str] = None,
+        path_filter: Optional[str] = None,
+        include_blueprint_functions: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Find all locations where a C++ or Blueprint function is called in Blueprints.
+
+        This tool searches through all Blueprints in the project to find where a specific
+        function is being called. This is essential for:
+        - Understanding function usage before refactoring
+        - Finding all callers before changing function signatures
+        - Identifying dependencies between C++ and Blueprints
+        - Code cleanup and dependency analysis
+
+        Args:
+            function_name: Name of the function to search for (e.g., "DealDamage", "BeginPlay")
+            class_name: Optional class name to filter results (e.g., "AMyCharacter")
+            path_filter: Optional path filter to limit search scope (e.g., "/Game/Characters/")
+            include_blueprint_functions: If True, also find Blueprint-defined function calls (default: True)
+
+        Returns:
+            Dict containing:
+            - success: bool - Operation success status
+            - function_name: str - The function name searched for
+            - usages: List of usage locations with details:
+                - blueprint: Blueprint name
+                - blueprint_path: Full asset path
+                - graph: Graph name where the call is located
+                - node_title: Display title of the function call node
+                - node_position: {x, y} coordinates of the node
+                - owning_class: Class that owns the function
+            - total_count: Number of usages found
+            - search_method: Method used for search (DirectGraphTraversal or FindInBlueprintSearchManager)
+            - search_time_ms: Time taken to complete search
+            - blueprints_searched: Number of blueprints searched
+
+        Example:
+            # Find all calls to a C++ function
+            find_cpp_function_in_blueprints(
+                function_name="DealDamage",
+                class_name="AMyCharacter"
+            )
+
+            # Search within a specific folder
+            find_cpp_function_in_blueprints(
+                function_name="BeginPlay",
+                path_filter="/Game/Characters/"
+            )
+
+            # Search only for C++ functions (exclude BP functions)
+            find_cpp_function_in_blueprints(
+                function_name="TakeDamage",
+                include_blueprint_functions=False
+            )
+
+            # Results example:
+            {
+                "success": True,
+                "function_name": "DealDamage",
+                "usages": [
+                    {
+                        "blueprint": "BP_PlayerCharacter",
+                        "blueprint_path": "/Game/Blueprints/Characters/BP_PlayerCharacter",
+                        "graph": "EventGraph",
+                        "node_title": "DealDamage",
+                        "node_position": {"x": 256, "y": 128},
+                        "owning_class": "AMyCharacter"
+                    }
+                ],
+                "total_count": 1,
+                "search_method": "DirectGraphTraversal",
+                "search_time_ms": 234.5,
+                "blueprints_searched": 45
+            }
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "function_name": function_name
+            }
+
+            if class_name:
+                params["class_name"] = class_name
+
+            if path_filter:
+                params["path_filter"] = path_filter
+
+            params["include_blueprint_functions"] = include_blueprint_functions
+
+            logger.info(f"Searching for function '{function_name}' in Blueprints...")
+            response = unreal.send_command("find_function_callers", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            if response.get("success"):
+                count = response.get("total_count", 0)
+                time_ms = response.get("search_time_ms", 0)
+                logger.info(f"Found {count} usages of '{function_name}' in {time_ms:.1f}ms")
+            else:
+                logger.error(f"Search failed: {response.get('message', 'Unknown error')}")
+
+            return response
+
+        except Exception as e:
+            error_msg = f"Error searching for function callers: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("Blueprint tools registered successfully") 

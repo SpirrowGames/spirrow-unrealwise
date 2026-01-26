@@ -1,8 +1,8 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: Phase I (v0.8.10)
+> **バージョン**: Phase I (v0.8.11)
 > **ステータス**: Beta
-> **最終更新**: 2026-01-12
+> **最終更新**: 2026-01-26
 
 ---
 
@@ -11,7 +11,7 @@
 | カテゴリ | ツール数 | 状態 |
 |---------|---------|------|
 | Actor操作 | 10 | ✅ |
-| Blueprint操作 | 15 | ✅ |
+| Blueprint操作 | 16 | ✅ |
 | BPノードグラフ | 9 | ✅ |
 | UMG Widget | 30 | ✅ |
 | Enhanced Input | 8 | ✅ |
@@ -21,10 +21,10 @@
 | EQS | 5 | ✅ |
 | Material | 5 | ✅ |
 | Config | 3 | ✅ |
-| Asset Utility | 7 | ✅ 🆕 |
+| Asset Utility | 7 | ✅ |
 | RAG | 4 | ✅ |
-| AI Image Generation | 3 | ✅ 🆕 |
-| **合計** | **133** | |
+| AI Image Generation | 3 | ✅ |
+| **合計** | **134** | |
 
 ---
 
@@ -37,8 +37,8 @@
 - Basic: `StaticMeshActor`, `PointLight`, `SpotLight`, `DirectionalLight`, `CameraActor`
 - Volumes: `NavMeshBoundsVolume`, `TriggerVolume`, `BlockingVolume`, `KillZVolume`, `PhysicsVolume`, `PostProcessVolume`, `AudioVolume`, `LightmassImportanceVolume`
 
-### Blueprint操作 (15)
-`create_blueprint`, `spawn_blueprint_actor`, `add_component_to_blueprint`, `set_static_mesh_properties`, `set_component_property`, `set_physics_properties`, `compile_blueprint`, `set_blueprint_property`, `create_data_asset`, `set_class_property`, `set_object_property`, `get_blueprint_properties`, `set_struct_property`, `set_data_asset_property`, `batch_set_properties` 🆕
+### Blueprint操作 (16)
+`create_blueprint`, `spawn_blueprint_actor`, `add_component_to_blueprint`, `set_static_mesh_properties`, `set_component_property`, `set_physics_properties`, `compile_blueprint`, `set_blueprint_property`, `create_data_asset`, `set_class_property`, `set_object_property`, `get_blueprint_properties`, `set_struct_property`, `set_data_asset_property`, `batch_set_properties`, `find_cpp_function_in_blueprints` 🆕
 
 ### BPノードグラフ (9)
 `add_blueprint_event_node`, `add_blueprint_input_action_node`, `add_blueprint_function_node`, `connect_blueprint_nodes`, `disconnect_blueprint_nodes` 🆕, `add_blueprint_variable`, `add_blueprint_get_self_component_reference`, `add_blueprint_self_reference`, `find_blueprint_nodes`
@@ -131,6 +131,50 @@ generate_and_import_texture(
 ---
 
 ## 最新の更新
+
+### 2026-01-26: Blueprint Function Caller Search (v0.8.11) 🆕
+
+**新規ツール追加 (1ツール)**:
+
+| ツール | 機能 | 優先度 |
+|--------|------|--------|
+| `find_cpp_function_in_blueprints` | C++/Blueprint関数の呼び出し元を検索、依存関係可視化 | 高 |
+
+**機能概要**:
+- C++またはBlueprint関数がどのBlueprintから呼ばれているかを検索
+- リファクタリング・関数削除前の影響範囲調査に活用
+- 85個のBlueprintを約12msで高速検索
+- 詳細情報: Blueprint名、グラフ名、ノード位置、所属クラス
+
+**パラメータ**:
+- `function_name` (必須): 検索対象の関数名
+- `class_name` (オプション): クラス名でフィルタ
+- `path_filter` (オプション): 検索対象パスで絞り込み
+- `include_blueprint_functions` (オプション): Blueprint関数も含めるか
+
+**使用例**:
+```python
+# 基本的な検索
+find_cpp_function_in_blueprints(
+    function_name="DealDamage"
+)
+
+# クラスとパスでフィルタ
+find_cpp_function_in_blueprints(
+    function_name="TakeDamage",
+    class_name="ACharacter",
+    path_filter="/Game/Characters/"
+)
+```
+
+**パフォーマンス**:
+- 検索速度: 11-14ms（85 Blueprints）
+- メモリ効率: 低負荷（順次読み込み）
+- 成功率: 100%
+
+**実装詳細**: [Docs/FindFunctionCallers_Implementation.md](Docs/FindFunctionCallers_Implementation.md)
+
+---
 
 ### 2026-01-12: AI Image Generation Integration (v0.8.10) 🆕
 

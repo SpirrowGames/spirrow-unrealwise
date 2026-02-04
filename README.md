@@ -3,130 +3,168 @@
 [![Unreal Engine](https://img.shields.io/badge/Unreal%20Engine-5.5+-blue)](https://www.unrealengine.com/)
 [![Python](https://img.shields.io/badge/Python-3.11+-green)](https://www.python.org/)
 [![MCP](https://img.shields.io/badge/MCP-Model%20Context%20Protocol-purple)](https://modelcontextprotocol.io/)
-[![Status](https://img.shields.io/badge/Status-Beta-yellow)]()
+[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
-AI（Claude）と Unreal Engine 5 を連携させる MCP サーバー。自然言語でBlueprint操作、レベルデザイン、UI作成を実現します。
+**[日本語版はこちら / Japanese](README_ja.md)**
 
-## ✨ 機能 (109ツール)
+An MCP (Model Context Protocol) server that bridges AI assistants (Claude) with Unreal Engine 5. Control Blueprints, design levels, create UI, and build AI systems using natural language.
 
-| カテゴリ | 説明 |
-|---------|------|
-| 🎮 **Actor** (10) | スポーン、Transform、プロパティ、コンポーネント |
-| 📘 **Blueprint** (17) | 作成、コンポーネント追加、ノードグラフ操作、関数参照検索 |
-| 🖼️ **UMG Widget** (29) | UI要素、レイアウト、アニメーション、バインディング |
-| 🎮 **Enhanced Input** (5) | Input Action、Mapping Context |
-| ⚔️ **GAS** (8) | GameplayTags、Effect、Ability |
-| 🤖 **AI** (28) | BehaviorTree、Blackboard、AIPerception、EQS |
-| 🎨 **Material** (5) | テンプレートベース作成 |
-| ⚙️ **Config** (3) | ini設定読み書き |
-| 🧠 **RAG** (4) | 知識ベース、プロジェクトコンテキスト |
+## Features (134 Tools)
 
-> 詳細: [FEATURE_STATUS.md](FEATURE_STATUS.md)
+| Category | Count | Description |
+|----------|-------|-------------|
+| **Actor** | 10 | Spawn, transform, properties, components |
+| **Blueprint** | 16 | Create, add components, property management |
+| **BP Node Graph** | 9 | Event nodes, function calls, variable operations |
+| **UMG Widget** | 30 | UI elements, layouts, animations, bindings |
+| **Enhanced Input** | 8 | Input Actions, Mapping Contexts |
+| **GAS** | 8 | GameplayTags, Effects, Abilities |
+| **AI (BT/BB)** | 20 | BehaviorTree, Blackboard operations |
+| **AI Perception** | 6 | Sight, Hearing, Damage sensing |
+| **EQS** | 5 | Environment Query System |
+| **Material** | 5 | Template-based material creation |
+| **Config** | 3 | INI file read/write |
+| **Asset Utility** | 7 | Asset management, texture import |
+| **RAG** | 4 | Knowledge base, project context |
+| **AI Image** | 3 | Stable Diffusion integration |
+
+> See [FEATURE_STATUS.md](FEATURE_STATUS.md) for detailed feature documentation.
 
 ---
 
-## 🚀 クイックスタート
+## Quick Start
 
-### 必要要件
+### Requirements
+
 - Unreal Engine 5.5+
-- Python 3.11+ / uv
-- Claude Desktop
+- Python 3.11+ with [uv](https://github.com/astral-sh/uv)
+- Claude Desktop or Claude Code
 
-### セットアップ
+### Installation
 
 ```bash
-# 1. クローン
-git clone https://github.com/your-repo/spirrow-unrealwise.git
+# 1. Clone the repository
+git clone https://github.com/SpirrowGames/spirrow-unrealwise.git
 cd spirrow-unrealwise
 
-# 2. Python依存関係
+# 2. Install Python dependencies
 cd Python && uv sync
 
-# 3. UEプラグイン
-# MCPGameProject/Plugins/SpirrowBridge を対象プロジェクトにコピー
+# 3. Copy the UE plugin to your project
+# Copy: MCPGameProject/Plugins/SpirrowBridge → YourProject/Plugins/
 ```
 
-### Claude Desktop設定
+### Claude Desktop Configuration
 
-`claude_desktop_config.json`:
+Add to your `claude_desktop_config.json`:
+
 ```json
 {
   "mcpServers": {
     "spirrow-unrealwise": {
       "command": "uv",
-      "args": ["--directory", "C:/path/to/Python", "run", "python", "unreal_mcp_server.py"],
-      "env": { "SPIRROW_UE_HOST": "127.0.0.1", "SPIRROW_UE_PORT": "8080" }
+      "args": ["--directory", "C:/path/to/spirrow-unrealwise/Python", "run", "python", "unreal_mcp_server.py"],
+      "env": {
+        "SPIRROW_UE_HOST": "127.0.0.1",
+        "SPIRROW_UE_PORT": "8080"
+      }
     }
   }
 }
 ```
 
-### 動作確認
-1. Unreal Editor起動（SpirrowBridge有効）
-2. Claude Desktopで「レベル内のアクター一覧を取得して」
+### Verify Installation
+
+1. Launch Unreal Editor with SpirrowBridge plugin enabled
+2. Open Claude Desktop and try: "List all actors in the current level"
 
 ---
 
-## 📖 使用例
+## Usage Examples
 
 ```
-「BP_Enemy という Actor Blueprint を作成して」
+"Create an Actor Blueprint called BP_Enemy"
 
-「BP_Enemy に SphereComponent を追加して、半径500に設定」
+"Add a SphereComponent to BP_Enemy with radius 500"
 
-「WBP_HUD に ProgressBar を中央に配置」
+"Create a Widget Blueprint WBP_HUD and add a centered ProgressBar"
 
-「BT_Enemy という BehaviorTree を作成して、Selector ノードを追加」
+"Create a BehaviorTree BT_Enemy and add a Selector node"
+
+"Set up AIPerception with sight sense, 2000 unit range, 90 degree FOV"
 ```
 
 ---
 
-## 📁 構造
+## Project Structure
 
 ```
 spirrow-unrealwise/
-├── Python/                    # MCPサーバー
-│   ├── unreal_mcp_server.py   # メイン
-│   ├── tools/                 # ツール定義 (12ファイル)
-│   └── tests/                 # テスト
-├── MCPGameProject/Plugins/    # UEプラグイン
-│   └── SpirrowBridge/
-└── Docs/                      # ドキュメント
+├── Python/                    # MCP Server
+│   ├── unreal_mcp_server.py   # Main server entry
+│   ├── tools/                 # Tool definitions (12 modules)
+│   └── tests/                 # Test suite
+├── MCPGameProject/Plugins/    # UE Plugin
+│   └── SpirrowBridge/         # Editor module
+├── Docs/                      # Documentation
+└── templates/                 # Material templates
 ```
 
 ---
 
-## 🔧 開発
+## Development
+
+### Running Tests
 
 ```bash
-# テスト実行
 cd Python && python tests/run_tests.py
-
-# 新規コマンド追加
-# → Docs/PATTERNS.md 参照
 ```
 
+### Adding New Commands
+
+See [Docs/PATTERNS.md](Docs/PATTERNS.md) for implementation patterns and guidelines.
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SPIRROW_UE_HOST` | `127.0.0.1` | Unreal Editor host |
+| `SPIRROW_UE_PORT` | `8080` | Unreal Editor port |
+| `AI_IMAGE_SERVER_URL` | `http://localhost:7860` | Stable Diffusion server |
+
 ---
 
-## 📋 バージョン
+## Version History
 
-**v0.8.1 (Beta)** - 2026-01-07
-- Blackboard BaseClass修正 - `base_class="Actor"`が正しく動作
-- 構造体プロパティ対応 (FBlackboardKeySelector等)
+**v0.8.11 (Beta)** - 2026-01-26
+- Added `find_cpp_function_in_blueprints` - Search for function callers across Blueprints
+
+**v0.8.10 (Beta)** - 2026-01-12
+- AI Image Generation integration (Stable Diffusion Forge)
+- Asset utility tools (texture import, folder management)
 
 **v0.8.0 (Beta)** - 2026-01-06
-- Phase H: AIPerception & EQS対応 (11ツール追加)
-- AI システム完全対応 (合計28ツール)
-- UE 5.6+ API互換
+- Phase H: AIPerception & EQS support (11 tools)
+- Complete AI system coverage (28 tools total)
 
-> 履歴: [Docs/CHANGELOG.md](Docs/CHANGELOG.md)
+> See [Docs/CHANGELOG.md](Docs/CHANGELOG.md) for full history.
 
 ---
 
-## 📄 ライセンス
+## Contributing
 
-MIT License
+Contributions are welcome! Please feel free to submit issues and pull requests.
 
-## 🔗 リンク
+---
 
-[MCP](https://modelcontextprotocol.io/) | [Unreal Engine](https://docs.unrealengine.com/) | [Claude](https://claude.ai/)
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+---
+
+## Links
+
+- [Model Context Protocol](https://modelcontextprotocol.io/)
+- [Unreal Engine Documentation](https://docs.unrealengine.com/)
+- [Claude](https://claude.ai/)

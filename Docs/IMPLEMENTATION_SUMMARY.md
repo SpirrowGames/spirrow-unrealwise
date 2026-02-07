@@ -16,7 +16,7 @@ C++ 実装の全体像。新しいセッション開始時の参照用。
 |----------|--------|------|
 | `BlueprintCoreCommands` | 23 KB | 作成/コンパイル/スポーン/複製/グラフ |
 | `BlueprintComponentCommands` | 26 KB | コンポーネント/プロパティ/物理 |
-| `BlueprintPropertyCommands` | 21 KB | クラススキャン/配列プロパティ |
+| `BlueprintPropertyCommands` | 24 KB | クラススキャン/配列プロパティ/DataAsset読取 |
 | `BlueprintCommands` | 1.7 KB | ルーター |
 
 #### BlueprintNode 系 (3分割 + ルーター)

@@ -1388,6 +1388,82 @@ def register_blueprint_tools(mcp: FastMCP):
             return {"success": False, "message": error_msg}
 
     @mcp.tool()
+    def get_data_asset_properties(
+        ctx: Context,
+        asset_name: str,
+        path: str = "/Game/",
+        include_inherited: bool = True,
+        category_filter: str = None
+    ) -> Dict[str, Any]:
+        """
+        Get all properties of a DataAsset instance.
+
+        Reads all property names, types, and current values from a DataAsset.
+        Useful for inspecting data-driven configurations like weapon stats,
+        item definitions, and gameplay parameters.
+
+        Args:
+            asset_name: Name of the DataAsset (e.g. "DA_WeaponRifle")
+            path: Asset path (default: "/Game/")
+            include_inherited: Include properties from parent classes (default: True)
+            category_filter: Filter by property category (optional)
+
+        Returns:
+            Dict with asset info and properties array containing name, type, value, category
+
+        Example:
+            # Get all properties of a weapon DataAsset
+            get_data_asset_properties(
+                asset_name="DA_Pistol",
+                path="/Game/Data/Weapons"
+            )
+
+            # Get only Combat category properties
+            get_data_asset_properties(
+                asset_name="DA_Pistol",
+                path="/Game/Data/Weapons",
+                category_filter="Combat"
+            )
+
+            # Get only properties defined in the asset's own class
+            get_data_asset_properties(
+                asset_name="DA_Pistol",
+                path="/Game/Data/Weapons",
+                include_inherited=False
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "asset_name": asset_name,
+                "path": path,
+                "include_inherited": include_inherited
+            }
+            if category_filter:
+                params["category_filter"] = category_filter
+
+            logger.info(f"Getting properties for DataAsset '{asset_name}'")
+            response = unreal.send_command("get_data_asset_properties", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Found {response.get('property_count', 0)} properties")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error getting DataAsset properties: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
     def batch_set_properties(
         ctx: Context,
         asset_name: str,

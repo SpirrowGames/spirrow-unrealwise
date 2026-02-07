@@ -27,6 +27,7 @@ private:
     TSharedPtr<FJsonObject> HandleGetBlueprintProperties(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleSetStructProperty(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleSetDataAssetProperty(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleGetDataAssetProperties(const TSharedPtr<FJsonObject>& Params);
 
     // Batch operations (v0.8.9)
     TSharedPtr<FJsonObject> HandleBatchSetProperties(const TSharedPtr<FJsonObject>& Params);

@@ -61,6 +61,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleCommand(c
     {
         return HandleSetDataAssetProperty(Params);
     }
+    else if (CommandType == TEXT("get_data_asset_properties"))
+    {
+        return HandleGetDataAssetProperties(Params);
+    }
     else if (CommandType == TEXT("batch_set_properties"))
     {
         return HandleBatchSetProperties(Params);
@@ -1261,6 +1265,92 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetDataAs
     Result->SetStringField(TEXT("asset_name"), AssetName);
     Result->SetStringField(TEXT("property_name"), PropertyName);
     Result->SetStringField(TEXT("asset_path"), FullPath);
+    return Result;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleGetDataAssetProperties(
+    const TSharedPtr<FJsonObject>& Params)
+{
+    // Validate required parameters
+    FString AssetName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("asset_name"), AssetName))
+    {
+        return Error;
+    }
+
+    FString Path, CategoryFilter;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/"));
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("category_filter"), CategoryFilter, TEXT(""));
+
+    bool bIncludeInherited;
+    FSpirrowBridgeCommonUtils::GetOptionalBool(Params, TEXT("include_inherited"), bIncludeInherited, true);
+
+    // Load DataAsset
+    FString FullPath = Path / AssetName + TEXT(".") + AssetName;
+    UObject* LoadedAsset = UEditorAssetLibrary::LoadAsset(FullPath);
+
+    if (!LoadedAsset)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetNotFound,
+            FString::Printf(TEXT("DataAsset not found: %s"), *FullPath));
+    }
+
+    UDataAsset* DataAsset = Cast<UDataAsset>(LoadedAsset);
+    if (!DataAsset)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidParameter,
+            FString::Printf(TEXT("Asset is not a DataAsset: %s"), *FullPath));
+    }
+
+    UClass* AssetClass = DataAsset->GetClass();
+    TArray<TSharedPtr<FJsonValue>> PropertiesArray;
+
+    for (TFieldIterator<FProperty> PropIt(AssetClass); PropIt; ++PropIt)
+    {
+        FProperty* Property = *PropIt;
+
+        // Skip inherited if not wanted
+        if (!bIncludeInherited && Property->GetOwnerClass() != AssetClass)
+        {
+            continue;
+        }
+
+        // Skip non-editable properties
+        if (!Property->HasAnyPropertyFlags(CPF_Edit | CPF_BlueprintVisible))
+        {
+            continue;
+        }
+
+        // Category filter
+        FString Category = Property->GetMetaData(TEXT("Category"));
+        if (!CategoryFilter.IsEmpty() && !Category.Contains(CategoryFilter))
+        {
+            continue;
+        }
+
+        TSharedPtr<FJsonObject> PropObj = MakeShared<FJsonObject>();
+        PropObj->SetStringField(TEXT("name"), Property->GetName());
+        PropObj->SetStringField(TEXT("type"), GetPropertyTypeName(Property));
+        PropObj->SetStringField(TEXT("category"), Category);
+        PropObj->SetBoolField(TEXT("editable_in_editor"), Property->HasAnyPropertyFlags(CPF_Edit));
+
+        // Get current value from the DataAsset instance
+        FString Value;
+        Property->ExportTextItem_Direct(Value,
+            Property->ContainerPtrToValuePtr<void>(DataAsset), nullptr, DataAsset, PPF_None);
+        PropObj->SetStringField(TEXT("value"), Value);
+
+        PropertiesArray.Add(MakeShared<FJsonValueObject>(PropObj));
+    }
+
+    TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject());
+    Result->SetBoolField(TEXT("success"), true);
+    Result->SetStringField(TEXT("asset_name"), AssetName);
+    Result->SetStringField(TEXT("asset_class"), AssetClass->GetName());
+    Result->SetNumberField(TEXT("property_count"), PropertiesArray.Num());
+    Result->SetArrayField(TEXT("properties"), PropertiesArray);
     return Result;
 }
 

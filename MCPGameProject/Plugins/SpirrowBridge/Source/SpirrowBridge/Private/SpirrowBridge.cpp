@@ -355,6 +355,7 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("get_blueprint_properties") ||
                      CommandType == TEXT("set_struct_property") ||
                      CommandType == TEXT("set_data_asset_property") ||
+                     CommandType == TEXT("get_data_asset_properties") ||
                      // Batch operations (v0.8.9)
                      CommandType == TEXT("batch_set_properties"))
             {

@@ -11,7 +11,7 @@
 | カテゴリ | ツール数 | 状態 |
 |---------|---------|------|
 | Actor操作 | 10 | ✅ |
-| Blueprint操作 | 16 | ✅ |
+| Blueprint操作 | 17 | ✅ |
 | BPノードグラフ | 9 | ✅ |
 | UMG Widget | 30 | ✅ |
 | Enhanced Input | 8 | ✅ |
@@ -24,7 +24,7 @@
 | Asset Utility | 7 | ✅ |
 | RAG | 4 | ✅ |
 | AI Image Generation | 3 | ✅ |
-| **合計** | **134** | |
+| **合計** | **135** | |
 
 ---
 
@@ -37,8 +37,8 @@
 - Basic: `StaticMeshActor`, `PointLight`, `SpotLight`, `DirectionalLight`, `CameraActor`
 - Volumes: `NavMeshBoundsVolume`, `TriggerVolume`, `BlockingVolume`, `KillZVolume`, `PhysicsVolume`, `PostProcessVolume`, `AudioVolume`, `LightmassImportanceVolume`
 
-### Blueprint操作 (16)
-`create_blueprint`, `spawn_blueprint_actor`, `add_component_to_blueprint`, `set_static_mesh_properties`, `set_component_property`, `set_physics_properties`, `compile_blueprint`, `set_blueprint_property`, `create_data_asset`, `set_class_property`, `set_object_property`, `get_blueprint_properties`, `set_struct_property`, `set_data_asset_property`, `batch_set_properties`, `find_cpp_function_in_blueprints` 🆕
+### Blueprint操作 (17)
+`create_blueprint`, `spawn_blueprint_actor`, `add_component_to_blueprint`, `set_static_mesh_properties`, `set_component_property`, `set_physics_properties`, `compile_blueprint`, `set_blueprint_property`, `create_data_asset`, `set_class_property`, `set_object_property`, `get_blueprint_properties`, `set_struct_property`, `set_data_asset_property`, `get_data_asset_properties` 🆕, `batch_set_properties`, `find_cpp_function_in_blueprints`
 
 ### BPノードグラフ (9)
 `add_blueprint_event_node`, `add_blueprint_input_action_node`, `add_blueprint_function_node`, `connect_blueprint_nodes`, `disconnect_blueprint_nodes` 🆕, `add_blueprint_variable`, `add_blueprint_get_self_component_reference`, `add_blueprint_self_reference`, `find_blueprint_nodes`

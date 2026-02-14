@@ -9,7 +9,7 @@
 
 An MCP (Model Context Protocol) server that bridges AI assistants (Claude) with Unreal Engine 5. Control Blueprints, design levels, create UI, and build AI systems using natural language.
 
-## Features (134 Tools)
+## Features (136 Tools)
 
 | Category | Count | Description |
 |----------|-------|-------------|
@@ -19,7 +19,7 @@ An MCP (Model Context Protocol) server that bridges AI assistants (Claude) with 
 | **UMG Widget** | 30 | UI elements, layouts, animations, bindings |
 | **Enhanced Input** | 8 | Input Actions, Mapping Contexts |
 | **GAS** | 8 | GameplayTags, Effects, Abilities |
-| **AI (BT/BB)** | 20 | BehaviorTree, Blackboard operations |
+| **AI (BT/BB)** | 22 | BehaviorTree, Blackboard, broken node detection |
 | **AI Perception** | 6 | Sight, Hearing, Damage sensing |
 | **EQS** | 5 | Environment Query System |
 | **Material** | 5 | Template-based material creation |
@@ -135,6 +135,11 @@ See [Docs/PATTERNS.md](Docs/PATTERNS.md) for implementation patterns and guideli
 ---
 
 ## Version History
+
+**v0.9.0 (Beta)** - 2026-02-15
+- BehaviorTree Health Check: `detect_broken_bt_nodes` and `fix_broken_bt_nodes`
+- Automatically detect and remove broken nodes (null NodeInstance) from BehaviorTrees
+- Fixes the "red error decorator" issue after compilation failures
 
 **v0.8.11 (Beta)** - 2026-01-26
 - Added `find_cpp_function_in_blueprints` - Search for function callers across Blueprints

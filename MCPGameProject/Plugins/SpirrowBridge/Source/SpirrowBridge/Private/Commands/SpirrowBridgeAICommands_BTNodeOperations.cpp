@@ -1307,3 +1307,360 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleListBTNodeTypes(
 	Result->SetArrayField(TEXT("service_types"), ServiceTypes);
 	return Result;
 }
+
+// ===== detect_broken_bt_nodes Handler =====
+
+TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleDetectBrokenBTNodes(
+	const TSharedPtr<FJsonObject>& Params)
+{
+	// パラメータ取得
+	FString BehaviorTreeName;
+	TSharedPtr<FJsonObject> NameError = FSpirrowBridgeCommonUtils::ValidateRequiredString(
+		Params, TEXT("behavior_tree_name"), BehaviorTreeName);
+	if (NameError) return NameError;
+
+	FString Path;
+	FSpirrowBridgeCommonUtils::GetOptionalString(
+		Params, TEXT("path"), Path, TEXT("/Game/AI/BehaviorTrees"));
+
+	// BehaviorTree取得
+	UBehaviorTree* BehaviorTree = FindBehaviorTreeAsset(BehaviorTreeName, Path);
+	if (!BehaviorTree)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::AssetNotFound,
+			FString::Printf(TEXT("BehaviorTree not found: %s at %s"), *BehaviorTreeName, *Path));
+	}
+
+	// Graph取得
+	UBehaviorTreeGraph* BTGraph = GetBTGraph(BehaviorTree);
+	if (!BTGraph)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::NodeCreationFailed,
+			TEXT("BehaviorTree has no graph"));
+	}
+
+	// 壊れたノードを検出
+	TArray<TSharedPtr<FJsonValue>> BrokenNodesArray;
+	int32 BrokenCount = 0;
+
+	for (UEdGraphNode* EdNode : BTGraph->Nodes)
+	{
+		UBehaviorTreeGraphNode* BTNode = Cast<UBehaviorTreeGraphNode>(EdNode);
+		if (!BTNode) continue;
+
+		// Rootノードはスキップ
+		if (Cast<UBehaviorTreeGraphNode_Root>(BTNode)) continue;
+
+		// NodeInstanceがnullの場合、壊れたノードとして記録
+		if (!BTNode->NodeInstance)
+		{
+			TSharedPtr<FJsonObject> BrokenInfo = MakeShareable(new FJsonObject());
+
+			// ノードタイプを判定
+			FString NodeType = TEXT("Unknown");
+			if (Cast<UBehaviorTreeGraphNode_Composite>(BTNode))
+			{
+				NodeType = TEXT("Composite");
+			}
+			else if (Cast<UBehaviorTreeGraphNode_Task>(BTNode))
+			{
+				NodeType = TEXT("Task");
+			}
+			else if (Cast<UBehaviorTreeGraphNode_Decorator>(BTNode))
+			{
+				NodeType = TEXT("Decorator");
+			}
+			else if (Cast<UBehaviorTreeGraphNode_Service>(BTNode))
+			{
+				NodeType = TEXT("Service");
+			}
+
+			BrokenInfo->SetStringField(TEXT("node_type"), NodeType);
+			BrokenInfo->SetStringField(TEXT("node_class"), BTNode->GetClass()->GetName());
+
+			// Position情報
+			TArray<TSharedPtr<FJsonValue>> PosArray;
+			PosArray.Add(MakeShareable(new FJsonValueNumber(BTNode->NodePosX)));
+			PosArray.Add(MakeShareable(new FJsonValueNumber(BTNode->NodePosY)));
+			BrokenInfo->SetArrayField(TEXT("position"), PosArray);
+
+			// GraphNode自体のポインタ情報（削除用の識別子として使用）
+			BrokenInfo->SetStringField(TEXT("graph_node_ptr"),
+				FString::Printf(TEXT("%p"), BTNode));
+
+			BrokenNodesArray.Add(MakeShareable(new FJsonValueObject(BrokenInfo)));
+			BrokenCount++;
+		}
+
+		// Decoratorの中にも壊れたものがないかチェック
+		for (UBehaviorTreeGraphNode* Decorator : BTNode->Decorators)
+		{
+			if (Decorator && !Decorator->NodeInstance)
+			{
+				TSharedPtr<FJsonObject> BrokenInfo = MakeShareable(new FJsonObject());
+				BrokenInfo->SetStringField(TEXT("node_type"), TEXT("Decorator"));
+				BrokenInfo->SetStringField(TEXT("node_class"), Decorator->GetClass()->GetName());
+
+				TArray<TSharedPtr<FJsonValue>> PosArray;
+				PosArray.Add(MakeShareable(new FJsonValueNumber(Decorator->NodePosX)));
+				PosArray.Add(MakeShareable(new FJsonValueNumber(Decorator->NodePosY)));
+				BrokenInfo->SetArrayField(TEXT("position"), PosArray);
+
+				BrokenInfo->SetStringField(TEXT("graph_node_ptr"),
+					FString::Printf(TEXT("%p"), Decorator));
+				BrokenInfo->SetStringField(TEXT("attached_to"),
+					BTNode->NodeInstance ? BTNode->NodeInstance->GetName() : TEXT("Unknown"));
+
+				BrokenNodesArray.Add(MakeShareable(new FJsonValueObject(BrokenInfo)));
+				BrokenCount++;
+			}
+		}
+
+		// Serviceの中にも壊れたものがないかチェック
+		UBehaviorTreeGraphNode_Composite* CompositeNode = Cast<UBehaviorTreeGraphNode_Composite>(BTNode);
+		if (CompositeNode)
+		{
+			for (UBehaviorTreeGraphNode* Service : CompositeNode->Services)
+			{
+				if (Service && !Service->NodeInstance)
+				{
+					TSharedPtr<FJsonObject> BrokenInfo = MakeShareable(new FJsonObject());
+					BrokenInfo->SetStringField(TEXT("node_type"), TEXT("Service"));
+					BrokenInfo->SetStringField(TEXT("node_class"), Service->GetClass()->GetName());
+
+					TArray<TSharedPtr<FJsonValue>> PosArray;
+					PosArray.Add(MakeShareable(new FJsonValueNumber(Service->NodePosX)));
+					PosArray.Add(MakeShareable(new FJsonValueNumber(Service->NodePosY)));
+					BrokenInfo->SetArrayField(TEXT("position"), PosArray);
+
+					BrokenInfo->SetStringField(TEXT("graph_node_ptr"),
+						FString::Printf(TEXT("%p"), Service));
+					BrokenInfo->SetStringField(TEXT("attached_to"),
+						BTNode->NodeInstance ? BTNode->NodeInstance->GetName() : TEXT("Unknown"));
+
+					BrokenNodesArray.Add(MakeShareable(new FJsonValueObject(BrokenInfo)));
+					BrokenCount++;
+				}
+			}
+		}
+	}
+
+	// レスポンス
+	TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject());
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("behavior_tree_name"), BehaviorTreeName);
+	Result->SetArrayField(TEXT("broken_nodes"), BrokenNodesArray);
+	Result->SetNumberField(TEXT("broken_count"), BrokenCount);
+
+	if (BrokenCount > 0)
+	{
+		Result->SetStringField(TEXT("message"),
+			FString::Printf(TEXT("Found %d broken node(s) with null NodeInstance"), BrokenCount));
+	}
+	else
+	{
+		Result->SetStringField(TEXT("message"), TEXT("No broken nodes found"));
+	}
+
+	return Result;
+}
+
+// ===== delete_broken_bt_nodes Handler =====
+
+TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleDeleteBrokenBTNodes(
+	const TSharedPtr<FJsonObject>& Params)
+{
+	// パラメータ取得
+	FString BehaviorTreeName;
+	TSharedPtr<FJsonObject> NameError = FSpirrowBridgeCommonUtils::ValidateRequiredString(
+		Params, TEXT("behavior_tree_name"), BehaviorTreeName);
+	if (NameError) return NameError;
+
+	FString Path;
+	FSpirrowBridgeCommonUtils::GetOptionalString(
+		Params, TEXT("path"), Path, TEXT("/Game/AI/BehaviorTrees"));
+
+	// BehaviorTree取得
+	UBehaviorTree* BehaviorTree = FindBehaviorTreeAsset(BehaviorTreeName, Path);
+	if (!BehaviorTree)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::AssetNotFound,
+			FString::Printf(TEXT("BehaviorTree not found: %s at %s"), *BehaviorTreeName, *Path));
+	}
+
+	// Graph取得
+	UBehaviorTreeGraph* BTGraph = GetBTGraph(BehaviorTree);
+	if (!BTGraph)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::NodeCreationFailed,
+			TEXT("BehaviorTree has no graph"));
+	}
+
+	// 壊れたノードを収集
+	TArray<UBehaviorTreeGraphNode*> NodesToDelete;
+
+	for (UEdGraphNode* EdNode : BTGraph->Nodes)
+	{
+		UBehaviorTreeGraphNode* BTNode = Cast<UBehaviorTreeGraphNode>(EdNode);
+		if (!BTNode) continue;
+
+		// Rootノードはスキップ
+		if (Cast<UBehaviorTreeGraphNode_Root>(BTNode)) continue;
+
+		// NodeInstanceがnullの場合、削除対象
+		if (!BTNode->NodeInstance)
+		{
+			NodesToDelete.Add(BTNode);
+		}
+
+		// Decoratorの中にも壊れたものがないかチェック
+		for (int32 i = BTNode->Decorators.Num() - 1; i >= 0; --i)
+		{
+			UBehaviorTreeGraphNode* Decorator = BTNode->Decorators[i];
+			if (Decorator && !Decorator->NodeInstance)
+			{
+				NodesToDelete.Add(Decorator);
+			}
+		}
+
+		// Serviceの中にも壊れたものがないかチェック
+		UBehaviorTreeGraphNode_Composite* CompositeNode = Cast<UBehaviorTreeGraphNode_Composite>(BTNode);
+		if (CompositeNode)
+		{
+			for (int32 i = CompositeNode->Services.Num() - 1; i >= 0; --i)
+			{
+				UBehaviorTreeGraphNode* Service = CompositeNode->Services[i];
+				if (Service && !Service->NodeInstance)
+				{
+					NodesToDelete.Add(Service);
+				}
+			}
+		}
+	}
+
+	// 削除実行
+	int32 DeletedCount = 0;
+	TArray<TSharedPtr<FJsonValue>> DeletedNodesArray;
+
+	for (UBehaviorTreeGraphNode* NodeToDelete : NodesToDelete)
+	{
+		TSharedPtr<FJsonObject> DeletedInfo = MakeShareable(new FJsonObject());
+
+		// ノードタイプを判定
+		FString NodeType = TEXT("Unknown");
+		if (Cast<UBehaviorTreeGraphNode_Composite>(NodeToDelete))
+		{
+			NodeType = TEXT("Composite");
+		}
+		else if (Cast<UBehaviorTreeGraphNode_Task>(NodeToDelete))
+		{
+			NodeType = TEXT("Task");
+		}
+		else if (Cast<UBehaviorTreeGraphNode_Decorator>(NodeToDelete))
+		{
+			NodeType = TEXT("Decorator");
+		}
+		else if (Cast<UBehaviorTreeGraphNode_Service>(NodeToDelete))
+		{
+			NodeType = TEXT("Service");
+		}
+
+		DeletedInfo->SetStringField(TEXT("node_type"), NodeType);
+		DeletedInfo->SetStringField(TEXT("node_class"), NodeToDelete->GetClass()->GetName());
+
+		// ★ 重要: HandleDeleteBTNodeと同じ削除処理を適用 ★
+
+		// RuntimeNodeの参照を保持
+		UBTNode* RuntimeNode = Cast<UBTNode>(NodeToDelete->NodeInstance);
+
+		// ピン接続を解除
+		for (UEdGraphPin* Pin : NodeToDelete->Pins)
+		{
+			if (Pin->Direction == EGPD_Output)
+			{
+				// 子ノードへの接続を全て解除
+				for (UEdGraphPin* LinkedPin : Pin->LinkedTo)
+				{
+					LinkedPin->BreakLinkTo(Pin);
+				}
+			}
+			Pin->BreakAllPinLinks();
+		}
+
+		// Decorator/Serviceの場合、親配列から削除
+		UBehaviorTreeGraphNode_Decorator* DecoratorNode = Cast<UBehaviorTreeGraphNode_Decorator>(NodeToDelete);
+		UBehaviorTreeGraphNode_Service* ServiceNode = Cast<UBehaviorTreeGraphNode_Service>(NodeToDelete);
+
+		if (DecoratorNode)
+		{
+			// 親ノードのDecorators配列から削除
+			if (DecoratorNode->ParentNode)
+			{
+				UBehaviorTreeGraphNode* ParentBTNode = Cast<UBehaviorTreeGraphNode>(DecoratorNode->ParentNode);
+				if (ParentBTNode)
+				{
+					ParentBTNode->Decorators.Remove(DecoratorNode);
+				}
+			}
+			DecoratorNode->ParentNode = nullptr;
+		}
+		else if (ServiceNode)
+		{
+			// 親ノードのServices配列から削除
+			if (ServiceNode->ParentNode)
+			{
+				UBehaviorTreeGraphNode_Composite* ParentComposite =
+					Cast<UBehaviorTreeGraphNode_Composite>(ServiceNode->ParentNode);
+				if (ParentComposite)
+				{
+					ParentComposite->Services.Remove(ServiceNode);
+				}
+			}
+			ServiceNode->ParentNode = nullptr;
+		}
+
+		// NodeInstanceの参照をクリア（壊れたノードは既にnullだが念のため）
+		NodeToDelete->NodeInstance = nullptr;
+
+		// グラフからノードを削除
+		BTGraph->RemoveNode(NodeToDelete);
+
+		// RuntimeNodeをMarkAsGarbageして次のUpdateAssetで除外
+		if (RuntimeNode)
+		{
+			RuntimeNode->MarkAsGarbage();
+		}
+
+		DeletedNodesArray.Add(MakeShareable(new FJsonValueObject(DeletedInfo)));
+		DeletedCount++;
+	}
+
+	// グラフ更新と保存
+	if (DeletedCount > 0)
+	{
+		FinalizeAndSaveBTGraphInternal(BTGraph, BehaviorTree);
+	}
+
+	// レスポンス
+	TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject());
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("behavior_tree_name"), BehaviorTreeName);
+	Result->SetArrayField(TEXT("deleted_nodes"), DeletedNodesArray);
+	Result->SetNumberField(TEXT("deleted_count"), DeletedCount);
+
+	if (DeletedCount > 0)
+	{
+		Result->SetStringField(TEXT("message"),
+			FString::Printf(TEXT("Deleted %d broken node(s)"), DeletedCount));
+	}
+	else
+	{
+		Result->SetStringField(TEXT("message"), TEXT("No broken nodes to delete"));
+	}
+
+	return Result;
+}

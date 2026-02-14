@@ -147,6 +147,16 @@ private:
 	 */
 	TSharedPtr<FJsonObject> HandleListBTNodes(const TSharedPtr<FJsonObject>& Params);
 
+	/**
+	 * Detect broken nodes (nodes with null NodeInstance) in a BehaviorTree.
+	 */
+	TSharedPtr<FJsonObject> HandleDetectBrokenBTNodes(const TSharedPtr<FJsonObject>& Params);
+
+	/**
+	 * Delete broken nodes (nodes with null NodeInstance) from a BehaviorTree.
+	 */
+	TSharedPtr<FJsonObject> HandleDeleteBrokenBTNodes(const TSharedPtr<FJsonObject>& Params);
+
 	// ===== BT Node Operation Helpers =====
 
 	/**

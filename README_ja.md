@@ -9,7 +9,7 @@
 
 AI（Claude）と Unreal Engine 5 を連携させる MCP サーバー。自然言語でBlueprint操作、レベルデザイン、UI作成、AIシステム構築を実現します。
 
-## 機能 (134ツール)
+## 機能 (136ツール)
 
 | カテゴリ | 数 | 説明 |
 |---------|-----|------|
@@ -19,7 +19,7 @@ AI（Claude）と Unreal Engine 5 を連携させる MCP サーバー。自然�
 | **UMG Widget** | 30 | UI要素、レイアウト、アニメーション、バインディング |
 | **Enhanced Input** | 8 | Input Action、Mapping Context |
 | **GAS** | 8 | GameplayTags、Effect、Ability |
-| **AI (BT/BB)** | 20 | BehaviorTree、Blackboard操作 |
+| **AI (BT/BB)** | 22 | BehaviorTree、Blackboard、壊れたノード検出 |
 | **AI Perception** | 6 | 視覚、聴覚、ダメージ感知 |
 | **EQS** | 5 | Environment Query System |
 | **Material** | 5 | テンプレートベースマテリアル作成 |
@@ -135,6 +135,11 @@ cd Python && python tests/run_tests.py
 ---
 
 ## バージョン履歴
+
+**v0.9.0 (Beta)** - 2026-02-15
+- BehaviorTree健全性チェック: `detect_broken_bt_nodes` と `fix_broken_bt_nodes` を追加
+- 壊れたノード（null NodeInstance）を自動検出・削除
+- コンパイル失敗後の「赤エラーDecorator」問題を解決
 
 **v0.8.11 (Beta)** - 2026-01-26
 - `find_cpp_function_in_blueprints` 追加 - Blueprint内の関数呼び出し元を検索

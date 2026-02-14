@@ -1301,3 +1301,133 @@ def register_ai_tools(mcp: FastMCP):
 		except Exception as e:
 			logger.error(f"Error listing AI assets: {e}")
 			return {"success": False, "error": str(e)}
+
+	# ===== BT Health Check Tools =====
+
+	@mcp.tool()
+	def detect_broken_bt_nodes(
+		ctx: Context,
+		behavior_tree_name: str,
+		path: str = "/Game/AI/BehaviorTrees"
+	) -> Dict[str, Any]:
+		"""
+		Detect broken BehaviorTree nodes (nodes with null NodeInstance).
+
+		When BehaviorTree nodes are corrupted (e.g., after compilation errors),
+		they may have null NodeInstance which causes them to appear broken in the editor
+		(red error marks). This tool detects such nodes.
+
+		Args:
+			behavior_tree_name: Name of the BehaviorTree to check
+			path: Content browser path where the BehaviorTree is located
+
+		Returns:
+			Dict containing:
+			- success: Whether the operation succeeded
+			- behavior_tree_name: Name of the BehaviorTree
+			- broken_nodes: List of broken nodes with:
+				- node_type: Type (Composite/Task/Decorator/Service)
+				- node_class: UClass name
+				- position: [X, Y] position in graph
+				- attached_to: Parent node name (for Decorators/Services)
+			- broken_count: Number of broken nodes found
+			- message: Status message
+
+		Example:
+			# Check BT for broken nodes
+			result = detect_broken_bt_nodes(behavior_tree_name="BT_AIFighter")
+			if result["broken_count"] > 0:
+				print(f"Found {result['broken_count']} broken nodes!")
+		"""
+		from unreal_mcp_server import get_unreal_connection
+
+		try:
+			unreal = get_unreal_connection()
+			if not unreal:
+				return {"success": False, "error": "Failed to connect to Unreal Engine"}
+
+			params = {
+				"behavior_tree_name": behavior_tree_name,
+				"path": path
+			}
+
+			logger.info(f"Detecting broken nodes in BT '{behavior_tree_name}'")
+			response = unreal.send_command("detect_broken_bt_nodes", params)
+
+			if response and response.get("success"):
+				broken_count = response.get("broken_count", 0)
+				if broken_count > 0:
+					logger.warning(f"Found {broken_count} broken node(s) in BT '{behavior_tree_name}'")
+				else:
+					logger.info(f"No broken nodes in BT '{behavior_tree_name}'")
+
+			return response or {"success": False, "error": "No response from Unreal Engine"}
+
+		except Exception as e:
+			logger.error(f"Error detecting broken BT nodes: {e}")
+			return {"success": False, "error": str(e)}
+
+	@mcp.tool()
+	def fix_broken_bt_nodes(
+		ctx: Context,
+		behavior_tree_name: str,
+		path: str = "/Game/AI/BehaviorTrees"
+	) -> Dict[str, Any]:
+		"""
+		Delete broken BehaviorTree nodes (nodes with null NodeInstance).
+
+		This tool automatically removes all broken nodes from the BehaviorTree.
+		Broken nodes are those with null NodeInstance, which typically appear
+		as red error nodes in the editor and cannot be configured properly.
+
+		WARNING: This operation cannot be undone. Make sure you have a backup
+		or version control before running this command.
+
+		Args:
+			behavior_tree_name: Name of the BehaviorTree to fix
+			path: Content browser path where the BehaviorTree is located
+
+		Returns:
+			Dict containing:
+			- success: Whether the operation succeeded
+			- behavior_tree_name: Name of the BehaviorTree
+			- deleted_nodes: List of deleted nodes with type and class info
+			- deleted_count: Number of nodes deleted
+			- message: Status message
+
+		Example:
+			# First detect broken nodes
+			result = detect_broken_bt_nodes(behavior_tree_name="BT_AIFighter")
+
+			# If broken nodes found, fix them
+			if result["broken_count"] > 0:
+				fix_result = fix_broken_bt_nodes(behavior_tree_name="BT_AIFighter")
+				print(f"Deleted {fix_result['deleted_count']} broken nodes")
+		"""
+		from unreal_mcp_server import get_unreal_connection
+
+		try:
+			unreal = get_unreal_connection()
+			if not unreal:
+				return {"success": False, "error": "Failed to connect to Unreal Engine"}
+
+			params = {
+				"behavior_tree_name": behavior_tree_name,
+				"path": path
+			}
+
+			logger.info(f"Deleting broken nodes in BT '{behavior_tree_name}'")
+			response = unreal.send_command("delete_broken_bt_nodes", params)
+
+			if response and response.get("success"):
+				deleted_count = response.get("deleted_count", 0)
+				if deleted_count > 0:
+					logger.info(f"Deleted {deleted_count} broken node(s) from BT '{behavior_tree_name}'")
+				else:
+					logger.info(f"No broken nodes to delete in BT '{behavior_tree_name}'")
+
+			return response or {"success": False, "error": "No response from Unreal Engine"}
+
+		except Exception as e:
+			logger.error(f"Error deleting broken BT nodes: {e}")
+			return {"success": False, "error": str(e)}

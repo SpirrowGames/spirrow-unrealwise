@@ -161,6 +161,15 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleCommand(
 	{
 		return HandleListBTNodes(Params);
 	}
+	// BT Node Health commands
+	else if (CommandType == TEXT("detect_broken_bt_nodes"))
+	{
+		return HandleDetectBrokenBTNodes(Params);
+	}
+	else if (CommandType == TEXT("delete_broken_bt_nodes"))
+	{
+		return HandleDeleteBrokenBTNodes(Params);
+	}
 
 	return FSpirrowBridgeCommonUtils::CreateErrorResponse(
 		ESpirrowErrorCode::UnknownCommand,

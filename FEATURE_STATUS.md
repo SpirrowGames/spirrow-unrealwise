@@ -1,30 +1,69 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: Phase I (v0.8.11)
+> **バージョン**: v0.9.1 (Meta-Tool Architecture)
 > **ステータス**: Beta
-> **最終更新**: 2026-01-26
+> **最終更新**: 2026-03-07
+
+---
+
+## アーキテクチャ
+
+**v0.9.1** でメタツール化を実施。161個の個別ツールを **25個** (14メタツール + 1ヘルプ + 10スタンドアロン) に統合。
+コンテキスト消費量を ~170K → ~22K tokens に削減。
+
+### 使い方
+```python
+# カテゴリ(command="コマンド名", params={...})
+editor(command="spawn_actor", params={"name": "MyLight", "type": "PointLight"})
+
+# パラメータ確認
+help(category="editor")                              # カテゴリ内コマンド一覧
+help(category="editor", command="spawn_actor")       # パラメータ詳細
+```
 
 ---
 
 ## 機能サマリー
 
-| カテゴリ | ツール数 | 状態 |
-|---------|---------|------|
-| Actor操作 | 10 | ✅ |
-| Blueprint操作 | 17 | ✅ |
-| BPノードグラフ | 9 | ✅ |
-| UMG Widget | 30 | ✅ |
-| Enhanced Input | 8 | ✅ |
-| GAS | 8 | ✅ |
-| AI (BT/BB) | 20 | ✅ |
-| AI Perception | 6 | ✅ |
-| EQS | 5 | ✅ |
-| Material | 5 | ✅ |
-| Config | 3 | ✅ |
-| Asset Utility | 7 | ✅ |
-| RAG | 4 | ✅ |
-| AI Image Generation | 3 | ✅ |
-| **合計** | **135** | |
+### メタツール (14カテゴリ = 148コマンド)
+
+| メタツール | 説明 | コマンド数 | 状態 |
+|-----------|------|-----------|------|
+| `editor` | Actor操作、トランスフォーム、プロパティ | 12 | ✅ |
+| `blueprint` | BP作成、コンパイル、プロパティ、DataAsset | 21 | ✅ |
+| `blueprint_node` | イベント、関数、変数、フロー制御、数学 | 21 | ✅ |
+| `umg_widget` | テキスト、画像、ボタン、スライダー等 | 19 | ✅ |
+| `umg_layout` | VBox/HBox、ScrollBox、リペアレント | 5 | ✅ |
+| `umg_variable` | Widget変数、関数、イベント | 5 | ✅ |
+| `umg_animation` | アニメーション、トラック、キーフレーム | 4 | ✅ |
+| `project` | Input Mapping、アセット、フォルダ、テクスチャ | 13 | ✅ |
+| `ai` | Blackboard、BehaviorTree、BTノード | 21 | ✅ |
+| `perception` | AI視覚、聴覚、ダメージ感知 | 6 | ✅ |
+| `eqs` | Environment Query System | 5 | ✅ |
+| `gas` | Gameplay Tags、Effect、Ability | 8 | ✅ |
+| `material` | マテリアルテンプレート、作成 | 6 | ✅ |
+| `config` | Unreal Config読み書き | 3 | ✅ |
+
+### スタンドアロンツール (10個 + 1 help)
+
+| ツール | 説明 | 状態 |
+|--------|------|------|
+| `help` | メタツールのパラメータドキュメント | ✅ |
+| `search_knowledge` | RAG知識ベース検索 | ✅ |
+| `add_knowledge` | RAGにナレッジ追加 | ✅ |
+| `list_knowledge` | ナレッジ一覧 | ✅ |
+| `delete_knowledge` | ナレッジ削除 | ✅ |
+| `get_project_context` | プロジェクトコンテキスト取得 | ✅ |
+| `update_project_context` | プロジェクトコンテキスト更新 | ✅ |
+| `find_relevant_nodes` | 関連ノード検索 | ✅ |
+| `get_ai_image_server_status` | AI画像サーバー状態 | ✅ |
+| `generate_image` | AI画像生成 | ✅ |
+| `generate_and_import_texture` | AI画像生成+UEインポート | ✅ |
+
+| | 数 |
+|---|---|
+| **MCP登録ツール合計** | **25** |
+| **内包コマンド合計** | **148** |
 
 ---
 
@@ -132,7 +171,30 @@ generate_and_import_texture(
 
 ## 最新の更新
 
-### 2026-01-26: Blueprint Function Caller Search (v0.8.11) 🆕
+### 2026-03-07: Meta-Tool Architecture (v0.9.1) 🆕
+
+**アーキテクチャ刷新**: 161個の個別MCP toolを14カテゴリのメタツールに統合。
+
+| | Before | After |
+|---|---|---|
+| MCP ツール数 | 161 | **25** |
+| 推定トークン消費 | ~170K | **~22K** |
+| 会話に使えるコンテキスト | ~30K | **~178K** |
+| C++ 変更 | - | **なし** |
+
+**新規ファイル**:
+- `Python/tools/command_schemas.py` - 全148コマンドのパラメータスキーマ
+- `Python/tools/help_tool.py` - `help()` ツール
+- `Python/tools/meta_utils.py` - メタツール共通ユーティリティ
+- `Python/tools/*_meta.py` - 12個のメタツールファイル
+
+**削除ファイル**: `editor_tools.py`, `blueprint_tools.py`, `node_tools.py`, `umg_tools.py`, `project_tools.py`, `ai_tools.py`, `perception_tools.py`, `eqs_tools.py`, `gas_tools.py`, `material_tools.py`, `config_tools.py`
+
+**保持ファイル**: `rag_tools.py`, `knowledge_tools.py`, `image_gen_tools.py`, `error_codes.py`
+
+---
+
+### 2026-01-26: Blueprint Function Caller Search (v0.8.11)
 
 **新規ツール追加 (1ツール)**:
 

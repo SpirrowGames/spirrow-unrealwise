@@ -275,134 +275,98 @@ mcp = FastMCP(
     lifespan=server_lifespan
 )
 
-# Import and register tools
-from tools.editor_tools import register_editor_tools
-from tools.blueprint_tools import register_blueprint_tools
-from tools.node_tools import register_blueprint_node_tools
-from tools.project_tools import register_project_tools
-from tools.umg_tools import register_umg_tools
+# Import and register meta-tools (14 categories + 1 help)
+from tools.help_tool import register_help_tool
+from tools.editor_meta import register_editor_meta_tool
+from tools.blueprint_meta import register_blueprint_meta_tool
+from tools.node_meta import register_node_meta_tool
+from tools.umg_meta import register_umg_meta_tools
+from tools.project_meta import register_project_meta_tool
+from tools.ai_meta import register_ai_meta_tool
+from tools.perception_meta import register_perception_meta_tool
+from tools.eqs_meta import register_eqs_meta_tool
+from tools.gas_meta import register_gas_meta_tool
+from tools.material_meta import register_material_meta_tool
+from tools.config_meta import register_config_meta_tool
+
+# Standalone tools (no C++ bridge, kept as-is)
 from tools.rag_tools import register_rag_tools
 from tools.knowledge_tools import register_knowledge_tools
-from tools.config_tools import register_config_tools
-from tools.gas_tools import register_gas_tools
-from tools.material_tools import register_material_tools
-from tools.ai_tools import register_ai_tools
-from tools.perception_tools import register_perception_tools
-from tools.eqs_tools import register_eqs_tools
 from tools.image_gen_tools import register_image_gen_tools
 
-# Register tools
-register_editor_tools(mcp)
-register_blueprint_tools(mcp)
-register_blueprint_node_tools(mcp)
-register_project_tools(mcp)
-register_umg_tools(mcp)
+# Register meta-tools
+register_help_tool(mcp)
+register_editor_meta_tool(mcp)
+register_blueprint_meta_tool(mcp)
+register_node_meta_tool(mcp)
+register_umg_meta_tools(mcp)
+register_project_meta_tool(mcp)
+register_ai_meta_tool(mcp)
+register_perception_meta_tool(mcp)
+register_eqs_meta_tool(mcp)
+register_gas_meta_tool(mcp)
+register_material_meta_tool(mcp)
+register_config_meta_tool(mcp)
+
+# Register standalone tools
 register_rag_tools(mcp)
 register_knowledge_tools(mcp)
-register_config_tools(mcp)
-register_gas_tools(mcp)
-register_material_tools(mcp)
-register_ai_tools(mcp)
-register_perception_tools(mcp)
-register_eqs_tools(mcp)
 register_image_gen_tools(mcp)
 
 @mcp.prompt()
 def info():
     """Information about available Unreal MCP tools and best practices."""
     return """
-    # Unreal MCP Server Tools and Best Practices
-    
-    ## UMG (Widget Blueprint) Tools
-    - `create_umg_widget_blueprint(widget_name, parent_class="UserWidget", path="/Game/UI")` 
-      Create a new UMG Widget Blueprint
-    - `add_text_block_to_widget(widget_name, text_block_name, text="", position=[0,0], size=[200,50], font_size=12, color=[1,1,1,1])`
-      Add a Text Block widget with customizable properties
-    - `add_button_to_widget(widget_name, button_name, text="", position=[0,0], size=[200,50], font_size=12, color=[1,1,1,1], background_color=[0.1,0.1,0.1,1])`
-      Add a Button widget with text and styling
-    - `bind_widget_event(widget_name, widget_component_name, event_name, function_name="")`
-      Bind events like OnClicked to functions
-    - `add_widget_to_viewport(widget_name, z_order=0)`
-      Add widget instance to game viewport
-    - `set_text_block_binding(widget_name, text_block_name, binding_property, binding_type="Text")`
-      Set up dynamic property binding for text blocks
+    # SpirrowBridge - Meta-Tool Architecture
 
-    ## Editor Tools
-    ### Viewport and Screenshots
-    - `focus_viewport(target, location, distance, orientation)` - Focus viewport
-    - `take_screenshot(filename, show_ui, resolution)` - Capture screenshots
+    ## How to Use
 
-    ### Actor Management
-    - `get_actors_in_level()` - List all actors in current level
-    - `find_actors_by_name(pattern)` - Find actors by name pattern
-    - `spawn_actor(name, type, location=[0,0,0], rotation=[0,0,0], scale=[1,1,1])` - Create actors
-    - `delete_actor(name)` - Remove actors
-    - `set_actor_transform(name, location, rotation, scale)` - Modify actor transform
-    - `get_actor_properties(name)` - Get actor properties
-    
-    ## Blueprint Management
-    - `create_blueprint(name, parent_class)` - Create new Blueprint classes
-    - `add_component_to_blueprint(blueprint_name, component_type, component_name)` - Add components
-    - `set_static_mesh_properties(blueprint_name, component_name, static_mesh)` - Configure meshes
-    - `set_physics_properties(blueprint_name, component_name)` - Configure physics
-    - `compile_blueprint(blueprint_name)` - Compile Blueprint changes
-    - `set_blueprint_property(blueprint_name, property_name, property_value)` - Set properties
-    - `set_pawn_properties(blueprint_name)` - Configure Pawn settings
-    - `spawn_blueprint_actor(blueprint_name, actor_name)` - Spawn Blueprint actors
-    
-    ## Blueprint Node Management
-    - `add_blueprint_event_node(blueprint_name, event_type)` - Add event nodes
-    - `add_blueprint_input_action_node(blueprint_name, action_name)` - Add input nodes
-    - `add_blueprint_function_node(blueprint_name, target, function_name)` - Add function nodes
-    - `connect_blueprint_nodes(blueprint_name, source_node_id, source_pin, target_node_id, target_pin)` - Connect nodes
-    - `add_blueprint_variable(blueprint_name, variable_name, variable_type)` - Add variables
-    - `add_blueprint_get_self_component_reference(blueprint_name, component_name)` - Add component refs
-    - `add_blueprint_self_reference(blueprint_name)` - Add self references
-    - `find_blueprint_nodes(blueprint_name, node_type, event_type)` - Find nodes
-    
-    ## Project Tools
-    - `create_input_mapping(action_name, key, input_type)` - Create input mappings
+    SpirrowBridge uses **meta-tools**: each category is a single tool with a `command` parameter.
 
-    ## RAG Knowledge Tools
-    - `search_knowledge(query, n_results=3, category=None)` - Search the RAG knowledge base
-    - `add_knowledge(document, category, tags=None, doc_id=None)` - Add knowledge to RAG server
-    - `list_knowledge()` - List all knowledge entries
-    - `delete_knowledge(doc_id)` - Delete a knowledge entry by ID
+    ### Pattern
+    ```
+    category(command="command_name", params={"key": "value", ...})
+    ```
 
-    ## Best Practices
-    
-    ### UMG Widget Development
-    - Create widgets with descriptive names that reflect their purpose
-    - Use consistent naming conventions for widget components
-    - Organize widget hierarchy logically
-    - Set appropriate anchors and alignment for responsive layouts
-    - Use property bindings for dynamic updates instead of direct setting
-    - Handle widget events appropriately with meaningful function names
-    - Clean up widgets when no longer needed
-    - Test widget layouts at different resolutions
-    
-    ### Editor and Actor Management
-    - Use unique names for actors to avoid conflicts
-    - Clean up temporary actors
-    - Validate transforms before applying
-    - Check actor existence before modifications
-    - Take regular viewport screenshots during development
-    - Keep the viewport focused on relevant actors during operations
-    
-    ### Blueprint Development
-    - Compile Blueprints after changes
-    - Use meaningful names for variables and functions
-    - Organize nodes logically
-    - Test functionality in isolation
-    - Consider performance implications
-    - Document complex setups
-    
-    ### Error Handling
-    - Check command responses for success
-    - Handle errors gracefully
-    - Log important operations
-    - Validate parameters
-    - Clean up resources on errors
+    ### Getting Help
+    ```
+    help(category="blueprint")                          # List all commands in category
+    help(category="blueprint", command="create_blueprint")  # Get params for a command
+    ```
+
+    ## Available Meta-Tools (14 categories)
+
+    | Tool | Description | Commands |
+    |------|-------------|----------|
+    | `editor` | Actors, transforms, properties, components | 12 |
+    | `blueprint` | Create, compile, properties, data assets, scanning | 21 |
+    | `blueprint_node` | Events, functions, variables, flow control, math | 21 |
+    | `umg_widget` | Widgets: text, image, button, slider, checkbox | 19 |
+    | `umg_layout` | Layout: vertical/horizontal boxes, scroll, reparent | 5 |
+    | `umg_variable` | Widget variables, functions, events | 5 |
+    | `umg_animation` | Widget animations, tracks, keyframes | 4 |
+    | `project` | Input mapping, assets, folders, textures | 13 |
+    | `ai` | Blackboards, behavior trees, BT nodes | 21 |
+    | `perception` | AI sight, hearing, damage senses | 6 |
+    | `eqs` | Environment Query System | 5 |
+    | `gas` | Gameplay tags, effects, abilities | 8 |
+    | `material` | Material templates and creation | 6 |
+    | `config` | Read/write Unreal config files | 3 |
+
+    ## Standalone Tools (unchanged)
+    - `search_knowledge`, `add_knowledge`, `list_knowledge`, `delete_knowledge`
+    - `get_project_context`, `update_project_context`
+    - `find_relevant_nodes`
+    - `get_ai_image_server_status`, `generate_image`, `generate_and_import_texture`
+
+    ## Quick Examples
+    ```
+    editor(command="spawn_actor", params={"name": "MyLight", "type": "PointLight", "location": [0, 0, 200]})
+    blueprint(command="create_blueprint", params={"name": "BP_Enemy", "parent_class": "Character"})
+    blueprint_node(command="add_blueprint_event_node", params={"blueprint_name": "BP_Enemy", "event_name": "BeginPlay"})
+    umg_widget(command="create_umg_widget_blueprint", params={"widget_name": "WBP_HUD"})
+    ai(command="create_behavior_tree", params={"name": "BT_EnemyAI"})
+    ```
     """
 
 # Run the server

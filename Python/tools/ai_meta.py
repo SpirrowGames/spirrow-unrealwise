@@ -28,6 +28,7 @@ COMMANDS = {
     "list_ai_assets": "list_ai_assets",
     "detect_broken_bt_nodes": "detect_broken_bt_nodes",
     "fix_broken_bt_nodes": "delete_broken_bt_nodes",
+    "repair_broken_bt_nodes": "repair_broken_bt_nodes",
 }
 
 
@@ -43,7 +44,7 @@ def register_ai_meta_tool(mcp: FastMCP):
         add_bt_decorator_node, add_bt_service_node, connect_bt_nodes,
         set_bt_node_property, delete_bt_node, list_bt_node_types,
         set_bt_node_position, auto_layout_bt, list_bt_nodes, list_ai_assets,
-        detect_broken_bt_nodes, fix_broken_bt_nodes
+        detect_broken_bt_nodes, fix_broken_bt_nodes, repair_broken_bt_nodes
         Use help("ai", "command_name") for params.
         """
         from tools.meta_utils import execute_command

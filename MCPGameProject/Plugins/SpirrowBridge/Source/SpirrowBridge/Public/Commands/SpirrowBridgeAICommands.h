@@ -157,6 +157,11 @@ private:
 	 */
 	TSharedPtr<FJsonObject> HandleDeleteBrokenBTNodes(const TSharedPtr<FJsonObject>& Params);
 
+	/**
+	 * Repair broken nodes by re-resolving class from ClassData and recreating NodeInstance.
+	 */
+	TSharedPtr<FJsonObject> HandleRepairBrokenBTNodes(const TSharedPtr<FJsonObject>& Params);
+
 	// ===== BT Node Operation Helpers =====
 
 	/**

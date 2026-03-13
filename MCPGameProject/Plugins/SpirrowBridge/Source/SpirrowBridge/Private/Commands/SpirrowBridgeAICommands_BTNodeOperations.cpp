@@ -1664,3 +1664,276 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleDeleteBrokenBTNodes(
 
 	return Result;
 }
+
+// ===== repair_broken_bt_nodes Handler =====
+
+TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleRepairBrokenBTNodes(
+	const TSharedPtr<FJsonObject>& Params)
+{
+	// パラメータ取得
+	FString BehaviorTreeName;
+	TSharedPtr<FJsonObject> NameError = FSpirrowBridgeCommonUtils::ValidateRequiredString(
+		Params, TEXT("behavior_tree_name"), BehaviorTreeName);
+	if (NameError) return NameError;
+
+	FString Path;
+	FSpirrowBridgeCommonUtils::GetOptionalString(
+		Params, TEXT("path"), Path, TEXT("/Game/AI/BehaviorTrees"));
+
+	// BehaviorTree取得
+	UBehaviorTree* BehaviorTree = FindBehaviorTreeAsset(BehaviorTreeName, Path);
+	if (!BehaviorTree)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::AssetNotFound,
+			FString::Printf(TEXT("BehaviorTree not found: %s at %s"), *BehaviorTreeName, *Path));
+	}
+
+	// Graph取得
+	UBehaviorTreeGraph* BTGraph = GetBTGraph(BehaviorTree);
+	if (!BTGraph)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::NodeCreationFailed,
+			TEXT("BehaviorTree has no graph"));
+	}
+
+	// 壊れたノードを収集して修復を試みる
+	int32 RepairedCount = 0;
+	int32 FailedCount = 0;
+	TArray<TSharedPtr<FJsonValue>> RepairedNodesArray;
+	TArray<TSharedPtr<FJsonValue>> FailedNodesArray;
+
+	// ヘルパーラムダ: 壊れたノードの修復を試みる
+	auto TryRepairNode = [&](UBehaviorTreeGraphNode* BrokenNode, const FString& NodeType, const FString& AttachedTo)
+	{
+		if (!BrokenNode || BrokenNode->NodeInstance)
+		{
+			return; // nullまたは壊れていない
+		}
+
+		TSharedPtr<FJsonObject> NodeInfo = MakeShareable(new FJsonObject());
+		NodeInfo->SetStringField(TEXT("node_type"), NodeType);
+		NodeInfo->SetStringField(TEXT("graph_node_class"), BrokenNode->GetClass()->GetName());
+		if (!AttachedTo.IsEmpty())
+		{
+			NodeInfo->SetStringField(TEXT("attached_to"), AttachedTo);
+		}
+
+		// ClassDataからクラスを再解決
+		FGraphNodeClassData& ClassData = BrokenNode->ClassData;
+		FString ClassName = ClassData.GetClassName();
+
+		if (ClassName.IsEmpty())
+		{
+			NodeInfo->SetStringField(TEXT("error"), TEXT("ClassData has no class name - cannot repair"));
+			FailedNodesArray.Add(MakeShareable(new FJsonValueObject(NodeInfo)));
+			FailedCount++;
+			return;
+		}
+
+		// _C サフィックスを除去（Blueprint生成クラス名対応）
+		FString CleanClassName = ClassName;
+		CleanClassName.RemoveFromEnd(TEXT("_C"));
+
+		NodeInfo->SetStringField(TEXT("class_name"), CleanClassName);
+
+		// クラス検索: まずClassDataに保存されているクラスを試す
+		UClass* ResolvedClass = nullptr;
+
+		// 方法1: ClassData自体からクラスを取得（アセットパスが保存されている場合）
+		// GetClass()でクラス参照を取得
+		const UClass* StoredClass = ClassData.GetClass();
+		if (StoredClass)
+		{
+			ResolvedClass = const_cast<UClass*>(StoredClass);
+		}
+
+		// 方法2: クラス名から検索（エンジン標準クラス）
+		if (!ResolvedClass)
+		{
+			// Decorator クラスの場合
+			if (NodeType == TEXT("Decorator"))
+			{
+				ResolvedClass = GetBTDecoratorClass(CleanClassName);
+				// BTDecorator_ プレフィックスなしでも試行
+				if (!ResolvedClass && !CleanClassName.StartsWith(TEXT("BTDecorator_")))
+				{
+					ResolvedClass = GetBTDecoratorClass(FString::Printf(TEXT("BTDecorator_%s"), *CleanClassName));
+				}
+			}
+			// Service クラスの場合
+			else if (NodeType == TEXT("Service"))
+			{
+				ResolvedClass = GetBTServiceClass(CleanClassName);
+				if (!ResolvedClass && !CleanClassName.StartsWith(TEXT("BTService_")))
+				{
+					ResolvedClass = GetBTServiceClass(FString::Printf(TEXT("BTService_%s"), *CleanClassName));
+				}
+			}
+			// Task クラスの場合
+			else if (NodeType == TEXT("Task"))
+			{
+				ResolvedClass = GetBTTaskNodeClass(CleanClassName);
+				if (!ResolvedClass && !CleanClassName.StartsWith(TEXT("BTTask_")))
+				{
+					ResolvedClass = GetBTTaskNodeClass(FString::Printf(TEXT("BTTask_%s"), *CleanClassName));
+				}
+			}
+			// Composite クラスの場合
+			else if (NodeType == TEXT("Composite"))
+			{
+				ResolvedClass = GetBTCompositeNodeClass(CleanClassName);
+				if (!ResolvedClass && !CleanClassName.StartsWith(TEXT("BTComposite_")))
+				{
+					ResolvedClass = GetBTCompositeNodeClass(FString::Printf(TEXT("BTComposite_%s"), *CleanClassName));
+				}
+			}
+		}
+
+		// 方法3: FindFirstObject によるグローバル検索
+		if (!ResolvedClass)
+		{
+			ResolvedClass = FindFirstObject<UClass>(*ClassName, EFindFirstObjectOptions::None);
+		}
+		if (!ResolvedClass)
+		{
+			ResolvedClass = FindFirstObject<UClass>(*CleanClassName, EFindFirstObjectOptions::None);
+		}
+
+		if (!ResolvedClass)
+		{
+			NodeInfo->SetStringField(TEXT("error"),
+				FString::Printf(TEXT("Could not resolve class: %s"), *ClassName));
+			FailedNodesArray.Add(MakeShareable(new FJsonValueObject(NodeInfo)));
+			FailedCount++;
+			return;
+		}
+
+		NodeInfo->SetStringField(TEXT("resolved_class"), ResolvedClass->GetName());
+
+		// ★ NodeInstanceを再生成 ★
+		// Outerの決定: Decorator/ServiceはBehaviorTree、Composite/TaskはGraphNode
+		UObject* Outer = nullptr;
+		if (NodeType == TEXT("Decorator") || NodeType == TEXT("Service"))
+		{
+			Outer = BehaviorTree;  // UpdateAsset()互換性のため
+		}
+		else
+		{
+			Outer = BrokenNode;    // 構造階層のため
+		}
+
+		FName UniqueName = GenerateUniqueNodeName(BTGraph, ResolvedClass);
+
+		UBTNode* NewNodeInstance = NewObject<UBTNode>(
+			Outer,
+			ResolvedClass,
+			UniqueName,
+			RF_Transactional
+		);
+
+		if (!NewNodeInstance)
+		{
+			NodeInfo->SetStringField(TEXT("error"),
+				FString::Printf(TEXT("NewObject failed for class: %s"), *ResolvedClass->GetName()));
+			FailedNodesArray.Add(MakeShareable(new FJsonValueObject(NodeInfo)));
+			FailedCount++;
+			return;
+		}
+
+		// NodeInstance設定
+		BrokenNode->NodeInstance = NewNodeInstance;
+
+		// ClassData更新
+		BrokenNode->ClassData = FGraphNodeClassData(ResolvedClass, TEXT(""));
+
+		// ピンを再初期化
+		BrokenNode->AllocateDefaultPins();
+
+		NodeInfo->SetStringField(TEXT("status"), TEXT("repaired"));
+		NodeInfo->SetStringField(TEXT("new_node_id"), NewNodeInstance->GetName());
+		RepairedNodesArray.Add(MakeShareable(new FJsonValueObject(NodeInfo)));
+		RepairedCount++;
+
+		UE_LOG(LogTemp, Display, TEXT("Repaired broken %s node: class=%s, new_instance=%s"),
+			*NodeType, *ResolvedClass->GetName(), *NewNodeInstance->GetName());
+	};
+
+	// BTGraph->Nodesを走査
+	for (UEdGraphNode* EdNode : BTGraph->Nodes)
+	{
+		UBehaviorTreeGraphNode* BTNode = Cast<UBehaviorTreeGraphNode>(EdNode);
+		if (!BTNode) continue;
+
+		// Rootノードはスキップ
+		if (Cast<UBehaviorTreeGraphNode_Root>(BTNode)) continue;
+
+		// メインノード（Composite/Task）の修復
+		if (!BTNode->NodeInstance)
+		{
+			FString NodeType = TEXT("Unknown");
+			if (Cast<UBehaviorTreeGraphNode_Composite>(BTNode))
+			{
+				NodeType = TEXT("Composite");
+			}
+			else if (Cast<UBehaviorTreeGraphNode_Task>(BTNode))
+			{
+				NodeType = TEXT("Task");
+			}
+			TryRepairNode(BTNode, NodeType, TEXT(""));
+		}
+
+		// ノード名を取得（Decorator/Serviceのattached_to表示用）
+		FString ParentNodeName = BTNode->NodeInstance ? BTNode->NodeInstance->GetName() : TEXT("Unknown");
+
+		// Decoratorの修復
+		for (UBehaviorTreeGraphNode* Decorator : BTNode->Decorators)
+		{
+			if (Decorator && !Decorator->NodeInstance)
+			{
+				TryRepairNode(Decorator, TEXT("Decorator"), ParentNodeName);
+			}
+		}
+
+		// Serviceの修復（Compositeノードのみ）
+		UBehaviorTreeGraphNode_Composite* CompositeNode = Cast<UBehaviorTreeGraphNode_Composite>(BTNode);
+		if (CompositeNode)
+		{
+			for (UBehaviorTreeGraphNode* Service : CompositeNode->Services)
+			{
+				if (Service && !Service->NodeInstance)
+				{
+					TryRepairNode(Service, TEXT("Service"), ParentNodeName);
+				}
+			}
+		}
+	}
+
+	// 修復があった場合、グラフ更新と保存
+	if (RepairedCount > 0)
+	{
+		FinalizeAndSaveBTGraphInternal(BTGraph, BehaviorTree);
+	}
+
+	// レスポンス
+	TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject());
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("behavior_tree_name"), BehaviorTreeName);
+	Result->SetArrayField(TEXT("repaired_nodes"), RepairedNodesArray);
+	Result->SetNumberField(TEXT("repaired_count"), RepairedCount);
+	Result->SetArrayField(TEXT("failed_nodes"), FailedNodesArray);
+	Result->SetNumberField(TEXT("failed_count"), FailedCount);
+
+	if (RepairedCount > 0 || FailedCount > 0)
+	{
+		Result->SetStringField(TEXT("message"),
+			FString::Printf(TEXT("Repaired %d node(s), %d failed"), RepairedCount, FailedCount));
+	}
+	else
+	{
+		Result->SetStringField(TEXT("message"), TEXT("No broken nodes found"));
+	}
+
+	return Result;
+}

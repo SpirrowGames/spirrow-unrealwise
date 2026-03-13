@@ -1196,6 +1196,13 @@ COMMAND_SCHEMAS = {
                 "path": {"type": "str", "default": "/Game/AI/BehaviorTrees", "desc": "Content path"},
             },
         },
+        "repair_broken_bt_nodes": {
+            "brief": "Repair broken BT nodes by re-resolving class and recreating NodeInstance",
+            "params": {
+                "behavior_tree_name": {"type": "str", "required": True, "desc": "BehaviorTree name"},
+                "path": {"type": "str", "default": "/Game/AI/BehaviorTrees", "desc": "Content path"},
+            },
+        },
     },
 
     # =========================================================================

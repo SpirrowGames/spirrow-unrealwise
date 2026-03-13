@@ -436,6 +436,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTCompositeNode(
 			RF_Transactional        // ★重要: RF_Transactional フラグ★
 		);
 
+		// ★ NodeInstance生成失敗チェック ★
+		if (!RuntimeNode)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::NodeCreationFailed,
+				FString::Printf(TEXT("Failed to create runtime composite node for class: %s"), *NodeType));
+		}
+
 		// グラフノードにランタイムノードを関連付け
 		ParallelNode->NodeInstance = RuntimeNode;
 		ParallelNode->ClassData = FGraphNodeClassData(NodeClass, TEXT(""));
@@ -467,6 +475,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTCompositeNode(
 			UniqueName,             // ★ユニークな名前を使用★
 			RF_Transactional
 		);
+
+		// ★ NodeInstance生成失敗チェック ★
+		if (!RuntimeNode)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::NodeCreationFailed,
+				FString::Printf(TEXT("Failed to create runtime composite node for class: %s"), *NodeType));
+		}
 
 		// グラフノードにランタイムノードを関連付け
 		CompositeNode->NodeInstance = RuntimeNode;
@@ -652,6 +668,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTTaskNode(
 			RF_Transactional
 		);
 
+		// ★ NodeInstance生成失敗チェック ★
+		if (!RuntimeNode)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::NodeCreationFailed,
+				FString::Printf(TEXT("Failed to create runtime task node for class: %s"), *TaskType));
+		}
+
 		SubtreeNode->NodeInstance = RuntimeNode;
 		SubtreeNode->ClassData = FGraphNodeClassData(TaskClass, TEXT(""));
 
@@ -680,6 +704,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTTaskNode(
 			UniqueName,             // ★ユニークな名前を使用★
 			RF_Transactional
 		);
+
+		// ★ NodeInstance生成失敗チェック ★
+		if (!RuntimeNode)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::NodeCreationFailed,
+				FString::Printf(TEXT("Failed to create runtime task node for class: %s"), *TaskType));
+		}
 
 		TaskNode->NodeInstance = RuntimeNode;
 		TaskNode->ClassData = FGraphNodeClassData(TaskClass, TEXT(""));
@@ -853,6 +885,16 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTDecoratorNode(
 		RF_Transactional
 	);
 
+	// ★ NodeInstance生成失敗チェック ★
+	if (!RuntimeDecorator)
+	{
+		// GraphNodeをクリーンアップ
+		DecoratorGraphNode->MarkAsGarbage();
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::NodeCreationFailed,
+			FString::Printf(TEXT("Failed to create runtime decorator instance for class: %s"), *DecoratorType));
+	}
+
 	DecoratorGraphNode->NodeInstance = RuntimeDecorator;
 	DecoratorGraphNode->ClassData = FGraphNodeClassData(DecoratorClass, TEXT(""));
 
@@ -865,6 +907,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTDecoratorNode(
 	DecoratorGraphNode->CreateNewGuid();
 	DecoratorGraphNode->PostPlacedNewNode();
 	DecoratorGraphNode->AllocateDefaultPins();
+
+	// ★ 初期化後にNodeInstanceが消えていないか再確認 ★
+	// PostPlacedNewNode()が内部でNodeInstanceを上書きする可能性がある
+	if (!DecoratorGraphNode->NodeInstance)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("NodeInstance was cleared after PostPlacedNewNode(), restoring for decorator: %s"), *DecoratorType);
+		DecoratorGraphNode->NodeInstance = RuntimeDecorator;
+	}
 
 	// ★ ターゲットノードのDecorators配列にのみ追加（BTGraph->Nodesには追加しない）★
 	TargetGraphNode->Decorators.Add(DecoratorGraphNode);
@@ -986,6 +1036,16 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTServiceNode(
 		RF_Transactional
 	);
 
+	// ★ NodeInstance生成失敗チェック ★
+	if (!RuntimeService)
+	{
+		// GraphNodeをクリーンアップ
+		ServiceGraphNode->MarkAsGarbage();
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::NodeCreationFailed,
+			FString::Printf(TEXT("Failed to create runtime service instance for class: %s"), *ServiceType));
+	}
+
 	ServiceGraphNode->NodeInstance = RuntimeService;
 	ServiceGraphNode->ClassData = FGraphNodeClassData(ServiceClass, TEXT(""));
 
@@ -998,6 +1058,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTServiceNode(
 	ServiceGraphNode->CreateNewGuid();
 	ServiceGraphNode->PostPlacedNewNode();
 	ServiceGraphNode->AllocateDefaultPins();
+
+	// ★ 初期化後にNodeInstanceが消えていないか再確認 ★
+	if (!ServiceGraphNode->NodeInstance)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("NodeInstance was cleared after PostPlacedNewNode(), restoring for service: %s"), *ServiceType);
+		ServiceGraphNode->NodeInstance = RuntimeService;
+	}
 
 	// ★ ターゲットノードのServices配列にのみ追加（BTGraph->Nodesには追加しない）★
 	TargetCompositeGraphNode->Services.Add(ServiceGraphNode);

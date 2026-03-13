@@ -510,7 +510,8 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("list_bt_nodes") ||
                      // BT Node Health Commands
                      CommandType == TEXT("detect_broken_bt_nodes") ||
-                     CommandType == TEXT("delete_broken_bt_nodes"))
+                     CommandType == TEXT("delete_broken_bt_nodes") ||
+                     CommandType == TEXT("repair_broken_bt_nodes"))
             {
                 ResultJson = AICommands->HandleCommand(CommandType, Params);
             }

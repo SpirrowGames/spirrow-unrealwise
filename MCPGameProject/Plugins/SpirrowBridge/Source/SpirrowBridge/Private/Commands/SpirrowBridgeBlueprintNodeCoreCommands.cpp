@@ -842,7 +842,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
         }
     }
     
-    if (!Function && !FunctionNode)
+    if (!Function && !FunctionNode && Blueprint->GeneratedClass)
     {
         Function = Blueprint->GeneratedClass->FindFunctionByName(*FunctionName);
     }

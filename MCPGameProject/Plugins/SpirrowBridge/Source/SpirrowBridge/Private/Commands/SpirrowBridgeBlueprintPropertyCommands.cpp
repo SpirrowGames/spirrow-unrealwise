@@ -515,6 +515,19 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetStruct
                     Errors.Add(FString::Printf(TEXT("Element %d: Failed to load class for %s: %s"), i, *FieldName, *ClassPath));
                 }
             }
+            else if (FObjectProperty* ObjFieldProp = CastField<FObjectProperty>(FieldProp))
+            {
+                FString ObjPath = FieldValue->AsString();
+                UObject* LoadedObj = StaticLoadObject(ObjFieldProp->PropertyClass, nullptr, *ObjPath);
+                if (LoadedObj)
+                {
+                    ObjFieldProp->SetObjectPropertyValue(FieldPtr, LoadedObj);
+                }
+                else
+                {
+                    Errors.Add(FString::Printf(TEXT("Element %d: Failed to load object for %s: %s"), i, *FieldName, *ObjPath));
+                }
+            }
             else if (FIntProperty* IntFieldProp = CastField<FIntProperty>(FieldProp))
             {
                 IntFieldProp->SetPropertyValue(FieldPtr, static_cast<int32>(FieldValue->AsNumber()));

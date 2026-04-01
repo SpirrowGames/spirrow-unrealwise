@@ -166,6 +166,12 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleAddCompo
     }
 
     // Add the component to the blueprint
+    if (!Blueprint->SimpleConstructionScript)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidBlueprint,
+            TEXT("Blueprint has no SimpleConstructionScript. Try compiling first."));
+    }
     USCS_Node* NewNode = Blueprint->SimpleConstructionScript->CreateNode(ComponentClass, *ComponentName);
     if (NewNode)
     {
@@ -188,6 +194,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleAddCompo
         }
 
         Blueprint->SimpleConstructionScript->AddNode(NewNode);
+
+        // コンパイル前にBlueprintを安全な状態にする
+        FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
         FKismetEditorUtilities::CompileBlueprint(Blueprint);
 
         TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
@@ -589,6 +598,12 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleSetPawnP
     }
 
     // Get the default object
+    if (!Blueprint->GeneratedClass)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidBlueprint,
+            TEXT("Blueprint has no GeneratedClass. Try compiling first."));
+    }
     UObject* DefaultObject = Blueprint->GeneratedClass->GetDefaultObject();
     if (!DefaultObject)
     {

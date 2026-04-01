@@ -545,6 +545,12 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(co
 
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
 
+    if (!Blueprint->GeneratedClass)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidBlueprint,
+            TEXT("Blueprint has no GeneratedClass after compile."));
+    }
     UGameplayEffect* EffectCDO = Cast<UGameplayEffect>(Blueprint->GeneratedClass->GetDefaultObject());
     if (!EffectCDO)
     {
@@ -986,6 +992,12 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayAbility(c
 
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
 
+    if (!Blueprint->GeneratedClass)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidBlueprint,
+            TEXT("Blueprint has no GeneratedClass after compile."));
+    }
     UGameplayAbility* AbilityCDO = Cast<UGameplayAbility>(Blueprint->GeneratedClass->GetDefaultObject());
     if (!AbilityCDO)
     {

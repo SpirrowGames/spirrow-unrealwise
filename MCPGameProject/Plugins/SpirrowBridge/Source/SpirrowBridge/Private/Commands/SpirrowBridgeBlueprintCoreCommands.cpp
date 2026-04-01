@@ -273,7 +273,15 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCoreCommands::HandleCompileBluepr
     }
 
     // Compile the blueprint
-    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    if (!Blueprint->GeneratedClass)
+    {
+        FKismetEditorUtilities::CompileBlueprint(Blueprint, EBlueprintCompileOptions::None);
+    }
+    else
+    {
+        FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    }
 
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
     ResultObj->SetBoolField(TEXT("success"), true);
@@ -370,6 +378,12 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCoreCommands::HandleSetBlueprintP
     }
 
     // Get the default object
+    if (!Blueprint->GeneratedClass)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidBlueprint,
+            TEXT("Blueprint has no GeneratedClass. Try compiling first."));
+    }
     UObject* DefaultObject = Blueprint->GeneratedClass->GetDefaultObject();
     if (!DefaultObject)
     {

@@ -29,6 +29,29 @@
 // ===== Helper Functions for Graph-Based Node Operations =====
 
 /**
+ * Generate a unique node name based on class name and existing node count
+ */
+static FName GenerateUniqueNodeName(UBehaviorTreeGraph* BTGraph, UClass* NodeClass)
+{
+	FString BaseClassName = NodeClass->GetName();
+
+	// Count existing nodes of the same class
+	int32 Index = 0;
+	for (UEdGraphNode* Node : BTGraph->Nodes)
+	{
+		UBehaviorTreeGraphNode* BTGraphNode = Cast<UBehaviorTreeGraphNode>(Node);
+		if (BTGraphNode && BTGraphNode->NodeInstance &&
+			BTGraphNode->NodeInstance->GetClass() == NodeClass)
+		{
+			Index++;
+		}
+	}
+
+	// Generate unique name like "BTComposite_Selector_1"
+	return FName(*FString::Printf(TEXT("%s_%d"), *BaseClassName, Index));
+}
+
+/**
  * Get the BehaviorTreeGraph from a BehaviorTree asset
  */
 static UBehaviorTreeGraph* GetBTGraph(UBehaviorTree* BehaviorTree)

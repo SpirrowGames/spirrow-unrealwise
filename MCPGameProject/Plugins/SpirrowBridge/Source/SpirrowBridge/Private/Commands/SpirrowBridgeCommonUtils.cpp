@@ -245,6 +245,10 @@ UK2Node_Event* FSpirrowBridgeCommonUtils::CreateEventNode(UEdGraph* Graph, const
     
     // Find the function to create the event
     UClass* BlueprintClass = Blueprint->GeneratedClass;
+    if (!BlueprintClass)
+    {
+        return nullptr;
+    }
     UFunction* EventFunction = BlueprintClass->FindFunctionByName(FName(*EventName));
     
     if (EventFunction)

@@ -543,7 +543,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(co
             TEXT("Failed to create GameplayEffect Blueprint"));
     }
 
-    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
     if (!Blueprint->GeneratedClass)
     {
@@ -643,7 +644,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(co
 
     Package->MarkPackageDirty();
     Blueprint->MarkPackageDirty();
-    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
     FString PackageFileName = FPackageName::LongPackageNameToFilename(PackagePath, FPackageName::GetAssetPackageExtension());
     FSavePackageArgs SaveArgs;
@@ -843,7 +845,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleSetAbilitySystemDefault
             TEXT("Component is not an AbilitySystemComponent"));
     }
 
-    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
     Blueprint->MarkPackageDirty();
 
     TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
@@ -990,7 +993,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayAbility(c
             TEXT("Failed to create GameplayAbility Blueprint"));
     }
 
-    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
     if (!Blueprint->GeneratedClass)
     {
@@ -1077,7 +1081,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayAbility(c
 
     Package->MarkPackageDirty();
     Blueprint->MarkPackageDirty();
-    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
     FString PackageFileName = FPackageName::LongPackageNameToFilename(PackagePath, FPackageName::GetAssetPackageExtension());
     FSavePackageArgs SaveArgs;

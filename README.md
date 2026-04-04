@@ -9,24 +9,28 @@
 
 An MCP (Model Context Protocol) server that bridges AI assistants (Claude) with Unreal Engine 5. Control Blueprints, design levels, create UI, and build AI systems using natural language.
 
-## Features (136 Tools)
+## Features (25 MCP Tools / 149 Commands)
 
-| Category | Count | Description |
-|----------|-------|-------------|
-| **Actor** | 10 | Spawn, transform, properties, components |
-| **Blueprint** | 16 | Create, add components, property management |
-| **BP Node Graph** | 9 | Event nodes, function calls, variable operations |
-| **UMG Widget** | 30 | UI elements, layouts, animations, bindings |
-| **Enhanced Input** | 8 | Input Actions, Mapping Contexts |
-| **GAS** | 8 | GameplayTags, Effects, Abilities |
-| **AI (BT/BB)** | 22 | BehaviorTree, Blackboard, broken node detection |
-| **AI Perception** | 6 | Sight, Hearing, Damage sensing |
-| **EQS** | 5 | Environment Query System |
-| **Material** | 5 | Template-based material creation |
-| **Config** | 3 | INI file read/write |
-| **Asset Utility** | 7 | Asset management, texture import |
-| **RAG** | 4 | Knowledge base, project context |
-| **AI Image** | 3 | Stable Diffusion integration |
+Since **v0.9.1**, all tools are consolidated into **meta-tools** for dramatically reduced context usage (~170K → ~22K tokens).
+
+| Meta-Tool | Commands | Description |
+|-----------|----------|-------------|
+| `editor` | 12 | Spawn, transform, properties, components |
+| `blueprint` | 21 | Create, compile, properties, DataAsset |
+| `blueprint_node` | 21 | Event nodes, functions, variables, flow control |
+| `umg_widget` | 18 | Text, image, button, slider, etc. |
+| `umg_layout` | 5 | VBox/HBox, ScrollBox, reparent |
+| `umg_variable` | 5 | Widget variables, functions, events |
+| `umg_animation` | 4 | Animations, tracks, keyframes |
+| `project` | 13 | Input Mapping, assets, folders, textures |
+| `ai` | 22 | BehaviorTree, Blackboard, BT repair |
+| `perception` | 6 | Sight, Hearing, Damage sensing |
+| `eqs` | 5 | Environment Query System |
+| `gas` | 8 | GameplayTags, Effects, Abilities |
+| `material` | 6 | Template-based material creation |
+| `config` | 3 | INI file read/write |
+
+**+ 10 standalone tools**: RAG (4), AI Image (3), Project Context (2), Related Nodes (1)
 
 > See [FEATURE_STATUS.md](FEATURE_STATUS.md) for detailed feature documentation.
 
@@ -102,7 +106,7 @@ Add to your `claude_desktop_config.json`:
 spirrow-unrealwise/
 ├── Python/                    # MCP Server
 │   ├── unreal_mcp_server.py   # Main server entry
-│   ├── tools/                 # Tool definitions (12 modules)
+│   ├── tools/                 # Tool definitions (14 meta + standalone)
 │   └── tests/                 # Test suite
 ├── MCPGameProject/Plugins/    # UE Plugin
 │   └── SpirrowBridge/         # Editor module
@@ -136,10 +140,18 @@ See [Docs/PATTERNS.md](Docs/PATTERNS.md) for implementation patterns and guideli
 
 ## Version History
 
+**v0.9.2 (Beta)** - 2026-03-13
+- BT node robustness: null pointer guards on all BT node creation
+- New `repair_broken_bt_nodes` command for NodeInstance re-resolution
+- Compile safety improvements
+
+**v0.9.1 (Beta)** - 2026-03-07
+- Meta-Tool Architecture: 161 individual tools → 25 MCP tools (14 meta + 1 help + 10 standalone)
+- Context token reduction: ~170K → ~22K (saves ~148K tokens)
+
 **v0.9.0 (Beta)** - 2026-02-15
 - BehaviorTree Health Check: `detect_broken_bt_nodes` and `fix_broken_bt_nodes`
 - Automatically detect and remove broken nodes (null NodeInstance) from BehaviorTrees
-- Fixes the "red error decorator" issue after compilation failures
 
 **v0.8.11 (Beta)** - 2026-01-26
 - Added `find_cpp_function_in_blueprints` - Search for function callers across Blueprints
@@ -147,10 +159,6 @@ See [Docs/PATTERNS.md](Docs/PATTERNS.md) for implementation patterns and guideli
 **v0.8.10 (Beta)** - 2026-01-12
 - AI Image Generation integration (Stable Diffusion Forge)
 - Asset utility tools (texture import, folder management)
-
-**v0.8.0 (Beta)** - 2026-01-06
-- Phase H: AIPerception & EQS support (11 tools)
-- Complete AI system coverage (28 tools total)
 
 > See [Docs/CHANGELOG.md](Docs/CHANGELOG.md) for full history.
 

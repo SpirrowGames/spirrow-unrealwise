@@ -193,11 +193,24 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleAddCompo
             }
         }
 
-        Blueprint->SimpleConstructionScript->AddNode(NewNode);
+        // 既存のルートノードがあれば子として追加、なければルートとして追加
+        USCS_Node* RootNode = nullptr;
+        const TArray<USCS_Node*>& RootNodes = Blueprint->SimpleConstructionScript->GetRootNodes();
+        if (RootNodes.Num() > 0)
+        {
+            RootNode = RootNodes[0];
+        }
 
-        // コンパイル前にBlueprintを安全な状態にする
-        FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
-        FKismetEditorUtilities::CompileBlueprint(Blueprint);
+        if (RootNode)
+        {
+            RootNode->AddChildNode(NewNode);
+        }
+        else
+        {
+            Blueprint->SimpleConstructionScript->AddNode(NewNode);
+        }
+
+        FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
         TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
         ResultObj->SetBoolField(TEXT("success"), true);

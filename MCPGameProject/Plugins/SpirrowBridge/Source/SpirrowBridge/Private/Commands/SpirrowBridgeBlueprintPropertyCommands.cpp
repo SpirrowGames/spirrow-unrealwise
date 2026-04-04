@@ -393,7 +393,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetBluepr
 
     Blueprint->Modify();
     Blueprint->MarkPackageDirty();
-    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
     TSharedPtr<FJsonObject> ResultJson = MakeShareable(new FJsonObject());
     ResultJson->SetBoolField(TEXT("success"), true);
@@ -559,7 +560,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetStruct
 
     Blueprint->Modify();
     Blueprint->MarkPackageDirty();
-    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
     TSharedPtr<FJsonObject> ResultJson = MakeShareable(new FJsonObject());
     ResultJson->SetBoolField(TEXT("success"), Errors.Num() == 0);
@@ -755,7 +757,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetClassP
 
     Blueprint->Modify();
     Blueprint->MarkPackageDirty();
-    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
     TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject());
     Result->SetBoolField(TEXT("success"), true);
@@ -821,7 +824,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetObject
 
     Blueprint->Modify();
     Blueprint->MarkPackageDirty();
-    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
     TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject());
     Result->SetBoolField(TEXT("success"), true);
@@ -1178,7 +1182,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetStruct
 
     Blueprint->Modify();
     Blueprint->MarkPackageDirty();
-    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
     TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject());
     Result->SetBoolField(TEXT("success"), Errors.Num() == 0);

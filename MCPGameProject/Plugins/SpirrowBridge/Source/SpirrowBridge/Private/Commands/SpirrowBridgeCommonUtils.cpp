@@ -13,6 +13,7 @@
 #include "K2Node_Self.h"
 #include "EdGraphSchema_K2.h"
 #include "Kismet2/BlueprintEditorUtils.h"
+#include "Kismet2/KismetEditorUtilities.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/LightComponent.h"
 #include "Components/PrimitiveComponent.h"
@@ -189,7 +190,14 @@ UBlueprint* FSpirrowBridgeCommonUtils::FindBlueprintByName(const FString& Bluepr
 
     // Construct asset path: /Path/BlueprintName.BlueprintName
     FString AssetPath = FString::Printf(TEXT("%s%s.%s"), *NormalizedPath, *BlueprintName, *BlueprintName);
-    return LoadObject<UBlueprint>(nullptr, *AssetPath);
+
+    // Prefer in-memory object to avoid reloading a modified blueprint from disk
+    UBlueprint* Blueprint = FindObject<UBlueprint>(nullptr, *AssetPath);
+    if (!Blueprint)
+    {
+        Blueprint = LoadObject<UBlueprint>(nullptr, *AssetPath);
+    }
+    return Blueprint;
 }
 
 UEdGraph* FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(UBlueprint* Blueprint)
@@ -212,6 +220,27 @@ UEdGraph* FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(UBlueprint* Blueprin
     UEdGraph* NewGraph = FBlueprintEditorUtils::CreateNewGraph(Blueprint, FName(TEXT("EventGraph")), UEdGraph::StaticClass(), UEdGraphSchema_K2::StaticClass());
     FBlueprintEditorUtils::AddUbergraphPage(Blueprint, NewGraph);
     return NewGraph;
+}
+
+void FSpirrowBridgeCommonUtils::SafeCompileBlueprint(UBlueprint* Blueprint)
+{
+    if (!Blueprint) return;
+
+    bool bNeedsFullCompile = (Blueprint->GeneratedClass == nullptr)
+        || (Blueprint->GeneratedClass == Blueprint->SkeletonGeneratedClass);
+
+    if (bNeedsFullCompile)
+    {
+        Blueprint->GeneratedClass = nullptr;
+        FKismetEditorUtilities::GenerateBlueprintSkeleton(Blueprint, true);
+        FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+        FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    }
+    else
+    {
+        // 既にコンパイル済みの場合はDirtyマークのみ（再コンパイルはクラッシュの原因になる）
+        Blueprint->MarkPackageDirty();
+    }
 }
 
 // Blueprint node utilities

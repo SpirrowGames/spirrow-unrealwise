@@ -674,8 +674,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleAddMappingContextTo
         PriorityPin->DefaultValue = FString::FromInt(Priority);
     }
 
-    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
-    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
     TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
     Result->SetBoolField(TEXT("success"), true);

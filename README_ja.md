@@ -9,24 +9,28 @@
 
 AI（Claude）と Unreal Engine 5 を連携させる MCP サーバー。自然言語でBlueprint操作、レベルデザイン、UI作成、AIシステム構築を実現します。
 
-## 機能 (136ツール)
+## 機能 (25 MCPツール / 149コマンド)
 
-| カテゴリ | 数 | 説明 |
-|---------|-----|------|
-| **Actor** | 10 | スポーン、Transform、プロパティ、コンポーネント |
-| **Blueprint** | 16 | 作成、コンポーネント追加、プロパティ管理 |
-| **BP ノードグラフ** | 9 | イベントノード、関数呼び出し、変数操作 |
-| **UMG Widget** | 30 | UI要素、レイアウト、アニメーション、バインディング |
-| **Enhanced Input** | 8 | Input Action、Mapping Context |
-| **GAS** | 8 | GameplayTags、Effect、Ability |
-| **AI (BT/BB)** | 22 | BehaviorTree、Blackboard、壊れたノード検出 |
-| **AI Perception** | 6 | 視覚、聴覚、ダメージ感知 |
-| **EQS** | 5 | Environment Query System |
-| **Material** | 5 | テンプレートベースマテリアル作成 |
-| **Config** | 3 | INIファイル読み書き |
-| **Asset Utility** | 7 | アセット管理、テクスチャインポート |
-| **RAG** | 4 | 知識ベース、プロジェクトコンテキスト |
-| **AI Image** | 3 | Stable Diffusion連携 |
+**v0.9.1** でメタツール化を実施。コンテキスト消費量を ~170K → ~22K tokens に大幅削減。
+
+| メタツール | コマンド数 | 説明 |
+|-----------|-----------|------|
+| `editor` | 12 | スポーン、Transform、プロパティ、コンポーネント |
+| `blueprint` | 21 | 作成、コンパイル、プロパティ、DataAsset |
+| `blueprint_node` | 21 | イベントノード、関数、変数、フロー制御 |
+| `umg_widget` | 18 | テキスト、画像、ボタン、スライダー等 |
+| `umg_layout` | 5 | VBox/HBox、ScrollBox、リペアレント |
+| `umg_variable` | 5 | Widget変数、関数、イベント |
+| `umg_animation` | 4 | アニメーション、トラック、キーフレーム |
+| `project` | 13 | Input Mapping、アセット、フォルダ、テクスチャ |
+| `ai` | 22 | BehaviorTree、Blackboard、BT修復 |
+| `perception` | 6 | 視覚、聴覚、ダメージ感知 |
+| `eqs` | 5 | Environment Query System |
+| `gas` | 8 | GameplayTags、Effect、Ability |
+| `material` | 6 | テンプレートベースマテリアル作成 |
+| `config` | 3 | INIファイル読み書き |
+
+**+ 10 スタンドアロンツール**: RAG (4)、AI画像 (3)、プロジェクトコンテキスト (2)、関連ノード (1)
 
 > 詳細は [FEATURE_STATUS.md](FEATURE_STATUS.md) を参照してください。
 
@@ -102,7 +106,7 @@ cd Python && uv sync
 spirrow-unrealwise/
 ├── Python/                    # MCPサーバー
 │   ├── unreal_mcp_server.py   # メインエントリ
-│   ├── tools/                 # ツール定義 (12モジュール)
+│   ├── tools/                 # ツール定義 (14メタ + スタンドアロン)
 │   └── tests/                 # テストスイート
 ├── MCPGameProject/Plugins/    # UEプラグイン
 │   └── SpirrowBridge/         # エディターモジュール
@@ -136,10 +140,18 @@ cd Python && python tests/run_tests.py
 
 ## バージョン履歴
 
+**v0.9.2 (Beta)** - 2026-03-13
+- BTノード堅牢性向上: 全BTノード作成時にnullポインタガード追加
+- `repair_broken_bt_nodes` コマンド追加（NodeInstance再生成）
+- コンパイル安全性改善
+
+**v0.9.1 (Beta)** - 2026-03-07
+- メタツールアーキテクチャ: 161個の個別ツール → 25 MCPツール（14メタ + 1ヘルプ + 10スタンドアロン）
+- コンテキストトークン削減: ~170K → ~22K（~148K節約）
+
 **v0.9.0 (Beta)** - 2026-02-15
 - BehaviorTree健全性チェック: `detect_broken_bt_nodes` と `fix_broken_bt_nodes` を追加
 - 壊れたノード（null NodeInstance）を自動検出・削除
-- コンパイル失敗後の「赤エラーDecorator」問題を解決
 
 **v0.8.11 (Beta)** - 2026-01-26
 - `find_cpp_function_in_blueprints` 追加 - Blueprint内の関数呼び出し元を検索
@@ -147,10 +159,6 @@ cd Python && python tests/run_tests.py
 **v0.8.10 (Beta)** - 2026-01-12
 - AI画像生成統合（Stable Diffusion Forge）
 - アセットユーティリティツール（テクスチャインポート、フォルダ管理）
-
-**v0.8.0 (Beta)** - 2026-01-06
-- Phase H: AIPerception & EQS対応（11ツール）
-- AIシステム完全対応（合計28ツール）
 
 > 詳細な履歴は [Docs/CHANGELOG.md](Docs/CHANGELOG.md) を参照してください。
 

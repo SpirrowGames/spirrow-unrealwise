@@ -1,8 +1,8 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: v0.9.1 (Meta-Tool Architecture)
+> **バージョン**: v0.9.2 (BT Robustness & Auto-Repair)
 > **ステータス**: Beta
-> **最終更新**: 2026-03-07
+> **最終更新**: 2026-04-04
 
 ---
 
@@ -10,6 +10,7 @@
 
 **v0.9.1** でメタツール化を実施。161個の個別ツールを **25個** (14メタツール + 1ヘルプ + 10スタンドアロン) に統合。
 コンテキスト消費量を ~170K → ~22K tokens に削減。
+**v0.9.2** でBTノードの堅牢性向上・自動修復機能を追加。
 
 ### 使い方
 ```python
@@ -32,12 +33,12 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 | `editor` | Actor操作、トランスフォーム、プロパティ | 12 | ✅ |
 | `blueprint` | BP作成、コンパイル、プロパティ、DataAsset | 21 | ✅ |
 | `blueprint_node` | イベント、関数、変数、フロー制御、数学 | 21 | ✅ |
-| `umg_widget` | テキスト、画像、ボタン、スライダー等 | 19 | ✅ |
+| `umg_widget` | テキスト、画像、ボタン、スライダー等 | 18 | ✅ |
 | `umg_layout` | VBox/HBox、ScrollBox、リペアレント | 5 | ✅ |
 | `umg_variable` | Widget変数、関数、イベント | 5 | ✅ |
 | `umg_animation` | アニメーション、トラック、キーフレーム | 4 | ✅ |
 | `project` | Input Mapping、アセット、フォルダ、テクスチャ | 13 | ✅ |
-| `ai` | Blackboard、BehaviorTree、BTノード | 21 | ✅ |
+| `ai` | Blackboard、BehaviorTree、BTノード、BT修復 | 22 | ✅ |
 | `perception` | AI視覚、聴覚、ダメージ感知 | 6 | ✅ |
 | `eqs` | Environment Query System | 5 | ✅ |
 | `gas` | Gameplay Tags、Effect、Ability | 8 | ✅ |
@@ -63,7 +64,7 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 | | 数 |
 |---|---|
 | **MCP登録ツール合計** | **25** |
-| **内包コマンド合計** | **148** |
+| **内包コマンド合計** | **149** |
 
 ---
 
@@ -103,11 +104,12 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 ### GAS (8)
 `add_gameplay_tags`, `list_gameplay_tags`, `remove_gameplay_tag`, `list_gas_assets`, `create_gameplay_effect`, `create_gameplay_ability`, `create_gas_character`, `set_ability_system_defaults`
 
-### AI - BehaviorTree/Blackboard (20)
+### AI - BehaviorTree/Blackboard (22)
 - **Blackboard (4)**: `create_blackboard`, `add_blackboard_key`, `remove_blackboard_key`, `list_blackboard_keys`
 - **BehaviorTree (3)**: `create_behavior_tree`, `set_behavior_tree_blackboard`, `get_behavior_tree_structure`
 - **BTノード操作 (8)**: `add_bt_composite_node`, `add_bt_task_node`, `add_bt_decorator_node`, `add_bt_service_node`, `connect_bt_nodes`, `set_bt_node_property`, `delete_bt_node`, `list_bt_node_types`
 - **BTノード位置 (2)**: `set_bt_node_position`, `auto_layout_bt`
+- **BT健全性 (3)**: `detect_broken_bt_nodes` 🆕, `fix_broken_bt_nodes` 🆕, `repair_broken_bt_nodes` 🆕
 - **BTデバッグ (1)**: `list_bt_nodes`
 - **ユーティリティ (1)**: `list_ai_assets`
 
@@ -171,7 +173,23 @@ generate_and_import_texture(
 
 ## 最新の更新
 
-### 2026-03-07: Meta-Tool Architecture (v0.9.1) 🆕
+### 2026-03-13: BT Robustness & Auto-Repair (v0.9.2) 🆕
+
+**BTノード堅牢性の向上と自動修復機能**:
+
+| 変更 | 内容 |
+|------|------|
+| `detect_broken_bt_nodes` | 壊れたBTノード（null NodeInstance）を検出 |
+| `fix_broken_bt_nodes` | 壊れたBTノードを削除して修復 |
+| `repair_broken_bt_nodes` | ClassDataからクラスを再解決しNodeInstanceを再生成 |
+| Null Pointer Guards | 全BTノード作成時（Decorator/Service/Composite/Task）にnullチェック追加 |
+| PostPlacedNewNode Guard | Decorator/ServiceのNodeInstance消失ガードを追加 |
+
+**コマンド数**: 148 → **149** (+1: `repair_broken_bt_nodes`)
+
+---
+
+### 2026-03-07: Meta-Tool Architecture (v0.9.1)
 
 **アーキテクチャ刷新**: 161個の個別MCP toolを14カテゴリのメタツールに統合。
 

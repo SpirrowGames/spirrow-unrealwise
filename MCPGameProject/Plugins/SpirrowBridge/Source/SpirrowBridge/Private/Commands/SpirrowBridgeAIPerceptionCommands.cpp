@@ -119,12 +119,20 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAIPerceptionCommands::HandleAddAIPerceptio
 	// Set the variable name
 	NewNode->SetVariableName(FName(*ComponentName));
 
-	// Add to root or default scene root
-	Blueprint->SimpleConstructionScript->AddNode(NewNode);
+	// 既存のルートノードがあれば子として追加、なければルートとして追加
+	const TArray<USCS_Node*>& RootNodes = Blueprint->SimpleConstructionScript->GetRootNodes();
+	if (RootNodes.Num() > 0)
+	{
+		RootNodes[0]->AddChildNode(NewNode);
+	}
+	else
+	{
+		Blueprint->SimpleConstructionScript->AddNode(NewNode);
+	}
 
 	// Mark Blueprint as modified and compile
-	FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
-	FKismetEditorUtilities::CompileBlueprint(Blueprint);
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+	FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
 	// Save the asset
 	UEditorAssetLibrary::SaveAsset(FullPath, false);
@@ -244,8 +252,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAIPerceptionCommands::HandleConfigureSight
 	PerceptionComp->ConfigureSense(*SightConfig);
 
 	// Mark Blueprint as modified and compile
-	FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
-	FKismetEditorUtilities::CompileBlueprint(Blueprint);
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+	FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
 	// Save the asset
 	UEditorAssetLibrary::SaveAsset(FullPath, false);
@@ -342,8 +350,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAIPerceptionCommands::HandleConfigureHeari
 	PerceptionComp->ConfigureSense(*HearingConfig);
 
 	// Mark Blueprint as modified and compile
-	FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
-	FKismetEditorUtilities::CompileBlueprint(Blueprint);
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+	FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
 	// Save the asset
 	UEditorAssetLibrary::SaveAsset(FullPath, false);
@@ -420,8 +428,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAIPerceptionCommands::HandleConfigureDamag
 	PerceptionComp->ConfigureSense(*DamageConfig);
 
 	// Mark Blueprint as modified and compile
-	FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
-	FKismetEditorUtilities::CompileBlueprint(Blueprint);
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+	FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
 	// Save the asset
 	UEditorAssetLibrary::SaveAsset(FullPath, false);
@@ -505,8 +513,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAIPerceptionCommands::HandleSetPerceptionD
 	PerceptionComp->SetDominantSense(SenseClass);
 
 	// Mark Blueprint as modified and compile
-	FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
-	FKismetEditorUtilities::CompileBlueprint(Blueprint);
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+	FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
 	// Save the asset
 	UEditorAssetLibrary::SaveAsset(FullPath, false);
@@ -611,12 +619,20 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAIPerceptionCommands::HandleAddPerceptionS
 		}
 	}
 
-	// Add to root
-	Blueprint->SimpleConstructionScript->AddNode(NewNode);
+	// 既存のルートノードがあれば子として追加、なければルートとして追加
+	const TArray<USCS_Node*>& RootNodes2 = Blueprint->SimpleConstructionScript->GetRootNodes();
+	if (RootNodes2.Num() > 0)
+	{
+		RootNodes2[0]->AddChildNode(NewNode);
+	}
+	else
+	{
+		Blueprint->SimpleConstructionScript->AddNode(NewNode);
+	}
 
 	// Mark Blueprint as modified and compile
-	FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
-	FKismetEditorUtilities::CompileBlueprint(Blueprint);
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+	FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
 	// Save the asset
 	UEditorAssetLibrary::SaveAsset(FullPath, false);

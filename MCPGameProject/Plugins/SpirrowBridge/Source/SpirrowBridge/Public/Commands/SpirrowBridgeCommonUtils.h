@@ -198,7 +198,10 @@ public:
     static UBlueprint* FindBlueprint(const FString& BlueprintName, const FString& Path = TEXT("/Game/Blueprints"));
     static UBlueprint* FindBlueprintByName(const FString& BlueprintName, const FString& Path = TEXT("/Game/Blueprints"));
     static UEdGraph* FindOrCreateEventGraph(UBlueprint* Blueprint);
-    
+
+    /** GeneratedClass/SkeletonGeneratedClassの不整合を修正して安全にコンパイル */
+    static void SafeCompileBlueprint(UBlueprint* Blueprint);
+
     // ============================================
     // Blueprint node utilities
     // ============================================

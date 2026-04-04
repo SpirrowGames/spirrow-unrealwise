@@ -272,16 +272,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCoreCommands::HandleCompileBluepr
         return Error;
     }
 
-    // Compile the blueprint
-    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
-    if (!Blueprint->GeneratedClass)
-    {
-        FKismetEditorUtilities::CompileBlueprint(Blueprint, EBlueprintCompileOptions::None);
-    }
-    else
-    {
-        FKismetEditorUtilities::CompileBlueprint(Blueprint);
-    }
+    FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
 
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
     ResultObj->SetBoolField(TEXT("success"), true);

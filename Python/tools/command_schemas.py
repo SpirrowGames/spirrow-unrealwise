@@ -272,11 +272,11 @@ COMMAND_SCHEMAS = {
             },
         },
         "set_data_asset_property": {
-            "brief": "Set a property on a DataAsset",
+            "brief": "Set a property on a DataAsset (supports TMap via dict or dot notation)",
             "params": {
                 "asset_name": {"type": "str", "required": True, "desc": "DataAsset name"},
-                "property_name": {"type": "str", "required": True, "desc": "Property name"},
-                "property_value": {"type": "any", "required": True, "desc": "Property value"},
+                "property_name": {"type": "str", "required": True, "desc": "Property name. Use dot notation for TMap entry: 'MapProp.KeyName'"},
+                "property_value": {"type": "any", "required": True, "desc": "Value to set. For TMap: dict to overwrite all, single value with dot notation, null to delete entry"},
                 "path": {"type": "str", "default": "/Game/Data", "desc": "Content path"},
             },
         },

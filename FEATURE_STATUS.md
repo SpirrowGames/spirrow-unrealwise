@@ -80,6 +80,11 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 ### Blueprint操作 (17)
 `create_blueprint`, `spawn_blueprint_actor`, `add_component_to_blueprint`, `set_static_mesh_properties`, `set_component_property`, `set_physics_properties`, `compile_blueprint`, `set_blueprint_property`, `create_data_asset`, `set_class_property`, `set_object_property`, `get_blueprint_properties`, `set_struct_property`, `set_data_asset_property`, `get_data_asset_properties` 🆕, `batch_set_properties`, `find_cpp_function_in_blueprints`
 
+**TMap プロパティサポート** 🆕: `set_data_asset_property` / `batch_set_properties` で `TMap<FName/FString, int32/float/double/bool/FString/FName>` の読み書きに対応
+- 全体上書き: `property_name="MapProp"`, `property_value={"Key": value, ...}`
+- 個別エントリ: `property_name="MapProp.KeyName"`, `property_value=value`
+- エントリ削除: `property_name="MapProp.KeyName"`, `property_value=null`
+
 ### BPノードグラフ (9)
 `add_blueprint_event_node`, `add_blueprint_input_action_node`, `add_blueprint_function_node`, `connect_blueprint_nodes`, `disconnect_blueprint_nodes` 🆕, `add_blueprint_variable`, `add_blueprint_get_self_component_reference`, `add_blueprint_self_reference`, `find_blueprint_nodes`
 

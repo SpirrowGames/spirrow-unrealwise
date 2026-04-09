@@ -577,13 +577,165 @@ UK2Node_Event* FSpirrowBridgeCommonUtils::FindExistingEventNode(UEdGraph* Graph,
     return nullptr;
 }
 
-bool FSpirrowBridgeCommonUtils::SetObjectProperty(UObject* Object, const FString& PropertyName, 
+bool FSpirrowBridgeCommonUtils::SetObjectProperty(UObject* Object, const FString& PropertyName,
                                      const TSharedPtr<FJsonValue>& Value, FString& OutErrorMessage)
 {
     if (!Object)
     {
         OutErrorMessage = TEXT("Invalid object");
         return false;
+    }
+
+    // ============================================
+    // Dot notation support for TMap entry access
+    // e.g. "IntProperties.StabilityMax" → set single entry in TMap
+    // ============================================
+    FString MapPropertyName, MapKeyName;
+    if (PropertyName.Split(TEXT("."), &MapPropertyName, &MapKeyName))
+    {
+        FProperty* MapProp = nullptr;
+        UClass* SearchClass = Object->GetClass();
+        while (SearchClass && !MapProp)
+        {
+            MapProp = SearchClass->FindPropertyByName(*MapPropertyName);
+            if (!MapProp) SearchClass = SearchClass->GetSuperClass();
+        }
+
+        if (!MapProp)
+        {
+            OutErrorMessage = FString::Printf(TEXT("Property not found: %s"), *MapPropertyName);
+            return false;
+        }
+
+        FMapProperty* MapProperty = CastField<FMapProperty>(MapProp);
+        if (!MapProperty)
+        {
+            OutErrorMessage = FString::Printf(TEXT("Property %s is not a TMap (dot notation requires TMap)"), *MapPropertyName);
+            return false;
+        }
+
+        void* MapAddr = MapProperty->ContainerPtrToValuePtr<void>(Object);
+        FScriptMapHelper MapHelper(MapProperty, MapAddr);
+        FProperty* KeyProp = MapProperty->KeyProp;
+        FProperty* ValueProp = MapProperty->ValueProp;
+
+        // Find existing key or add new entry
+        int32 FoundIndex = INDEX_NONE;
+        if (CastField<FNameProperty>(KeyProp))
+        {
+            FName SearchKey(*MapKeyName);
+            for (int32 i = 0; i < MapHelper.GetMaxIndex(); ++i)
+            {
+                if (MapHelper.IsValidIndex(i))
+                {
+                    FName ExistingKey;
+                    KeyProp->GetValue_InContainer(MapHelper.GetKeyPtr(i), &ExistingKey);
+                    if (ExistingKey == SearchKey)
+                    {
+                        FoundIndex = i;
+                        break;
+                    }
+                }
+            }
+        }
+        else if (CastField<FStrProperty>(KeyProp))
+        {
+            for (int32 i = 0; i < MapHelper.GetMaxIndex(); ++i)
+            {
+                if (MapHelper.IsValidIndex(i))
+                {
+                    FString ExistingKey;
+                    KeyProp->GetValue_InContainer(MapHelper.GetKeyPtr(i), &ExistingKey);
+                    if (ExistingKey == MapKeyName)
+                    {
+                        FoundIndex = i;
+                        break;
+                    }
+                }
+            }
+        }
+        else
+        {
+            OutErrorMessage = FString::Printf(TEXT("Unsupported TMap key type for dot notation: %s"), *KeyProp->GetCPPType());
+            return false;
+        }
+
+        // null value = delete entry
+        if (!Value.IsValid() || Value->IsNull())
+        {
+            if (FoundIndex != INDEX_NONE)
+            {
+                MapHelper.RemoveAt(FoundIndex);
+                MapHelper.Rehash();
+                UE_LOG(LogTemp, Display, TEXT("Removed TMap entry %s[%s] on %s"), *MapPropertyName, *MapKeyName, *Object->GetName());
+                return true;
+            }
+            else
+            {
+                OutErrorMessage = FString::Printf(TEXT("TMap key '%s' not found in %s (nothing to delete)"), *MapKeyName, *MapPropertyName);
+                return false;
+            }
+        }
+
+        if (FoundIndex == INDEX_NONE)
+        {
+            FoundIndex = MapHelper.AddDefaultValue_Invalid_NeedsRehash();
+            // Set the key
+            if (FNameProperty* NameKeyProp = CastField<FNameProperty>(KeyProp))
+            {
+                NameKeyProp->SetPropertyValue(MapHelper.GetKeyPtr(FoundIndex), FName(*MapKeyName));
+            }
+            else if (FStrProperty* StrKeyProp = CastField<FStrProperty>(KeyProp))
+            {
+                StrKeyProp->SetPropertyValue(MapHelper.GetKeyPtr(FoundIndex), MapKeyName);
+            }
+        }
+
+        // Set the value
+        uint8* ValueAddr = MapHelper.GetValuePtr(FoundIndex);
+        bool bSuccess = false;
+        if (FIntProperty* IntProp = CastField<FIntProperty>(ValueProp))
+        {
+            IntProp->SetPropertyValue(ValueAddr, static_cast<int32>(Value->AsNumber()));
+            bSuccess = true;
+        }
+        else if (FFloatProperty* FloatProp = CastField<FFloatProperty>(ValueProp))
+        {
+            FloatProp->SetPropertyValue(ValueAddr, static_cast<float>(Value->AsNumber()));
+            bSuccess = true;
+        }
+        else if (FDoubleProperty* DoubleProp = CastField<FDoubleProperty>(ValueProp))
+        {
+            DoubleProp->SetPropertyValue(ValueAddr, Value->AsNumber());
+            bSuccess = true;
+        }
+        else if (FBoolProperty* BoolProp = CastField<FBoolProperty>(ValueProp))
+        {
+            BoolProp->SetPropertyValue(ValueAddr, Value->AsBool());
+            bSuccess = true;
+        }
+        else if (FStrProperty* StrProp = CastField<FStrProperty>(ValueProp))
+        {
+            StrProp->SetPropertyValue(ValueAddr, Value->AsString());
+            bSuccess = true;
+        }
+        else if (FNameProperty* NameProp = CastField<FNameProperty>(ValueProp))
+        {
+            NameProp->SetPropertyValue(ValueAddr, FName(*Value->AsString()));
+            bSuccess = true;
+        }
+        else
+        {
+            OutErrorMessage = FString::Printf(TEXT("Unsupported TMap value type: %s"), *ValueProp->GetCPPType());
+            return false;
+        }
+
+        if (bSuccess)
+        {
+            MapHelper.Rehash();
+            UE_LOG(LogTemp, Display, TEXT("Set TMap entry %s[%s] on %s"), *MapPropertyName, *MapKeyName, *Object->GetName());
+        }
+        return bSuccess;
     }
 
     // Search through class hierarchy for the property
@@ -1052,6 +1204,90 @@ bool FSpirrowBridgeCommonUtils::SetObjectProperty(UObject* Object, const FString
     {
         DoubleProp->SetPropertyValue(PropertyAddr, Value->AsNumber());
         UE_LOG(LogTemp, Display, TEXT("Set double property %s to: %f"), *PropertyName, Value->AsNumber());
+        return true;
+    }
+    // ============================================
+    // FMapProperty handling — full TMap overwrite from JSON object
+    // e.g. {"StabilityMax": 100, "SIDecayRate": 10}
+    // ============================================
+    else if (FMapProperty* MapProperty = CastField<FMapProperty>(Property))
+    {
+        if (Value->Type != EJson::Object)
+        {
+            OutErrorMessage = FString::Printf(TEXT("TMap property %s requires a JSON object value (e.g. {\"Key\": value})"), *PropertyName);
+            return false;
+        }
+
+        const TSharedPtr<FJsonObject>& MapJson = Value->AsObject();
+        FProperty* KeyProp = MapProperty->KeyProp;
+        FProperty* ValueProp = MapProperty->ValueProp;
+
+        // Validate key type is FName or FString
+        bool bKeyIsName = CastField<FNameProperty>(KeyProp) != nullptr;
+        bool bKeyIsString = CastField<FStrProperty>(KeyProp) != nullptr;
+        if (!bKeyIsName && !bKeyIsString)
+        {
+            OutErrorMessage = FString::Printf(TEXT("TMap key type %s not supported (only FName and FString)"), *KeyProp->GetCPPType());
+            return false;
+        }
+
+        FScriptMapHelper MapHelper(MapProperty, PropertyAddr);
+        MapHelper.EmptyValues();
+
+        int32 EntryCount = 0;
+        for (const auto& Pair : MapJson->Values)
+        {
+            int32 NewIndex = MapHelper.AddDefaultValue_Invalid_NeedsRehash();
+
+            // Set key
+            if (bKeyIsName)
+            {
+                CastField<FNameProperty>(KeyProp)->SetPropertyValue(MapHelper.GetKeyPtr(NewIndex), FName(*Pair.Key));
+            }
+            else
+            {
+                CastField<FStrProperty>(KeyProp)->SetPropertyValue(MapHelper.GetKeyPtr(NewIndex), Pair.Key);
+            }
+
+            // Set value
+            uint8* ValAddr = MapHelper.GetValuePtr(NewIndex);
+            const TSharedPtr<FJsonValue>& EntryValue = Pair.Value;
+
+            if (FIntProperty* IntValProp = CastField<FIntProperty>(ValueProp))
+            {
+                IntValProp->SetPropertyValue(ValAddr, static_cast<int32>(EntryValue->AsNumber()));
+            }
+            else if (FFloatProperty* FloatValProp = CastField<FFloatProperty>(ValueProp))
+            {
+                FloatValProp->SetPropertyValue(ValAddr, static_cast<float>(EntryValue->AsNumber()));
+            }
+            else if (FDoubleProperty* DblValProp = CastField<FDoubleProperty>(ValueProp))
+            {
+                DblValProp->SetPropertyValue(ValAddr, EntryValue->AsNumber());
+            }
+            else if (FBoolProperty* BoolValProp = CastField<FBoolProperty>(ValueProp))
+            {
+                BoolValProp->SetPropertyValue(ValAddr, EntryValue->AsBool());
+            }
+            else if (FStrProperty* StrValProp = CastField<FStrProperty>(ValueProp))
+            {
+                StrValProp->SetPropertyValue(ValAddr, EntryValue->AsString());
+            }
+            else if (FNameProperty* NameValProp = CastField<FNameProperty>(ValueProp))
+            {
+                NameValProp->SetPropertyValue(ValAddr, FName(*EntryValue->AsString()));
+            }
+            else
+            {
+                MapHelper.EmptyValues();
+                OutErrorMessage = FString::Printf(TEXT("Unsupported TMap value type: %s"), *ValueProp->GetCPPType());
+                return false;
+            }
+            EntryCount++;
+        }
+
+        MapHelper.Rehash();
+        UE_LOG(LogTemp, Display, TEXT("Set TMap property %s with %d entries"), *PropertyName, EntryCount);
         return true;
     }
 

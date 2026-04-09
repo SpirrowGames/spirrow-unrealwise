@@ -28,10 +28,13 @@
 
 // ===== Helper Functions for Graph-Based Node Operations =====
 
+// 匿名名前空間で囲み、Unity ビルド時に BTNodeCreation.cpp の同名 static 関数と衝突しないようにする
+namespace
+{
 /**
  * Generate a unique node name based on class name and existing node count
  */
-static FName GenerateUniqueNodeName(UBehaviorTreeGraph* BTGraph, UClass* NodeClass)
+FName GenerateUniqueNodeName(UBehaviorTreeGraph* BTGraph, UClass* NodeClass)
 {
 	FString BaseClassName = NodeClass->GetName();
 
@@ -50,6 +53,7 @@ static FName GenerateUniqueNodeName(UBehaviorTreeGraph* BTGraph, UClass* NodeCla
 	// Generate unique name like "BTComposite_Selector_1"
 	return FName(*FString::Printf(TEXT("%s_%d"), *BaseClassName, Index));
 }
+} // namespace
 
 /**
  * Get the BehaviorTreeGraph from a BehaviorTree asset

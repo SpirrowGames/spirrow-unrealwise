@@ -522,16 +522,24 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleSetNodePi
         }
         if (K2Schema)
         {
+            // K2Schema->TrySetDefaultObject internally fires
+            // Node->PinDefaultValueChanged, which for K2Node_CallFunction
+            // calls FDynamicOutputHelper::ConformOutputType() — that is how
+            // DeterminesOutputType ReturnValue pins get narrowed to the
+            // concrete class. Do NOT call ReconstructNode here afterward:
+            // it would destroy the pins and re-allocate them against a
+            // (temporarily) empty Class pin, leaving ReturnValue stuck at
+            // the base type even though the Class pin value is preserved
+            // via RewireOldPinsToNewPins.
             K2Schema->TrySetDefaultObject(*TargetPin, ResolvedClass);
         }
         else
         {
+            // Fallback when no K2 schema: write directly and fire the
+            // default-value notification manually so the node can narrow.
             TargetPin->DefaultObject = ResolvedClass;
+            TargetNode->PinDefaultValueChanged(TargetPin);
         }
-        // Downstream pins (e.g. ReturnValue) may carry a narrowed type that
-        // depends on the Class pin's object. Reconstruct the node so that
-        // ReallocatePinsDuringReconstruction can re-type them.
-        TargetNode->ReconstructNode();
     }
     else if (bIsObjectPin)
     {
@@ -1086,15 +1094,16 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
         }
     }
 
-    // If a Class/Object pin default was written, reconstruct the node so that
-    // DeterminesOutputType / templated ReturnValue pins can re-resolve their
-    // concrete type. Without this, GetGameInstanceSubsystem(Class=Foo) will
-    // keep its ReturnValue typed as the base UGameInstanceSubsystem* and
-    // downstream connections will report "not compatible" errors.
-    if (bDefaultObjectWritten)
-    {
-        SpawnedNode->ReconstructNode();
-    }
+    // Note: narrowing of DeterminesOutputType / templated ReturnValue pins is
+    // handled inside K2Schema->TrySetDefaultObject — it fires
+    // Node->PinDefaultValueChanged which in turn calls
+    // UK2Node_CallFunction::ConformOutputType. We intentionally do NOT call
+    // SpawnedNode->ReconstructNode() here: doing so would destroy the
+    // already-narrowed pins and re-allocate them against a momentarily
+    // empty Class pin, leaving ReturnValue stuck at the base type. The
+    // bDefaultObjectWritten flag is kept only in case we need it for
+    // diagnostics or future work.
+    (void)bDefaultObjectWritten;
 
     FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
 

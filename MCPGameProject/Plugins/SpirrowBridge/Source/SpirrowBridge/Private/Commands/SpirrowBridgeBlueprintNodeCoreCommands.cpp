@@ -978,63 +978,122 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
     }
 
     // Set parameters if provided (works for both function-call pins and
-    // variable-set input pin named after the property)
+    // variable-set input pin named after the property).
+    //
+    // Class/Object pins are stored on Pin->DefaultObject via
+    // K2Schema->TrySetDefaultObject, not Pin->DefaultValue. If any such pin
+    // was written, the node must be reconstructed afterward so downstream
+    // pin types (e.g. templated ReturnValue with DeterminesOutputType) are
+    // narrowed correctly — otherwise the caller sees the base return type
+    // and downstream connections report type mismatches.
+    bool bDefaultObjectWritten = false;
     if (Params->HasField(TEXT("params")))
     {
         const TSharedPtr<FJsonObject>* ParamsObj;
         if (Params->TryGetObjectField(TEXT("params"), ParamsObj))
         {
+            const UEdGraphSchema_K2* K2Schema = Cast<const UEdGraphSchema_K2>(EventGraph->GetSchema());
+
             for (const TPair<FString, TSharedPtr<FJsonValue>>& Param : (*ParamsObj)->Values)
             {
                 UEdGraphPin* ParamPin = FSpirrowBridgeCommonUtils::FindPin(SpawnedNode, Param.Key, EGPD_Input);
-                if (ParamPin)
+                if (!ParamPin) continue;
+
+                const TSharedPtr<FJsonValue>& ParamValue = Param.Value;
+                const FName& ParamCat = ParamPin->PinType.PinCategory;
+                const bool bIsClassParamPin = (ParamCat == UEdGraphSchema_K2::PC_Class
+                                            || ParamCat == UEdGraphSchema_K2::PC_SoftClass);
+                const bool bIsObjectParamPin = (ParamCat == UEdGraphSchema_K2::PC_Object
+                                             || ParamCat == UEdGraphSchema_K2::PC_SoftObject
+                                             || ParamCat == UEdGraphSchema_K2::PC_Interface);
+
+                if (ParamValue->Type == EJson::String)
                 {
-                    const TSharedPtr<FJsonValue>& ParamValue = Param.Value;
-                    if (ParamValue->Type == EJson::String)
+                    const FString StrVal = ParamValue->AsString();
+
+                    if (bIsClassParamPin)
                     {
-                        if (ParamPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Class)
+                        // Use FindClassByNameAnywhere so bare names like
+                        // "VoxelCollapseSubsystem" and fully-qualified
+                        // "/Script/VoxelRuntime.VoxelCollapseSubsystem" both work.
+                        UClass* ResolvedClass = FSpirrowBridgeCommonUtils::FindClassByNameAnywhere(StrVal);
+                        if (ResolvedClass)
                         {
-                            FString ClassName = ParamValue->AsString();
-                            UClass* Class = LoadObject<UClass>(nullptr, *ClassName);
-                            if (!Class) Class = LoadObject<UClass>(nullptr, *(TEXT("/Script/Engine.") + ClassName));
-                            if (Class)
-                            {
-                                const UEdGraphSchema_K2* K2Schema = Cast<const UEdGraphSchema_K2>(EventGraph->GetSchema());
-                                if (K2Schema) K2Schema->TrySetDefaultObject(*ParamPin, Class);
-                            }
+                            if (K2Schema) K2Schema->TrySetDefaultObject(*ParamPin, ResolvedClass);
+                            else ParamPin->DefaultObject = ResolvedClass;
+                            bDefaultObjectWritten = true;
                         }
                         else
                         {
-                            ParamPin->DefaultValue = ParamValue->AsString();
+                            UE_LOG(LogSpirrowBridgeNodeCore, Warning,
+                                TEXT("add_blueprint_function_node: could not resolve class '%s' for pin '%s'"),
+                                *StrVal, *Param.Key);
                         }
                     }
-                    else if (ParamValue->Type == EJson::Number)
+                    else if (bIsObjectParamPin)
                     {
-                        if (ParamPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Int)
-                            ParamPin->DefaultValue = FString::FromInt(FMath::RoundToInt(ParamValue->AsNumber()));
-                        else
-                            ParamPin->DefaultValue = FString::SanitizeFloat(ParamValue->AsNumber());
-                    }
-                    else if (ParamValue->Type == EJson::Boolean)
-                    {
-                        ParamPin->DefaultValue = ParamValue->AsBool() ? TEXT("true") : TEXT("false");
-                    }
-                    else if (ParamValue->Type == EJson::Array)
-                    {
-                        const TArray<TSharedPtr<FJsonValue>>* ArrayValue;
-                        if (ParamValue->TryGetArray(ArrayValue) && ArrayValue->Num() == 3 &&
-                            ParamPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Struct &&
-                            ParamPin->PinType.PinSubCategoryObject == TBaseStructure<FVector>::Get())
+                        // Asset reference: LoadObject handles package paths.
+                        UObject* ResolvedObject = LoadObject<UObject>(nullptr, *StrVal);
+                        if (!ResolvedObject)
                         {
-                            float X = (*ArrayValue)[0]->AsNumber();
-                            float Y = (*ArrayValue)[1]->AsNumber();
-                            float Z = (*ArrayValue)[2]->AsNumber();
-                            ParamPin->DefaultValue = FString::Printf(TEXT("(X=%f,Y=%f,Z=%f)"), X, Y, Z);
+                            // Some object pins accept a UClass (e.g. when the
+                            // underlying type is a SubclassOf-like wrapper).
+                            ResolvedObject = FSpirrowBridgeCommonUtils::FindClassByNameAnywhere(StrVal);
                         }
+                        if (ResolvedObject)
+                        {
+                            if (K2Schema) K2Schema->TrySetDefaultObject(*ParamPin, ResolvedObject);
+                            else ParamPin->DefaultObject = ResolvedObject;
+                            bDefaultObjectWritten = true;
+                        }
+                        else
+                        {
+                            UE_LOG(LogSpirrowBridgeNodeCore, Warning,
+                                TEXT("add_blueprint_function_node: could not resolve object '%s' for pin '%s'"),
+                                *StrVal, *Param.Key);
+                        }
+                    }
+                    else
+                    {
+                        ParamPin->DefaultValue = StrVal;
+                    }
+                }
+                else if (ParamValue->Type == EJson::Number)
+                {
+                    if (ParamCat == UEdGraphSchema_K2::PC_Int)
+                        ParamPin->DefaultValue = FString::FromInt(FMath::RoundToInt(ParamValue->AsNumber()));
+                    else
+                        ParamPin->DefaultValue = FString::SanitizeFloat(ParamValue->AsNumber());
+                }
+                else if (ParamValue->Type == EJson::Boolean)
+                {
+                    ParamPin->DefaultValue = ParamValue->AsBool() ? TEXT("true") : TEXT("false");
+                }
+                else if (ParamValue->Type == EJson::Array)
+                {
+                    const TArray<TSharedPtr<FJsonValue>>* ArrayValue;
+                    if (ParamValue->TryGetArray(ArrayValue) && ArrayValue->Num() == 3 &&
+                        ParamCat == UEdGraphSchema_K2::PC_Struct &&
+                        ParamPin->PinType.PinSubCategoryObject == TBaseStructure<FVector>::Get())
+                    {
+                        float X = (*ArrayValue)[0]->AsNumber();
+                        float Y = (*ArrayValue)[1]->AsNumber();
+                        float Z = (*ArrayValue)[2]->AsNumber();
+                        ParamPin->DefaultValue = FString::Printf(TEXT("(X=%f,Y=%f,Z=%f)"), X, Y, Z);
                     }
                 }
             }
         }
+    }
+
+    // If a Class/Object pin default was written, reconstruct the node so that
+    // DeterminesOutputType / templated ReturnValue pins can re-resolve their
+    // concrete type. Without this, GetGameInstanceSubsystem(Class=Foo) will
+    // keep its ReturnValue typed as the base UGameInstanceSubsystem* and
+    // downstream connections will report "not compatible" errors.
+    if (bDefaultObjectWritten)
+    {
+        SpawnedNode->ReconstructNode();
     }
 
     FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);

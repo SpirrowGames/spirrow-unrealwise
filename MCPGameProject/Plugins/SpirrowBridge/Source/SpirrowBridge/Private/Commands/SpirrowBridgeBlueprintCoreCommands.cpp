@@ -254,20 +254,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCoreCommands::HandleCreateBluepri
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCoreCommands::HandleCompileBlueprint(const TSharedPtr<FJsonObject>& Params)
 {
-    // Validate required parameters
-    FString BlueprintName;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
-
-    // Get optional parameters
-    FString Path;
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
-
-    // Validate and load Blueprint
+    // Resolve target Blueprint (regular BP or Level Blueprint via target_type)
     UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
     {
         return Error;
     }
@@ -276,8 +265,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCoreCommands::HandleCompileBluepr
 
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
     ResultObj->SetBoolField(TEXT("success"), true);
-    ResultObj->SetStringField(TEXT("name"), BlueprintName);
-    ResultObj->SetStringField(TEXT("path"), Path + TEXT("/") + BlueprintName);
+    ResultObj->SetStringField(TEXT("name"), Blueprint->GetName());
+    ResultObj->SetStringField(TEXT("path"), Blueprint->GetPathName());
     ResultObj->SetBoolField(TEXT("compiled"), true);
     return ResultObj;
 }
@@ -492,26 +481,15 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCoreCommands::HandleDuplicateBlue
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCoreCommands::HandleGetBlueprintGraph(const TSharedPtr<FJsonObject>& Params)
 {
-    // Validate required parameters
-    FString BlueprintName;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
-
-    // Get optional parameters
-    FString Path;
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
-
-    // Validate and load Blueprint
+    // Resolve target Blueprint (regular BP or Level Blueprint via target_type)
     UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
     {
         return Error;
     }
 
     TSharedPtr<FJsonObject> ResultData = MakeShareable(new FJsonObject());
-    ResultData->SetStringField(TEXT("blueprint_name"), BlueprintName);
+    ResultData->SetStringField(TEXT("blueprint_name"), Blueprint->GetName());
     ResultData->SetStringField(TEXT("parent_class"), Blueprint->ParentClass ? Blueprint->ParentClass->GetName() : TEXT("None"));
 
     // Get Event Graph nodes

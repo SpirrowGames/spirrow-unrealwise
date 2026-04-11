@@ -50,6 +50,12 @@ def register_blueprint_meta_tool(mcp: FastMCP):
         create_data_asset, set_class_property, set_object_property,
         get_blueprint_properties, set_struct_property, set_data_asset_property,
         get_data_asset_properties, batch_set_properties, find_cpp_function_in_blueprints
+
+        Level Blueprint support: compile_blueprint and get_blueprint_graph accept
+        target_type="level_blueprint" to operate on the current level's Level
+        Script Blueprint instead of a regular asset. Optional level_path (e.g.
+        "/Game/Maps/MyMap") selects a specific level; omit for the current one.
+
         Use help("blueprint", "command_name") for params.
         """
         from tools.meta_utils import execute_command

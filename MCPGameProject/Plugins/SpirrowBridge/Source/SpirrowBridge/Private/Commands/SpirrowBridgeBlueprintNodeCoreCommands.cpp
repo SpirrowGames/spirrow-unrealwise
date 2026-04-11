@@ -65,11 +65,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleCommand(c
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleConnectBlueprintNodes(const TSharedPtr<FJsonObject>& Params)
 {
     // Validate required parameters
-    FString BlueprintName, SourceNodeId, TargetNodeId, SourcePinName, TargetPinName;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
+    FString SourceNodeId, TargetNodeId, SourcePinName, TargetPinName;
     if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("source_node_id"), SourceNodeId))
     {
         return Error;
@@ -87,13 +83,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleConnectBl
         return Error;
     }
 
-    // Get optional parameters
-    FString Path;
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
-
-    // Validate and load Blueprint
+    // Resolve target Blueprint (regular BP or Level Blueprint via target_type)
     UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
     {
         return Error;
     }
@@ -144,12 +136,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleConnectBl
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleDisconnectBlueprintNodes(const TSharedPtr<FJsonObject>& Params)
 {
-    // Validate required parameters - at minimum need blueprint and one node
-    FString BlueprintName, NodeId, PinName;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
+    // Validate required parameters
+    FString NodeId, PinName;
     if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("node_id"), NodeId))
     {
         return Error;
@@ -163,13 +151,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleDisconnec
     Params->TryGetStringField(TEXT("target_node_id"), TargetNodeId);
     Params->TryGetStringField(TEXT("target_pin"), TargetPinName);
 
-    // Get optional parameters
-    FString Path;
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
-
-    // Validate and load Blueprint
+    // Resolve target Blueprint (regular BP or Level Blueprint via target_type)
     UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
     {
         return Error;
     }
@@ -302,24 +286,16 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleDisconnec
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleFindBlueprintNodes(const TSharedPtr<FJsonObject>& Params)
 {
-    // Validate required parameters
-    FString BlueprintName;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
-
-    // Get optional parameters
-    FString Path, NodeType, EventType, FunctionNameFilter, VariableNameFilter;
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
+    // Get optional filter parameters
+    FString NodeType, EventType, FunctionNameFilter, VariableNameFilter;
     Params->TryGetStringField(TEXT("node_type"), NodeType);
     Params->TryGetStringField(TEXT("event_type"), EventType);
     Params->TryGetStringField(TEXT("function_name"), FunctionNameFilter);
     Params->TryGetStringField(TEXT("variable_name"), VariableNameFilter);
 
-    // Validate and load Blueprint
+    // Resolve target Blueprint (regular BP or Level Blueprint via target_type)
     UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
     {
         return Error;
     }
@@ -436,11 +412,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleFindBluep
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleSetNodePinValue(const TSharedPtr<FJsonObject>& Params)
 {
     // Validate required parameters
-    FString BlueprintName, NodeId, PinName, PinValue;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
+    FString NodeId, PinName, PinValue;
     if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("node_id"), NodeId))
     {
         return Error;
@@ -454,13 +426,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleSetNodePi
         return Error;
     }
 
-    // Get optional parameters
-    FString Path;
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
-
-    // Validate and load Blueprint
+    // Resolve target Blueprint (regular BP or Level Blueprint via target_type)
     UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
     {
         return Error;
     }
@@ -505,15 +473,113 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleSetNodePi
             Details);
     }
 
-    if (TargetPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Int)
+    // Pin type dispatch:
+    //  - Primitive (int/float/bool): write Pin->DefaultValue as string
+    //  - Struct (Vector/Rotator/...): write Pin->DefaultValue as K2-encoded string (caller's responsibility)
+    //  - Class / SoftClass: resolve UClass* and write Pin->DefaultObject via K2Schema->TrySetDefaultObject
+    //  - Object / SoftObject / Interface: resolve UObject* asset and write Pin->DefaultObject via TrySetDefaultObject
+    //
+    // K2 stores class/object pin defaults on Pin->DefaultObject, NOT Pin->DefaultValue.
+    // Using DefaultValue for class pins produces the compile error:
+    //   "String NewDefaultValue 'X' specified on class pin 'Class'".
+    const FEdGraphPinType& PinT = TargetPin->PinType;
+    const UEdGraphSchema_K2* K2Schema = GetDefault<UEdGraphSchema_K2>();
+
+    bool bIsClassPin = (PinT.PinCategory == UEdGraphSchema_K2::PC_Class
+                     || PinT.PinCategory == UEdGraphSchema_K2::PC_SoftClass);
+    bool bIsObjectPin = (PinT.PinCategory == UEdGraphSchema_K2::PC_Object
+                      || PinT.PinCategory == UEdGraphSchema_K2::PC_SoftObject
+                      || PinT.PinCategory == UEdGraphSchema_K2::PC_Interface);
+
+    if (bIsClassPin)
+    {
+        UClass* ResolvedClass = FSpirrowBridgeCommonUtils::FindClassByNameAnywhere(PinValue);
+        if (!ResolvedClass)
+        {
+            TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+            Details->SetStringField(TEXT("pin_type"), TEXT("Class"));
+            Details->SetStringField(TEXT("pin_value"), PinValue);
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::ClassNotFound,
+                FString::Printf(TEXT("Class not found for class pin value: %s"), *PinValue),
+                Details);
+        }
+        // Validate: the resolved class must be a child of the pin's expected base class
+        if (UClass* ExpectedBase = Cast<UClass>(PinT.PinSubCategoryObject.Get()))
+        {
+            if (!ResolvedClass->IsChildOf(ExpectedBase))
+            {
+                TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+                Details->SetStringField(TEXT("pin_value"), PinValue);
+                Details->SetStringField(TEXT("resolved_class"), ResolvedClass->GetName());
+                Details->SetStringField(TEXT("expected_base"), ExpectedBase->GetName());
+                return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                    ESpirrowErrorCode::PropertyTypeMismatch,
+                    FString::Printf(TEXT("Class %s is not a subclass of pin's expected base %s"),
+                        *ResolvedClass->GetName(), *ExpectedBase->GetName()),
+                    Details);
+            }
+        }
+        if (K2Schema)
+        {
+            K2Schema->TrySetDefaultObject(*TargetPin, ResolvedClass);
+        }
+        else
+        {
+            TargetPin->DefaultObject = ResolvedClass;
+        }
+        // Downstream pins (e.g. ReturnValue) may carry a narrowed type that
+        // depends on the Class pin's object. Reconstruct the node so that
+        // ReallocatePinsDuringReconstruction can re-type them.
+        TargetNode->ReconstructNode();
+    }
+    else if (bIsObjectPin)
+    {
+        // For asset references the caller passes a package path. LoadObject
+        // will synchronously load the asset if needed.
+        UObject* ResolvedObject = LoadObject<UObject>(nullptr, *PinValue);
+        if (!ResolvedObject)
+        {
+            // Fallback: some object pins may expect a class rather than an asset
+            ResolvedObject = FSpirrowBridgeCommonUtils::FindClassByNameAnywhere(PinValue);
+        }
+        if (!ResolvedObject)
+        {
+            TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+            Details->SetStringField(TEXT("pin_type"), TEXT("Object"));
+            Details->SetStringField(TEXT("pin_value"), PinValue);
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::AssetNotFound,
+                FString::Printf(TEXT("Object not found for object pin value: %s"), *PinValue),
+                Details);
+        }
+        if (K2Schema)
+        {
+            K2Schema->TrySetDefaultObject(*TargetPin, ResolvedObject);
+        }
+        else
+        {
+            TargetPin->DefaultObject = ResolvedObject;
+        }
+    }
+    else if (PinT.PinCategory == UEdGraphSchema_K2::PC_Int)
+    {
         TargetPin->DefaultValue = FString::FromInt(FCString::Atoi(*PinValue));
-    else if (TargetPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Float || 
-             TargetPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Real)
+    }
+    else if (PinT.PinCategory == UEdGraphSchema_K2::PC_Float ||
+             PinT.PinCategory == UEdGraphSchema_K2::PC_Real)
+    {
         TargetPin->DefaultValue = FString::SanitizeFloat(FCString::Atof(*PinValue));
-    else if (TargetPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Boolean)
+    }
+    else if (PinT.PinCategory == UEdGraphSchema_K2::PC_Boolean)
+    {
         TargetPin->DefaultValue = PinValue.ToBool() ? TEXT("true") : TEXT("false");
+    }
     else
+    {
+        // Covers string, name, text, struct (caller provides K2-encoded string), etc.
         TargetPin->DefaultValue = PinValue;
+    }
 
     FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
 
@@ -522,29 +588,26 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleSetNodePi
     ResultObj->SetStringField(TEXT("node_id"), NodeId);
     ResultObj->SetStringField(TEXT("pin_name"), PinName);
     ResultObj->SetStringField(TEXT("pin_value"), PinValue);
+    ResultObj->SetStringField(TEXT("pin_category"), PinT.PinCategory.ToString());
+    if (bIsClassPin || bIsObjectPin)
+    {
+        ResultObj->SetBoolField(TEXT("wrote_default_object"), true);
+    }
     return ResultObj;
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleDeleteNode(const TSharedPtr<FJsonObject>& Params)
 {
     // Validate required parameters
-    FString BlueprintName, NodeId;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
+    FString NodeId;
     if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("node_id"), NodeId))
     {
         return Error;
     }
 
-    // Get optional parameters
-    FString Path;
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
-
-    // Validate and load Blueprint
+    // Resolve target Blueprint (regular BP or Level Blueprint via target_type)
     UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
     {
         return Error;
     }
@@ -587,11 +650,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleDeleteNod
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleMoveNode(const TSharedPtr<FJsonObject>& Params)
 {
     // Validate required parameters
-    FString BlueprintName, NodeId;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
+    FString NodeId;
     if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("node_id"), NodeId))
     {
         return Error;
@@ -605,13 +664,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleMoveNode(
 
     FVector2D NewPosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("position"));
 
-    // Get optional parameters
-    FString Path;
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
-
-    // Validate and load Blueprint
+    // Resolve target Blueprint (regular BP or Level Blueprint via target_type)
     UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
     {
         return Error;
     }
@@ -652,11 +707,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleMoveNode(
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBlueprintEvent(const TSharedPtr<FJsonObject>& Params)
 {
     // Validate required parameters
-    FString BlueprintName, EventName;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
+    FString EventName;
     if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("event_name"), EventName))
     {
         return Error;
@@ -668,13 +719,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
         NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
     }
 
-    // Get optional parameters
-    FString Path;
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
-
-    // Validate and load Blueprint
+    // Resolve target Blueprint (regular BP or Level Blueprint via target_type)
     UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
     {
         return Error;
     }
@@ -768,11 +815,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBlueprintFunctionCall(const TSharedPtr<FJsonObject>& Params)
 {
     // Validate required parameters
-    FString BlueprintName, FunctionName;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
+    FString FunctionName;
     if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("function_name"), FunctionName))
     {
         return Error;
@@ -785,13 +828,12 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
     }
 
     // Get optional parameters
-    FString Target, Path;
+    FString Target;
     Params->TryGetStringField(TEXT("target"), Target);
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
 
-    // Validate and load Blueprint
+    // Resolve target Blueprint (regular BP or Level Blueprint via target_type)
     UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
     {
         return Error;
     }
@@ -846,20 +888,97 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
     {
         Function = Blueprint->GeneratedClass->FindFunctionByName(*FunctionName);
     }
-    
+
     if (Function && !FunctionNode)
     {
         FunctionNode = FSpirrowBridgeCommonUtils::CreateFunctionCallNode(EventGraph, Function, NodePosition);
     }
-    
-    if (!FunctionNode)
+
+    // --- Fallback: external UPROPERTY Set/Get ---
+    // If the requested "function" is really a Set<Prop>/Get<Prop> on an external
+    // class (e.g. SetMaxClusterForPhysics on UVoxelCollapseSubsystem), the
+    // corresponding K2 node is UK2Node_VariableSet/Get with an external member
+    // reference — not a UK2Node_CallFunction. Detect that here so callers do
+    // not need a separate API for this common case.
+    UK2Node_VariableSet* FallbackSetNode = nullptr;
+    UK2Node_VariableGet* FallbackGetNode = nullptr;
+    FString FallbackClassName;
+    FString FallbackPropertyName;
+    if (!FunctionNode && !Target.IsEmpty())
+    {
+        UClass* FallbackClass = FSpirrowBridgeCommonUtils::FindClassByNameAnywhere(Target);
+        if (FallbackClass)
+        {
+            FString StrippedName;
+            bool bWantSet = false;
+            bool bWantGet = false;
+
+            if (FunctionName.StartsWith(TEXT("K2_Set")))
+            {
+                StrippedName = FunctionName.RightChop(6);
+                bWantSet = true;
+            }
+            else if (FunctionName.StartsWith(TEXT("Set")))
+            {
+                StrippedName = FunctionName.RightChop(3);
+                bWantSet = true;
+            }
+            else if (FunctionName.StartsWith(TEXT("K2_Get")))
+            {
+                StrippedName = FunctionName.RightChop(6);
+                bWantGet = true;
+            }
+            else if (FunctionName.StartsWith(TEXT("Get")))
+            {
+                StrippedName = FunctionName.RightChop(3);
+                bWantGet = true;
+            }
+
+            if (bWantSet && !StrippedName.IsEmpty())
+            {
+                FString SpawnError;
+                FallbackSetNode = FSpirrowBridgeCommonUtils::SpawnExternalPropertySetNode(
+                    EventGraph, FallbackClass, FName(*StrippedName), NodePosition, SpawnError);
+                if (FallbackSetNode)
+                {
+                    FallbackClassName = FallbackClass->GetName();
+                    FallbackPropertyName = StrippedName;
+                    UE_LOG(LogSpirrowBridgeNodeCore, Log,
+                        TEXT("add_blueprint_function_node: fell back to external UPROPERTY Set node for %s::%s"),
+                        *FallbackClass->GetName(), *StrippedName);
+                }
+            }
+            else if (bWantGet && !StrippedName.IsEmpty())
+            {
+                FString SpawnError;
+                FallbackGetNode = FSpirrowBridgeCommonUtils::SpawnExternalPropertyGetNode(
+                    EventGraph, FallbackClass, FName(*StrippedName), NodePosition, SpawnError);
+                if (FallbackGetNode)
+                {
+                    FallbackClassName = FallbackClass->GetName();
+                    FallbackPropertyName = StrippedName;
+                    UE_LOG(LogSpirrowBridgeNodeCore, Log,
+                        TEXT("add_blueprint_function_node: fell back to external UPROPERTY Get node for %s::%s"),
+                        *FallbackClass->GetName(), *StrippedName);
+                }
+            }
+        }
+    }
+
+    // Resolve the final spawned node (either a function call or a variable node)
+    UEdGraphNode* SpawnedNode = FunctionNode;
+    if (!SpawnedNode) SpawnedNode = FallbackSetNode;
+    if (!SpawnedNode) SpawnedNode = FallbackGetNode;
+
+    if (!SpawnedNode)
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(
             ESpirrowErrorCode::FunctionNotFound,
             FString::Printf(TEXT("Function not found: %s in target %s"), *FunctionName, Target.IsEmpty() ? TEXT("Blueprint") : *Target));
     }
 
-    // Set parameters if provided
+    // Set parameters if provided (works for both function-call pins and
+    // variable-set input pin named after the property)
     if (Params->HasField(TEXT("params")))
     {
         const TSharedPtr<FJsonObject>* ParamsObj;
@@ -867,7 +986,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
         {
             for (const TPair<FString, TSharedPtr<FJsonValue>>& Param : (*ParamsObj)->Values)
             {
-                UEdGraphPin* ParamPin = FSpirrowBridgeCommonUtils::FindPin(FunctionNode, Param.Key, EGPD_Input);
+                UEdGraphPin* ParamPin = FSpirrowBridgeCommonUtils::FindPin(SpawnedNode, Param.Key, EGPD_Input);
                 if (ParamPin)
                 {
                     const TSharedPtr<FJsonValue>& ParamValue = Param.Value;
@@ -922,6 +1041,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
 
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
     ResultObj->SetBoolField(TEXT("success"), true);
-    ResultObj->SetStringField(TEXT("node_id"), FunctionNode->NodeGuid.ToString());
+    ResultObj->SetStringField(TEXT("node_id"), SpawnedNode->NodeGuid.ToString());
+    if (FallbackSetNode || FallbackGetNode)
+    {
+        // Surface the fallback so callers can detect the variable-node path
+        ResultObj->SetBoolField(TEXT("fallback_variable_node"), true);
+        ResultObj->SetStringField(TEXT("fallback_kind"), FallbackSetNode ? TEXT("VariableSet") : TEXT("VariableGet"));
+        ResultObj->SetStringField(TEXT("target_class"), FallbackClassName);
+        ResultObj->SetStringField(TEXT("property_name"), FallbackPropertyName);
+    }
     return ResultObj;
 }

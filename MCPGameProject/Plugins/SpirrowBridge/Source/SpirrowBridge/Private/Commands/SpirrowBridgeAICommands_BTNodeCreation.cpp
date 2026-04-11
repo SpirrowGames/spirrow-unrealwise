@@ -132,7 +132,7 @@ static bool ConnectGraphNodes(UBehaviorTreeGraphNode* ParentGraphNode, UBehavior
 /**
  * Generate a unique node name based on class name and existing node count
  */
-static FName GenerateUniqueNodeName(UBehaviorTreeGraph* BTGraph, UClass* NodeClass)
+static FName GenerateUniqueBTNodeNameForCreation(UBehaviorTreeGraph* BTGraph, UClass* NodeClass)
 {
 	FString BaseClassName = NodeClass->GetName();
 
@@ -426,7 +426,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTCompositeNode(
 		UBehaviorTreeGraphNode_SimpleParallel* ParallelNode = NodeCreator.CreateNode();
 
 		// ★ ユニークな名前を生成（問題3修正）★
-		FName UniqueName = GenerateUniqueNodeName(BTGraph, NodeClass);
+		FName UniqueName = GenerateUniqueBTNodeNameForCreation(BTGraph, NodeClass);
 
 		// ランタイムノード作成（★Outer は GraphNode に★）
 		UBTCompositeNode* RuntimeNode = NewObject<UBTCompositeNode>(
@@ -466,7 +466,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTCompositeNode(
 		UBehaviorTreeGraphNode_Composite* CompositeNode = NodeCreator.CreateNode();
 
 		// ★ ユニークな名前を生成（問題3修正）★
-		FName UniqueName = GenerateUniqueNodeName(BTGraph, NodeClass);
+		FName UniqueName = GenerateUniqueBTNodeNameForCreation(BTGraph, NodeClass);
 
 		// ランタイムノード作成
 		UBTCompositeNode* RuntimeNode = NewObject<UBTCompositeNode>(
@@ -658,7 +658,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTTaskNode(
 		UBehaviorTreeGraphNode_SubtreeTask* SubtreeNode = NodeCreator.CreateNode();
 
 		// ★ ユニークな名前を生成（問題3修正）★
-		FName UniqueName = GenerateUniqueNodeName(BTGraph, TaskClass);
+		FName UniqueName = GenerateUniqueBTNodeNameForCreation(BTGraph, TaskClass);
 
 		// ランタイムノード作成
 		UBTTaskNode* RuntimeNode = NewObject<UBTTaskNode>(
@@ -695,7 +695,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTTaskNode(
 		UBehaviorTreeGraphNode_Task* TaskNode = NodeCreator.CreateNode();
 
 		// ★ ユニークな名前を生成（問題3修正）★
-		FName UniqueName = GenerateUniqueNodeName(BTGraph, TaskClass);
+		FName UniqueName = GenerateUniqueBTNodeNameForCreation(BTGraph, TaskClass);
 
 		// ランタイムノード作成
 		UBTTaskNode* RuntimeNode = NewObject<UBTTaskNode>(
@@ -875,7 +875,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTDecoratorNode(
 	);
 
 	// ★ ユニークな名前を生成（問題3修正）★
-	FName UniqueName = GenerateUniqueNodeName(BTGraph, DecoratorClass);
+	FName UniqueName = GenerateUniqueBTNodeNameForCreation(BTGraph, DecoratorClass);
 
 	// ★ ランタイムノード作成（OuterはBehaviorTree - UpdateAsset互換性のため）★
 	UBTDecorator* RuntimeDecorator = NewObject<UBTDecorator>(
@@ -1026,7 +1026,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTServiceNode(
 	);
 
 	// ★ ユニークな名前を生成（問題3修正）★
-	FName UniqueName = GenerateUniqueNodeName(BTGraph, ServiceClass);
+	FName UniqueName = GenerateUniqueBTNodeNameForCreation(BTGraph, ServiceClass);
 
 	// ★ ランタイムノード作成（OuterはBehaviorTree - UpdateAsset互換性のため）★
 	UBTService* RuntimeService = NewObject<UBTService>(

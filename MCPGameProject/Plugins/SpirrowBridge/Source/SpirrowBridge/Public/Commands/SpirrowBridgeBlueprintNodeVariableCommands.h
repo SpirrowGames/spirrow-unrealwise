@@ -24,4 +24,11 @@ private:
     TSharedPtr<FJsonObject> HandleAddBlueprintGetSelfComponentReference(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleAddBlueprintSelfReference(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleAddBlueprintInputActionNode(const TSharedPtr<FJsonObject>& Params);
+
+    // External property (UPROPERTY on another class, e.g. Subsystem fields)
+    TSharedPtr<FJsonObject> HandleAddExternalPropertySetNode(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleAddExternalPropertyGetNode(const TSharedPtr<FJsonObject>& Params);
+
+    // Typed subsystem accessor (UK2Node_GetSubsystem with class baked in)
+    TSharedPtr<FJsonObject> HandleAddGetSubsystemNode(const TSharedPtr<FJsonObject>& Params);
 };

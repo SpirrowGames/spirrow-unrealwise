@@ -164,10 +164,12 @@ COMMAND_SCHEMAS = {
             },
         },
         "compile_blueprint": {
-            "brief": "Compile a Blueprint",
+            "brief": "Compile a Blueprint (regular or Level Script)",
             "params": {
-                "blueprint_name": {"type": "str", "required": True, "desc": "Blueprint name"},
+                "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
                 "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
+                "target_type": {"type": "str", "default": "blueprint", "desc": "'blueprint' (default) or 'level_blueprint' to target the Level Script Blueprint"},
+                "level_path": {"type": "str", "desc": "Level asset path (e.g. /Game/Maps/MyMap). Omit for the currently edited level. Only used when target_type=level_blueprint"},
             },
         },
         "set_blueprint_property": {
@@ -189,10 +191,12 @@ COMMAND_SCHEMAS = {
             },
         },
         "get_blueprint_graph": {
-            "brief": "Get node graph structure of a Blueprint",
+            "brief": "Get node graph structure of a Blueprint (regular or Level Script)",
             "params": {
-                "blueprint_name": {"type": "str", "required": True, "desc": "Blueprint name"},
+                "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
                 "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
+                "target_type": {"type": "str", "default": "blueprint", "desc": "'blueprint' (default) or 'level_blueprint'"},
+                "level_path": {"type": "str", "desc": "Level asset path. Omit for current level. Only used when target_type=level_blueprint"},
             },
         },
         "scan_project_classes": {
@@ -311,15 +315,25 @@ COMMAND_SCHEMAS = {
 
     # =========================================================================
     # BLUEPRINT_NODE (21 commands)
+    #
+    # All commands in this section accept two optional params (not shown in
+    # every schema entry for brevity):
+    #   target_type: "blueprint" (default) or "level_blueprint"
+    #   level_path:  "/Game/Maps/MyMap" etc. Only used when
+    #                target_type=level_blueprint; omit to target the currently
+    #                edited persistent level's Level Script Blueprint.
+    # When target_type=level_blueprint, blueprint_name / path are ignored.
     # =========================================================================
     "blueprint_node": {
         "add_blueprint_event_node": {
-            "brief": "Add an event node",
+            "brief": "Add an event node (works on regular BP or Level Script BP)",
             "params": {
-                "blueprint_name": {"type": "str", "required": True, "desc": "Blueprint name"},
-                "event_name": {"type": "str", "required": True, "desc": "Event name"},
+                "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
+                "event_name": {"type": "str", "required": True, "desc": "Event name (e.g. BeginPlay, Tick, ActorBeginOverlap for LSB)"},
                 "node_position": {"type": "list[int]", "default": [0, 0], "desc": "Node position [x,y]"},
                 "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
+                "target_type": {"type": "str", "default": "blueprint", "desc": "'blueprint' (default) or 'level_blueprint' to target the Level Script Blueprint"},
+                "level_path": {"type": "str", "desc": "Level asset path (e.g. /Game/Maps/MyMap). Omit for current level. Only used when target_type=level_blueprint"},
                 "rationale": {"type": "str", "desc": "Design rationale"},
             },
         },
@@ -333,26 +347,30 @@ COMMAND_SCHEMAS = {
             },
         },
         "add_blueprint_function_node": {
-            "brief": "Add a function call node",
+            "brief": "Add a function call node (regular BP or LSB). Falls back to external UPROPERTY Set/Get if function_name is Set<Prop>/Get<Prop> and no matching function exists",
             "params": {
-                "blueprint_name": {"type": "str", "required": True, "desc": "Blueprint name"},
-                "target": {"type": "str", "required": True, "desc": "Target object for function call"},
-                "function_name": {"type": "str", "required": True, "desc": "Function name"},
+                "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
+                "target": {"type": "str", "required": True, "desc": "Target class name (function owner, or owner of UPROPERTY for fallback)"},
+                "function_name": {"type": "str", "required": True, "desc": "Function name. If not found and starts with Set/Get/K2_Set/K2_Get, the handler falls back to spawning a UK2Node_VariableSet/Get for the matching UPROPERTY"},
                 "params": {"type": "dict", "default": {}, "desc": "Function parameters"},
                 "node_position": {"type": "list[int]", "default": [0, 0], "desc": "Node position [x,y]"},
                 "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
+                "target_type": {"type": "str", "default": "blueprint", "desc": "'blueprint' or 'level_blueprint'"},
+                "level_path": {"type": "str", "desc": "Level asset path. Omit for current level. Only used when target_type=level_blueprint"},
                 "rationale": {"type": "str", "desc": "Design rationale"},
             },
         },
         "connect_blueprint_nodes": {
-            "brief": "Connect two Blueprint nodes",
+            "brief": "Connect two Blueprint nodes (works on regular BP or Level Script BP)",
             "params": {
-                "blueprint_name": {"type": "str", "required": True, "desc": "Blueprint name"},
+                "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
                 "source_node_id": {"type": "str", "required": True, "desc": "Source node ID"},
                 "source_pin": {"type": "str", "required": True, "desc": "Source pin name"},
                 "target_node_id": {"type": "str", "required": True, "desc": "Target node ID"},
                 "target_pin": {"type": "str", "required": True, "desc": "Target pin name"},
                 "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
+                "target_type": {"type": "str", "default": "blueprint", "desc": "'blueprint' or 'level_blueprint'"},
+                "level_path": {"type": "str", "desc": "Level asset path. Omit for current level. Only used when target_type=level_blueprint"},
             },
         },
         "add_blueprint_variable": {
@@ -384,22 +402,26 @@ COMMAND_SCHEMAS = {
             },
         },
         "find_blueprint_nodes": {
-            "brief": "Find nodes in a Blueprint graph",
+            "brief": "Find nodes in a Blueprint graph (works on regular BP or Level Script BP)",
             "params": {
-                "blueprint_name": {"type": "str", "required": True, "desc": "Blueprint name"},
+                "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
                 "node_type": {"type": "any", "desc": "Filter by node type"},
                 "event_type": {"type": "any", "desc": "Filter by event type"},
                 "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
+                "target_type": {"type": "str", "default": "blueprint", "desc": "'blueprint' or 'level_blueprint'"},
+                "level_path": {"type": "str", "desc": "Level asset path. Omit for current level. Only used when target_type=level_blueprint"},
             },
         },
         "set_node_pin_value": {
-            "brief": "Set a value on a node pin",
+            "brief": "Set a default value on a node pin. Handles primitive, struct, Class, SoftClass, Object, SoftObject and Interface pins (regular BP or LSB)",
             "params": {
-                "blueprint_name": {"type": "str", "required": True, "desc": "Blueprint name"},
+                "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
                 "node_id": {"type": "str", "required": True, "desc": "Node ID"},
                 "pin_name": {"type": "str", "required": True, "desc": "Pin name"},
-                "pin_value": {"type": "any", "required": True, "desc": "Pin value"},
+                "pin_value": {"type": "any", "required": True, "desc": "Pin value. For Class pins: class path like '/Script/VoxelRuntime.VoxelCollapseSubsystem' or bare class name. For Object pins: asset path. For primitives/struct: string representation. The handler dispatches to Pin->DefaultValue (primitives) or Pin->DefaultObject (Class/Object) automatically"},
                 "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
+                "target_type": {"type": "str", "default": "blueprint", "desc": "'blueprint' or 'level_blueprint'"},
+                "level_path": {"type": "str", "desc": "Level asset path. Omit for current level. Only used when target_type=level_blueprint"},
             },
         },
         "add_variable_get_node": {
@@ -504,6 +526,42 @@ COMMAND_SCHEMAS = {
                 "value_type": {"type": "str", "default": "Float", "desc": "Value type"},
                 "node_position": {"type": "list[int]", "default": [0, 0], "desc": "Node position [x,y]"},
                 "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
+            },
+        },
+        "add_external_property_set_node": {
+            "brief": "Add a VariableSet node for a UPROPERTY on another class (e.g. Subsystem field)",
+            "params": {
+                "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
+                "target_class": {"type": "str", "required": True, "desc": "Owner class name, e.g. 'VoxelCollapseSubsystem' (U/A prefix handled automatically)"},
+                "property_name": {"type": "str", "required": True, "desc": "UPROPERTY name. Must be BlueprintReadWrite (not BlueprintReadOnly)"},
+                "node_position": {"type": "list[int]", "default": [0, 0], "desc": "Node position [x,y]"},
+                "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
+                "target_type": {"type": "str", "default": "blueprint", "desc": "'blueprint' or 'level_blueprint'"},
+                "level_path": {"type": "str", "desc": "Level asset path. Omit for current level. Only used when target_type=level_blueprint"},
+            },
+        },
+        "add_external_property_get_node": {
+            "brief": "Add a VariableGet node for a UPROPERTY on another class",
+            "params": {
+                "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
+                "target_class": {"type": "str", "required": True, "desc": "Owner class name, e.g. 'VoxelCollapseSubsystem'"},
+                "property_name": {"type": "str", "required": True, "desc": "UPROPERTY name. Must be BlueprintVisible"},
+                "node_position": {"type": "list[int]", "default": [0, 0], "desc": "Node position [x,y]"},
+                "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
+                "target_type": {"type": "str", "default": "blueprint", "desc": "'blueprint' or 'level_blueprint'"},
+                "level_path": {"type": "str", "desc": "Level asset path. Omit for current level. Only used when target_type=level_blueprint"},
+            },
+        },
+        "add_get_subsystem_node": {
+            "brief": "Add a typed UK2Node_GetSubsystem with the subsystem class baked in (ReturnValue is strongly typed, no Cast needed)",
+            "params": {
+                "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
+                "subsystem_class": {"type": "str", "required": True, "desc": "Subsystem class, e.g. '/Script/VoxelRuntime.VoxelCollapseSubsystem' or 'VoxelCollapseSubsystem'"},
+                "subsystem_kind": {"type": "str", "default": "GameInstance", "desc": "One of: 'GameInstance' (default), 'World', 'Engine', 'LocalPlayer'. Determines which K2 node variant is spawned and validates the class against the expected base"},
+                "node_position": {"type": "list[int]", "default": [0, 0], "desc": "Node position [x,y]"},
+                "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
+                "target_type": {"type": "str", "default": "blueprint", "desc": "'blueprint' or 'level_blueprint'"},
+                "level_path": {"type": "str", "desc": "Level asset path. Omit for current level. Only used when target_type=level_blueprint"},
             },
         },
     },

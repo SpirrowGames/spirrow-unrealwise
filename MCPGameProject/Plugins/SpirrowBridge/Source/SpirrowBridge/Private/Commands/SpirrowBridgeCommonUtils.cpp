@@ -1,6 +1,10 @@
 #include "Commands/SpirrowBridgeCommonUtils.h"
 #include "GameFramework/Actor.h"
 #include "Engine/Blueprint.h"
+#include "Engine/LevelScriptBlueprint.h"
+#include "Engine/World.h"
+#include "Engine/Level.h"
+#include "Editor.h"
 #include "WidgetBlueprint.h"
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphNode.h"
@@ -1463,6 +1467,242 @@ TSharedPtr<FJsonObject> FSpirrowBridgeCommonUtils::ValidateBlueprint(
     }
     
     return nullptr; // Success
+}
+
+UClass* FSpirrowBridgeCommonUtils::FindClassByNameAnywhere(const FString& ClassName)
+{
+    if (ClassName.IsEmpty())
+    {
+        return nullptr;
+    }
+
+    // 1) Direct lookup (handles fully-qualified "/Script/Module.Class")
+    if (UClass* Direct = FindObject<UClass>(nullptr, *ClassName))
+    {
+        return Direct;
+    }
+
+    // 2) Try /Script/Engine prefix (many core classes live there)
+    if (UClass* Engine = LoadObject<UClass>(nullptr, *(FString(TEXT("/Script/Engine.")) + ClassName)))
+    {
+        return Engine;
+    }
+
+    // 3) Iterate loaded classes; match bare name or standard U/A prefix
+    const FString WithU = FString(TEXT("U")) + ClassName;
+    const FString WithA = FString(TEXT("A")) + ClassName;
+    for (TObjectIterator<UClass> It; It; ++It)
+    {
+        UClass* C = *It;
+        if (!C)
+        {
+            continue;
+        }
+        const FString Name = C->GetName();
+        if (Name == ClassName || Name == WithU || Name == WithA)
+        {
+            return C;
+        }
+    }
+
+    return nullptr;
+}
+
+UK2Node_VariableSet* FSpirrowBridgeCommonUtils::SpawnExternalPropertySetNode(
+    UEdGraph* Graph,
+    UClass* OwnerClass,
+    FName PropertyName,
+    const FVector2D& NodePos,
+    FString& OutError)
+{
+    if (!Graph)
+    {
+        OutError = TEXT("Graph is null");
+        return nullptr;
+    }
+    if (!OwnerClass)
+    {
+        OutError = TEXT("OwnerClass is null");
+        return nullptr;
+    }
+
+    FProperty* Prop = OwnerClass->FindPropertyByName(PropertyName);
+    if (!Prop)
+    {
+        OutError = FString::Printf(TEXT("Property not found: %s on %s"), *PropertyName.ToString(), *OwnerClass->GetName());
+        return nullptr;
+    }
+    if (!Prop->HasAnyPropertyFlags(CPF_BlueprintVisible))
+    {
+        OutError = FString::Printf(TEXT("Property %s on %s is not BlueprintVisible"), *PropertyName.ToString(), *OwnerClass->GetName());
+        return nullptr;
+    }
+    if (Prop->HasAnyPropertyFlags(CPF_BlueprintReadOnly))
+    {
+        OutError = FString::Printf(TEXT("Property %s on %s is BlueprintReadOnly (declare as BlueprintReadWrite to Set from Blueprint)"), *PropertyName.ToString(), *OwnerClass->GetName());
+        return nullptr;
+    }
+
+    UK2Node_VariableSet* SetNode = NewObject<UK2Node_VariableSet>(Graph);
+    if (!SetNode)
+    {
+        OutError = TEXT("NewObject<UK2Node_VariableSet> returned null");
+        return nullptr;
+    }
+    SetNode->VariableReference.SetExternalMember(PropertyName, OwnerClass);
+    SetNode->NodePosX = NodePos.X;
+    SetNode->NodePosY = NodePos.Y;
+    Graph->AddNode(SetNode, false, false);
+    SetNode->CreateNewGuid();
+    SetNode->PostPlacedNewNode();
+    SetNode->AllocateDefaultPins();
+    return SetNode;
+}
+
+UK2Node_VariableGet* FSpirrowBridgeCommonUtils::SpawnExternalPropertyGetNode(
+    UEdGraph* Graph,
+    UClass* OwnerClass,
+    FName PropertyName,
+    const FVector2D& NodePos,
+    FString& OutError)
+{
+    if (!Graph)
+    {
+        OutError = TEXT("Graph is null");
+        return nullptr;
+    }
+    if (!OwnerClass)
+    {
+        OutError = TEXT("OwnerClass is null");
+        return nullptr;
+    }
+
+    FProperty* Prop = OwnerClass->FindPropertyByName(PropertyName);
+    if (!Prop)
+    {
+        OutError = FString::Printf(TEXT("Property not found: %s on %s"), *PropertyName.ToString(), *OwnerClass->GetName());
+        return nullptr;
+    }
+    if (!Prop->HasAnyPropertyFlags(CPF_BlueprintVisible))
+    {
+        OutError = FString::Printf(TEXT("Property %s on %s is not BlueprintVisible"), *PropertyName.ToString(), *OwnerClass->GetName());
+        return nullptr;
+    }
+
+    UK2Node_VariableGet* GetNode = NewObject<UK2Node_VariableGet>(Graph);
+    if (!GetNode)
+    {
+        OutError = TEXT("NewObject<UK2Node_VariableGet> returned null");
+        return nullptr;
+    }
+    GetNode->VariableReference.SetExternalMember(PropertyName, OwnerClass);
+    GetNode->NodePosX = NodePos.X;
+    GetNode->NodePosY = NodePos.Y;
+    Graph->AddNode(GetNode, false, false);
+    GetNode->CreateNewGuid();
+    GetNode->PostPlacedNewNode();
+    GetNode->AllocateDefaultPins();
+    return GetNode;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(
+    const TSharedPtr<FJsonObject>& Params,
+    UBlueprint*& OutBlueprint)
+{
+    OutBlueprint = nullptr;
+
+    if (!Params.IsValid())
+    {
+        return CreateErrorResponse(ESpirrowErrorCode::InvalidParams, TEXT("Invalid params object"));
+    }
+
+    FString TargetType;
+    GetOptionalString(Params, TEXT("target_type"), TargetType, TEXT("blueprint"));
+
+    if (TargetType.Equals(TEXT("level_blueprint"), ESearchCase::IgnoreCase)
+        || TargetType.Equals(TEXT("level"), ESearchCase::IgnoreCase))
+    {
+        // Level Blueprint path: resolve via UWorld -> PersistentLevel -> LSB
+        FString LevelPath;
+        Params->TryGetStringField(TEXT("level_path"), LevelPath);
+
+        UWorld* World = nullptr;
+        if (LevelPath.IsEmpty())
+        {
+            if (!GEditor)
+            {
+                return CreateErrorResponse(
+                    ESpirrowErrorCode::SystemError,
+                    TEXT("GEditor is not available (target_type=level_blueprint requires editor)"));
+            }
+            World = GEditor->GetEditorWorldContext().World();
+            if (!World)
+            {
+                return CreateErrorResponse(
+                    ESpirrowErrorCode::AssetNotFound,
+                    TEXT("No active editor world. Open a level in the editor or provide 'level_path'."));
+            }
+        }
+        else
+        {
+            // Accept either "/Game/Maps/MyMap" or "/Game/Maps/MyMap.MyMap"
+            FString ResolvedPath = LevelPath;
+            if (!ResolvedPath.Contains(TEXT(".")))
+            {
+                FString AssetName;
+                FString LeftPart;
+                if (ResolvedPath.Split(TEXT("/"), &LeftPart, &AssetName, ESearchCase::IgnoreCase, ESearchDir::FromEnd))
+                {
+                    ResolvedPath = FString::Printf(TEXT("%s/%s.%s"), *LeftPart, *AssetName, *AssetName);
+                }
+            }
+
+            World = LoadObject<UWorld>(nullptr, *ResolvedPath);
+            if (!World)
+            {
+                TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+                Details->SetStringField(TEXT("level_path"), LevelPath);
+                Details->SetStringField(TEXT("resolved_path"), ResolvedPath);
+                return CreateErrorResponse(
+                    ESpirrowErrorCode::AssetNotFound,
+                    FString::Printf(TEXT("Level (World) not found: %s"), *LevelPath),
+                    Details);
+            }
+        }
+
+        if (!World->PersistentLevel)
+        {
+            return CreateErrorResponse(
+                ESpirrowErrorCode::BlueprintNotFound,
+                TEXT("World has no PersistentLevel"));
+        }
+
+        ULevelScriptBlueprint* LSB = World->PersistentLevel->GetLevelScriptBlueprint(false);
+        if (!LSB)
+        {
+            // Create the LSB if it doesn't exist yet
+            LSB = World->PersistentLevel->GetLevelScriptBlueprint(true);
+        }
+        if (!LSB)
+        {
+            return CreateErrorResponse(
+                ESpirrowErrorCode::BlueprintNotFound,
+                TEXT("Failed to get Level Script Blueprint for the persistent level"));
+        }
+
+        OutBlueprint = LSB;
+        return nullptr;
+    }
+
+    // Fallback: standard name+path resolution (preserves legacy behavior)
+    FString BlueprintName;
+    if (auto Error = ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
+    {
+        return Error;
+    }
+    FString Path;
+    GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
+    return ValidateBlueprint(BlueprintName, Path, OutBlueprint);
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(

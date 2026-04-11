@@ -1,8 +1,8 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: v0.9.2 (BT Robustness & Auto-Repair)
+> **バージョン**: v0.9.3 (Level Blueprint + External UPROPERTY + Typed Subsystem)
 > **ステータス**: Beta
-> **最終更新**: 2026-04-04
+> **最終更新**: 2026-04-12
 
 ---
 
@@ -11,6 +11,7 @@
 **v0.9.1** でメタツール化を実施。161個の個別ツールを **25個** (14メタツール + 1ヘルプ + 10スタンドアロン) に統合。
 コンテキスト消費量を ~170K → ~22K tokens に削減。
 **v0.9.2** でBTノードの堅牢性向上・自動修復機能を追加。
+**v0.9.3** で `blueprint` / `blueprint_node` メタツールに Level Blueprint (LSB) 対応、外部クラスの UPROPERTY Set/Get ノード対応 (explicit API + `add_blueprint_function_node` 透過的 fallback)、typed Get Subsystem ノード、`set_node_pin_value` の Class/Object ピン対応を追加。
 
 ### 使い方
 ```python
@@ -31,8 +32,8 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 | メタツール | 説明 | コマンド数 | 状態 |
 |-----------|------|-----------|------|
 | `editor` | Actor操作、トランスフォーム、プロパティ | 12 | ✅ |
-| `blueprint` | BP作成、コンパイル、プロパティ、DataAsset | 21 | ✅ |
-| `blueprint_node` | イベント、関数、変数、フロー制御、数学 | 21 | ✅ |
+| `blueprint` | BP作成、コンパイル、プロパティ、DataAsset (LSB対応) 🆕 | 21 | ✅ |
+| `blueprint_node` | イベント、関数、変数、フロー制御、数学 (LSB + 外部UPROPERTY + typed Subsystem) 🆕 | 24 | ✅ |
 | `umg_widget` | テキスト、画像、ボタン、スライダー等 | 18 | ✅ |
 | `umg_layout` | VBox/HBox、ScrollBox、リペアレント | 5 | ✅ |
 | `umg_variable` | Widget変数、関数、イベント | 5 | ✅ |
@@ -64,7 +65,7 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 | | 数 |
 |---|---|
 | **MCP登録ツール合計** | **25** |
-| **内包コマンド合計** | **149** |
+| **内包コマンド合計** | **152** |
 
 ---
 
@@ -85,10 +86,86 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 - 個別エントリ: `property_name="MapProp.KeyName"`, `property_value=value`
 - エントリ削除: `property_name="MapProp.KeyName"`, `property_value=null`
 
-### BPノードグラフ (9)
-`add_blueprint_event_node`, `add_blueprint_input_action_node`, `add_blueprint_function_node`, `connect_blueprint_nodes`, `disconnect_blueprint_nodes` 🆕, `add_blueprint_variable`, `add_blueprint_get_self_component_reference`, `add_blueprint_self_reference`, `find_blueprint_nodes`
+### BPノードグラフ (24)
 
-**add_blueprint_event_node**: BlueprintImplementableEvent オーバーライド対応 🆕
+- **イベント/関数** (3): `add_blueprint_event_node`, `add_blueprint_input_action_node`, `add_blueprint_function_node`
+- **接続/検索/編集** (6): `connect_blueprint_nodes`, `disconnect_blueprint_nodes`, `find_blueprint_nodes`, `set_node_pin_value`, `delete_blueprint_node`, `move_blueprint_node`
+- **変数/参照** (5): `add_blueprint_variable`, `add_variable_get_node`, `add_variable_set_node`, `add_blueprint_get_self_component_reference`, `add_blueprint_self_reference`
+- **制御フロー/数学** (7): `add_branch_node`, `add_sequence_node`, `add_delay_node`, `add_forloop_with_break_node`, `add_print_string_node`, `add_math_node`, `add_comparison_node`
+- **外部UPROPERTY / Subsystem** 🆕 (3): `add_external_property_set_node`, `add_external_property_get_node`, `add_get_subsystem_node`
+
+**add_blueprint_event_node**: BlueprintImplementableEvent オーバーライド対応
+**add_blueprint_function_node**: `Set<Prop>`/`Get<Prop>` 関数名が見つからない場合、同名の外部 UPROPERTY Set/Get ノードに自動 fallback 🆕
+**set_node_pin_value**: Class/SoftClass/Object/SoftObject/Interface ピンに対応 (`Pin->DefaultObject` + `ReconstructNode`) 🆕
+
+### Level Blueprint対応 🆕 (v0.9.3)
+`blueprint` / `blueprint_node` メタツールの以下コマンドは、`target_type="level_blueprint"` パラメータで **Level Script Blueprint** (レベルブループリント) を対象にできます。`blueprint_name` / `path` は無視されます。
+
+- **ノード編集** (`blueprint_node`): `add_blueprint_event_node`, `add_blueprint_function_node`, `connect_blueprint_nodes`, `disconnect_blueprint_nodes`, `find_blueprint_nodes`, `set_node_pin_value`, `delete_blueprint_node`, `move_blueprint_node`, `add_blueprint_variable`, `add_variable_get_node`, `add_variable_set_node`, `add_blueprint_self_reference`, `add_branch_node`, `add_sequence_node`, `add_delay_node`, `add_forloop_with_break_node`, `add_print_string_node`, `add_math_node`, `add_comparison_node`, `add_external_property_set_node` 🆕, `add_external_property_get_node` 🆕
+- **BP操作** (`blueprint`): `compile_blueprint`, `get_blueprint_graph`
+
+**level_path** パラメータ (省略可): 特定のレベルアセットを指定 (例: `"/Game/Maps/MyMap"`)。省略時は現在編集中のレベル。
+
+```python
+# 現在のレベルのLSBにBeginPlayイベントを追加
+blueprint_node(command="add_blueprint_event_node", params={
+    "target_type": "level_blueprint",
+    "event_name": "ReceiveBeginPlay"
+})
+
+# LSBをコンパイル
+blueprint(command="compile_blueprint", params={"target_type": "level_blueprint"})
+```
+
+### Typed Get Subsystem ノード 🆕 (v0.9.3)
+`SubsystemBlueprintLibrary::GetGameInstanceSubsystem(Class)` を経由すると Class ピンが string としてしか渡せず、戻り値の型が narrow されない問題がある。UE標準の `UK2Node_GetSubsystem` は `Initialize(UClass*)` で **クラスを node 生成時に焼き込む** ため、ReturnValue が最初から typed (`UVoxelCollapseSubsystem*` 等) になる。
+
+**新規コマンド**:
+- `add_get_subsystem_node` — typed K2Node_GetSubsystem を生成。`subsystem_kind` で 4 種類 (GameInstance / World / Engine / LocalPlayer) に対応:
+
+| subsystem_kind | 生成される K2 node | 要件 (ExpectedBase) |
+|---|---|---|
+| `GameInstance` (default) | `UK2Node_GetSubsystem` | `UGameInstanceSubsystem` サブクラス |
+| `World` | `UK2Node_GetSubsystem` | `UWorldSubsystem` サブクラス |
+| `Engine` | `UK2Node_GetEngineSubsystem` | `UEngineSubsystem` サブクラス |
+| `LocalPlayer` | `UK2Node_GetSubsystemFromPC` | `ULocalPlayerSubsystem` サブクラス |
+
+```python
+# typed subsystem → Cast 不要、下流の Set ノードに直接接続可能
+sub = blueprint_node(command="add_get_subsystem_node", params={
+    "target_type": "level_blueprint",
+    "subsystem_class": "/Script/VoxelRuntime.VoxelCollapseSubsystem",
+    "subsystem_kind": "GameInstance",
+    "node_position": [400, 0]
+})
+```
+
+### set_node_pin_value: Class/Object ピン対応 🆕 (v0.9.3)
+`set_node_pin_value` が K2 の Class/SoftClass/Object/SoftObject/Interface ピンを正しく扱うようになった。内部でピンカテゴリを判定し、`Pin->DefaultValue` (文字列) と `Pin->DefaultObject` (UObject*) を自動的に使い分ける。
+
+- **Class/SoftClass ピン**: `pin_value` にクラスパス (`/Script/VoxelRuntime.VoxelCollapseSubsystem`) または bare class name (`VoxelCollapseSubsystem`) を渡す → `FindClassByNameAnywhere` で解決、`K2Schema->TrySetDefaultObject` で設定、`ReconstructNode()` で下流ピン型を narrow。
+- **Object/SoftObject/Interface ピン**: `pin_value` にアセットパス (`/Game/Textures/T_Grass.T_Grass`) を渡す → `LoadObject` で解決。
+- **Class 型検証**: ピンが持つ `PinSubCategoryObject` (期待される base class) に対して解決されたクラスが `IsChildOf` かチェック。不一致時は `PropertyTypeMismatch` エラーを返す。
+
+### 外部UPROPERTY Set/Get ノード 🆕 (v0.9.3)
+`UPROPERTY(BlueprintReadWrite)` を **別クラス (Subsystemなど)** 経由で Set/Get するノードは、K2内部的には `UK2Node_CallFunction` ではなく `UK2Node_VariableSet/Get` の外部メンバ参照。`add_blueprint_function_node` では表現できない。
+
+**新規コマンド** (明示的API):
+- `add_external_property_set_node` — 外部クラスのUPROPERTYにSetノード追加 (BlueprintReadWrite必須)
+- `add_external_property_get_node` — 外部クラスのUPROPERTYにGetノード追加 (BlueprintVisible必須)
+
+**透過的 fallback**: `add_blueprint_function_node` に `function_name="SetMaxClusterForPhysics"` など `Set<Prop>` / `Get<Prop>` / `K2_Set<Prop>` / `K2_Get<Prop>` の関数名を渡した時、関数が見つからなければ自動的にプロパティSet/Getノードにフォールバック。既存呼び出しはそのまま動作。
+
+```python
+# Level BlueprintでSubsystemのUPROPERTYにSet
+blueprint_node(command="add_external_property_set_node", params={
+    "target_type": "level_blueprint",
+    "target_class": "VoxelCollapseSubsystem",
+    "property_name": "MaxClusterForPhysics",
+    "node_position": [900, 0]
+})
+# → VariableSetノードが生成される。MaxClusterForPhysics入力ピンにset_node_pin_valueで値を設定可能。
+```
 
 ### UMG Widget (30)
 - **Core (3)**: create, viewport, anchor
@@ -178,7 +255,27 @@ generate_and_import_texture(
 
 ## 最新の更新
 
-### 2026-03-13: BT Robustness & Auto-Repair (v0.9.2) 🆕
+### 2026-04-12: Level Blueprint + External UPROPERTY + Typed Subsystem (v0.9.3) 🆕
+
+**Blueprint / blueprint_node メタツールの3大強化**:
+
+| 変更 | 内容 |
+|------|------|
+| **LSB target_type** | `blueprint` / `blueprint_node` の graph 編集系 23 コマンドが `target_type="level_blueprint"` + `level_path` でLevel Script Blueprintを直接編集可能に。`FSpirrowBridgeCommonUtils::ResolveTargetBlueprint` ヘルパーで統一解決 |
+| **add_external_property_set_node** 🆕 | 外部クラスの UPROPERTY(BlueprintReadWrite) に対する `UK2Node_VariableSet` 生成。Subsystem フィールドなど典型ケースに対応 |
+| **add_external_property_get_node** 🆕 | 同じく `UK2Node_VariableGet` 生成。BlueprintVisible が要件 |
+| **add_blueprint_function_node fallback** | `function_name` が `Set<Prop>` / `Get<Prop>` / `K2_Set<Prop>` / `K2_Get<Prop>` で関数として見つからない場合、自動的に外部 UPROPERTY Set/Get ノードに fallback。既存呼び出しは壊れない |
+| **add_get_subsystem_node** 🆕 | `UK2Node_GetSubsystem::Initialize(UClass*)` でクラスを焼き込んだ typed ノードを生成。`subsystem_kind` で GameInstance / World / Engine / LocalPlayer の4種類に対応。ReturnValue が strongly typed になるため Cast 不要 |
+| **set_node_pin_value: Class/Object ピン対応** 🆕 | ピンカテゴリを判定して `Pin->DefaultValue` (プリミティブ) と `Pin->DefaultObject` (Class/SoftClass/Object/SoftObject/Interface) を自動選択。Class ピン設定時は `ReconstructNode()` で下流型を narrow。`PinSubCategoryObject` に対する型チェック付き |
+| **CommonUtils ヘルパー追加** | `FindClassByNameAnywhere` (bare name / U/A プレフィックス自動ハンドル), `SpawnExternalPropertySetNode`, `SpawnExternalPropertyGetNode`, `ResolveTargetBlueprint` |
+| **Unity build ambiguity fix** | `GenerateUniqueNodeName` が BTNodeOperations/BTNodeCreation 間で unity build 時に衝突していた問題を解決 (BTNodeCreation 側を `GenerateUniqueBTNodeNameForCreation` にリネーム) |
+
+**コマンド数**: 149 → **152** (+3: `add_external_property_set_node`, `add_external_property_get_node`, `add_get_subsystem_node`)
+**blueprint_node コマンド数**: 21 → **24**
+
+---
+
+### 2026-03-13: BT Robustness & Auto-Repair (v0.9.2)
 
 **BTノード堅牢性の向上と自動修復機能**:
 

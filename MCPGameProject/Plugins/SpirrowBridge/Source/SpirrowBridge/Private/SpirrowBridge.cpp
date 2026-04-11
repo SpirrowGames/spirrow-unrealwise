@@ -387,7 +387,12 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("add_print_string_node") ||
                      // Math & comparison nodes
                      CommandType == TEXT("add_math_node") ||
-                     CommandType == TEXT("add_comparison_node"))
+                     CommandType == TEXT("add_comparison_node") ||
+                     // External UPROPERTY Set/Get nodes (UPROPERTY on another class)
+                     CommandType == TEXT("add_external_property_set_node") ||
+                     CommandType == TEXT("add_external_property_get_node") ||
+                     // Typed Get Subsystem node (K2Node_GetSubsystem with class baked in)
+                     CommandType == TEXT("add_get_subsystem_node"))
             {
                 ResultJson = BlueprintNodeCommands->HandleCommand(CommandType, Params);
             }

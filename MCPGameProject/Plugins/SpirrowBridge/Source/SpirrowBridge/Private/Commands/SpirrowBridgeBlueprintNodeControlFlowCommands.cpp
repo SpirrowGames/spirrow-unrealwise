@@ -54,26 +54,15 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleCo
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAddBranchNode(const TSharedPtr<FJsonObject>& Params)
 {
-    // Validate required parameters
-    FString BlueprintName;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
-
     FVector2D NodePosition(0.0f, 0.0f);
     if (Params->HasField(TEXT("node_position")))
     {
         NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
     }
 
-    // Get optional parameters
-    FString Path;
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
-
-    // Validate and load Blueprint
+    // Resolve target Blueprint (regular BP or Level Blueprint via target_type)
     UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
     {
         return Error;
     }
@@ -112,13 +101,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAddSequenceNode(const TSharedPtr<FJsonObject>& Params)
 {
-    // Validate required parameters
-    FString BlueprintName;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
-
     // Get optional parameters
     double NumOutputsDouble;
     FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("num_outputs"), NumOutputsDouble, 2.0);
@@ -130,12 +112,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
         NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
     }
 
-    FString Path;
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
-
-    // Validate and load Blueprint
+    // Resolve target Blueprint (regular BP or Level Blueprint via target_type)
     UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
     {
         return Error;
     }
@@ -180,13 +159,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAddDelayNode(const TSharedPtr<FJsonObject>& Params)
 {
-    // Validate required parameters
-    FString BlueprintName;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
-
     // Get optional parameters
     double Duration;
     FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("duration"), Duration, 1.0);
@@ -197,12 +169,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
         NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
     }
 
-    FString Path;
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
-
-    // Validate and load Blueprint
+    // Resolve target Blueprint (regular BP or Level Blueprint via target_type)
     UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
     {
         return Error;
     }
@@ -255,13 +224,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAddForLoopWithBreakNode(const TSharedPtr<FJsonObject>& Params)
 {
-    // Validate required parameters
-    FString BlueprintName;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
-
     // Get optional parameters
     double FirstIndexDouble, LastIndexDouble;
     FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("first_index"), FirstIndexDouble, 0.0);
@@ -275,12 +237,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
         NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
     }
 
-    FString Path;
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
-
-    // Validate and load Blueprint
+    // Resolve target Blueprint (regular BP or Level Blueprint via target_type)
     UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
     {
         return Error;
     }
@@ -353,13 +312,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAddPrintStringNode(const TSharedPtr<FJsonObject>& Params)
 {
-    // Validate required parameters
-    FString BlueprintName;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
-
     // Get optional parameters
     FString Message;
     FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("message"), Message, TEXT("Hello"));
@@ -370,12 +322,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
         NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
     }
 
-    FString Path;
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
-
-    // Validate and load Blueprint
+    // Resolve target Blueprint (regular BP or Level Blueprint via target_type)
     UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
     {
         return Error;
     }
@@ -422,11 +371,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAddMathNode(const TSharedPtr<FJsonObject>& Params)
 {
     // Validate required parameters
-    FString BlueprintName, Operation;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
+    FString Operation;
     if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("operation"), Operation))
     {
         return Error;
@@ -442,12 +387,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
         NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
     }
 
-    FString Path;
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
-
-    // Validate and load Blueprint
+    // Resolve target Blueprint (regular BP or Level Blueprint via target_type)
     UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
     {
         return Error;
     }
@@ -514,11 +456,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAddComparisonNode(const TSharedPtr<FJsonObject>& Params)
 {
     // Validate required parameters
-    FString BlueprintName, Operation;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
+    FString Operation;
     if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("operation"), Operation))
     {
         return Error;
@@ -534,12 +472,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
         NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
     }
 
-    FString Path;
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
-
-    // Validate and load Blueprint
+    // Resolve target Blueprint (regular BP or Level Blueprint via target_type)
     UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
     {
         return Error;
     }

@@ -28,6 +28,9 @@ COMMANDS = {
     "add_print_string_node": "add_print_string_node",
     "add_math_node": "add_math_node",
     "add_comparison_node": "add_comparison_node",
+    "add_external_property_set_node": "add_external_property_set_node",
+    "add_external_property_get_node": "add_external_property_get_node",
+    "add_get_subsystem_node": "add_get_subsystem_node",
 }
 
 RATIONALE_COMMANDS = {
@@ -50,7 +53,37 @@ def register_node_meta_tool(mcp: FastMCP):
         add_variable_set_node, add_branch_node, delete_blueprint_node,
         move_blueprint_node, add_sequence_node, add_delay_node,
         add_forloop_with_break_node, add_print_string_node,
-        add_math_node, add_comparison_node
+        add_math_node, add_comparison_node,
+        add_external_property_set_node, add_external_property_get_node,
+        add_get_subsystem_node
+
+        Level Blueprint support: every command in this tool accepts optional
+        target_type="level_blueprint" to edit the current level's Level Script
+        Blueprint instead of a regular Blueprint. blueprint_name is ignored in
+        that mode. Optional level_path selects a specific level asset (e.g.
+        "/Game/Maps/MyMap"); omit for the currently edited level.
+
+        External UPROPERTY Set/Get: add_external_property_set_node /
+        add_external_property_get_node spawn UK2Node_VariableSet/Get with an
+        *external* member reference — use these (or pass a "Set<PropName>" /
+        "Get<PropName>" function_name to add_blueprint_function_node which
+        will transparently fall back) to set/read a UPROPERTY on another
+        object such as a Subsystem's BlueprintReadWrite field.
+
+        Typed subsystem access: add_get_subsystem_node spawns a
+        UK2Node_GetSubsystem (or Engine/LocalPlayer variant) with the target
+        subsystem class baked in at construction. The ReturnValue pin is
+        strongly typed (e.g. VoxelCollapseSubsystem*), so downstream Cast
+        nodes are unnecessary. Prefer this over routing through
+        SubsystemBlueprintLibrary.GetGameInstanceSubsystem + Cast.
+
+        Class/Object pin defaults: set_node_pin_value now handles Class,
+        SoftClass, Object, SoftObject and Interface pins. Pass the class
+        path (e.g. "/Script/VoxelRuntime.VoxelCollapseSubsystem") or bare
+        class name for Class pins; asset path for Object pins. The handler
+        uses K2Schema->TrySetDefaultObject and reconstructs the node so
+        downstream pin types are narrowed correctly.
+
         Use help("blueprint_node", "command_name") for params.
         """
         # Handle deprecated command

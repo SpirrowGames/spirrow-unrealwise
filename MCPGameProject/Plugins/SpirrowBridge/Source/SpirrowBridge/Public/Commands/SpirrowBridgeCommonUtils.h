@@ -163,8 +163,25 @@ public:
     
     /** Validate Blueprint exists and return it, or error response */
     static TSharedPtr<FJsonObject> ValidateBlueprint(
-        const FString& BlueprintName, 
-        const FString& Path, 
+        const FString& BlueprintName,
+        const FString& Path,
+        UBlueprint*& OutBlueprint);
+
+    /**
+     * Resolve the target Blueprint from command params.
+     *
+     * Supports two modes:
+     *  - Regular Blueprint (default): reads `blueprint_name` (required) and
+     *    `path` (optional, defaults to /Game/Blueprints) and loads the asset.
+     *  - Level Blueprint: when `target_type == "level_blueprint"`, resolves
+     *    the ULevelScriptBlueprint from the editor world. An optional
+     *    `level_path` param (e.g. "/Game/Maps/MyMap.MyMap") selects a
+     *    specific level; omit to use the currently edited persistent level.
+     *
+     * Returns nullptr on success (OutBlueprint set), or an error JSON object.
+     */
+    static TSharedPtr<FJsonObject> ResolveTargetBlueprint(
+        const TSharedPtr<FJsonObject>& Params,
         UBlueprint*& OutBlueprint);
     
     /** Validate Widget Blueprint exists and return it, or error response */
@@ -209,6 +226,39 @@ public:
     static UK2Node_CallFunction* CreateFunctionCallNode(UEdGraph* Graph, UFunction* Function, const FVector2D& Position);
     static UK2Node_VariableGet* CreateVariableGetNode(UEdGraph* Graph, UBlueprint* Blueprint, const FString& VariableName, const FVector2D& Position);
     static UK2Node_VariableSet* CreateVariableSetNode(UEdGraph* Graph, UBlueprint* Blueprint, const FString& VariableName, const FVector2D& Position);
+
+    /**
+     * Find a UClass by bare name. Tries direct lookup, /Script/Engine prefix,
+     * and finally iterates loaded classes to find names matching with U/A
+     * prefix stripping (e.g. "VoxelCollapseSubsystem" -> UVoxelCollapseSubsystem).
+     * Returns nullptr if not found.
+     */
+    static UClass* FindClassByNameAnywhere(const FString& ClassName);
+
+    /**
+     * Spawn a UK2Node_VariableSet node that writes to an *external* class
+     * member (i.e. a UPROPERTY on another object, not a variable of the BP
+     * itself). The property must be BlueprintVisible and not BlueprintReadOnly.
+     *
+     * OutError is populated with a human-readable reason when the spawn fails.
+     */
+    static UK2Node_VariableSet* SpawnExternalPropertySetNode(
+        UEdGraph* Graph,
+        UClass* OwnerClass,
+        FName PropertyName,
+        const FVector2D& NodePos,
+        FString& OutError);
+
+    /**
+     * Spawn a UK2Node_VariableGet node that reads an *external* class member.
+     * The property must be BlueprintVisible.
+     */
+    static UK2Node_VariableGet* SpawnExternalPropertyGetNode(
+        UEdGraph* Graph,
+        UClass* OwnerClass,
+        FName PropertyName,
+        const FVector2D& NodePos,
+        FString& OutError);
     static UK2Node_InputAction* CreateInputActionNode(UEdGraph* Graph, const FString& ActionName, const FVector2D& Position);
     static UK2Node_Self* CreateSelfReferenceNode(UEdGraph* Graph, const FVector2D& Position);
     static bool ConnectGraphNodes(UEdGraph* Graph, UEdGraphNode* SourceNode, const FString& SourcePinName, 

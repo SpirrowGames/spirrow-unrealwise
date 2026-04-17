@@ -17,4 +17,6 @@ private:
     TSharedPtr<FJsonObject> HandleCreateLevel(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleSaveCurrentLevel(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleOpenLevel(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleGetWorldSettings(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleSetWorldProperties(const TSharedPtr<FJsonObject>& Params);
 };

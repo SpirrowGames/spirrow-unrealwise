@@ -1,6 +1,6 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: v0.9.4 (Level Creation / create_level)
+> **バージョン**: v0.9.5 (WorldSettings Configuration)
 > **ステータス**: Beta
 > **最終更新**: 2026-04-12
 
@@ -31,7 +31,7 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 
 | メタツール | 説明 | コマンド数 | 状態 |
 |-----------|------|-----------|------|
-| `editor` | Actor操作、トランスフォーム、プロパティ、レベル作成/保存/オープン 🆕 | 15 | ✅ |
+| `editor` | Actor操作、トランスフォーム、プロパティ、レベル作成/保存/オープン、WorldSettings 🆕 | 17 | ✅ |
 | `blueprint` | BP作成、コンパイル、プロパティ、DataAsset (LSB対応) 🆕 | 21 | ✅ |
 | `blueprint_node` | イベント、関数、変数、フロー制御、数学 (LSB + 外部UPROPERTY + typed Subsystem) 🆕 | 24 | ✅ |
 | `umg_widget` | テキスト、画像、ボタン、スライダー等 | 18 | ✅ |
@@ -65,7 +65,7 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 | | 数 |
 |---|---|
 | **MCP登録ツール合計** | **25** |
-| **内包コマンド合計** | **155** |
+| **内包コマンド合計** | **157** |
 
 ---
 
@@ -94,6 +94,27 @@ editor(command="open_level", params={"level_path": "/Game/Maps/MyMap"})
 ```
 
 作成後はそのまま `blueprint_node(command=..., params={"target_type": "level_blueprint", "level_path": "/Game/Maps/MyMap", ...})` で LSB 編集可能。
+
+### WorldSettings 🆕 (2)
+現在開いているエディタワールドの `AWorldSettings` (レベルごとのシングルトン) を読み書き。
+- `get_world_settings` — `properties` 配列で任意のフィールドを指定、省略時は curated preset (9個) を返す
+  - Curated preset: `DefaultGameMode` (UI 上の "GameMode Override") / `DefaultPhysicsVolumeClass` / `KillZ` / `KillZDamageType` / `WorldToMeters` / `GlobalGravityZ` / `TimeDilation` / `bEnableWorldBoundsChecks` / `bEnableWorldComposition`
+  - 存在しないプロパティ名は `unknown_properties` 配列に入る (エラーにしない)
+- `set_world_properties` — dict で一括設定。`SetObjectProperty` をラップして class picker (`TSubclassOf`) / primitive / struct を統一処理
+  - 部分成功 OK — 個別の失敗は `failed` 配列へ、`applied` に成功リスト
+  - 1つでも applied があれば level を dirty マーク → `save_current_level` で永続化
+  - 全失敗時のみ `success=false`
+
+```python
+editor(command="get_world_settings")  # curated preset
+editor(command="get_world_settings", params={"properties": ["KillZ", "WorldToMeters"]})
+editor(command="set_world_properties", params={"properties": {
+    "KillZ": -5000,
+    "DefaultGameMode": "/Game/Blueprints/BP_GM_Default.BP_GM_Default_C",
+    "bEnableWorldBoundsChecks": True
+}})
+editor(command="save_current_level")
+```
 
 ### Blueprint操作 (17)
 `create_blueprint`, `spawn_blueprint_actor`, `add_component_to_blueprint`, `set_static_mesh_properties`, `set_component_property`, `set_physics_properties`, `compile_blueprint`, `set_blueprint_property`, `create_data_asset`, `set_class_property`, `set_object_property`, `get_blueprint_properties`, `set_struct_property`, `set_data_asset_property`, `get_data_asset_properties` 🆕, `batch_set_properties`, `find_cpp_function_in_blueprints`
@@ -272,7 +293,23 @@ generate_and_import_texture(
 
 ## 最新の更新
 
-### 2026-04-17: Level Lifecycle (v0.9.4) 🆕
+### 2026-04-17: WorldSettings Configuration (v0.9.5) 🆕
+
+**レベル毎の `AWorldSettings` を Unrealwise から読み書き可能に**:
+
+| 変更 | 内容 |
+|------|------|
+| **get_world_settings** 🆕 | 現在のエディタワールドの AWorldSettings を取得。`properties` 省略時は curated preset (9個: DefaultGameMode / DefaultPhysicsVolumeClass / KillZ / KillZDamageType / WorldToMeters / GlobalGravityZ / TimeDilation / bEnableWorldBoundsChecks / bEnableWorldComposition)、指定時はそのフィールドだけ返す。存在しない名前は `unknown_properties` 配列に格納 (エラーにしない) |
+| **set_world_properties** 🆕 | dict 形式で一括設定。既存の `FSpirrowBridgeCommonUtils::SetObjectProperty` をラップし class picker / primitive / struct を統一処理。**部分成功** (applied / failed 配列)、1つでも成功なら level を dirty マーク。全失敗時のみ `success=false` |
+| **対象** | 現在開いているエディタワールドのみ。別レベルの WorldSettings を編集したい場合は `open_level` (v0.9.4) で先に切り替える |
+| **永続化** | 設定後は自動保存しない。`save_current_level` を呼ぶまではメモリ上の変更のみ |
+
+**コマンド数**: 155 → **157** (+2)
+**editor コマンド数**: 15 → **17**
+
+---
+
+### 2026-04-17: Level Lifecycle (v0.9.4)
 
 **`.umap` (Level) をUnrealwise経由で create / save / open 可能に**:
 

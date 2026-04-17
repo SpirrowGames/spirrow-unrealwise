@@ -31,7 +31,7 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 
 | メタツール | 説明 | コマンド数 | 状態 |
 |-----------|------|-----------|------|
-| `editor` | Actor操作、トランスフォーム、プロパティ、レベル作成 🆕 | 13 | ✅ |
+| `editor` | Actor操作、トランスフォーム、プロパティ、レベル作成/保存/オープン 🆕 | 15 | ✅ |
 | `blueprint` | BP作成、コンパイル、プロパティ、DataAsset (LSB対応) 🆕 | 21 | ✅ |
 | `blueprint_node` | イベント、関数、変数、フロー制御、数学 (LSB + 外部UPROPERTY + typed Subsystem) 🆕 | 24 | ✅ |
 | `umg_widget` | テキスト、画像、ボタン、スライダー等 | 18 | ✅ |
@@ -65,7 +65,7 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 | | 数 |
 |---|---|
 | **MCP登録ツール合計** | **25** |
-| **内包コマンド合計** | **153** |
+| **内包コマンド合計** | **155** |
 
 ---
 
@@ -78,16 +78,19 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 - Basic: `StaticMeshActor`, `PointLight`, `SpotLight`, `DirectionalLight`, `CameraActor`
 - Volumes: `NavMeshBoundsVolume`, `TriggerVolume`, `BlockingVolume`, `KillZVolume`, `PhysicsVolume`, `PostProcessVolume`, `AudioVolume`, `LightmassImportanceVolume`
 
-### レベル作成 🆕 (1)
-`create_level` — 新規 `.umap` をディスクに作成し、エディタを新レベルに切り替え (UEditorLevelLibrary::NewLevel)。
-- `template="default"` (UE 5.7 既定 = World Partition 有効)
-- `template="empty"` (`/Engine/Maps/Templates/Empty` = 非WP)
-- `template="/Game/..."` (任意の既存レベルアセットをテンプレートに使用)
-- `overwrite=true` で既存レベル上書き可
+### レベルライフサイクル 🆕 (3)
+- `create_level` — 新規 `.umap` をディスクに作成し、エディタを新レベルに切り替え (UEditorLevelLibrary::NewLevel / NewLevelFromTemplate)
+  - `template="default"` (UE 5.7 既定 = World Partition 有効)
+  - `template="empty"` (`/Engine/Maps/Templates/Empty` = 非WP)
+  - `template="/Game/..."` (任意の既存レベルアセットをテンプレートに使用)
+  - `overwrite=true` で既存レベル上書き可
+- `save_current_level` — 現在エディタで開いているレベルをディスクに保存 (UEditorLoadingAndSavingUtils::SaveCurrentLevel)
+- `open_level` — 指定された `.umap` をエディタで開く (UEditorLevelLibrary::LoadLevel)。dirty な状態で呼ぶと UE 側の save dialog が出るため、必要なら事前に `save_current_level` を呼ぶ
 
 ```python
 editor(command="create_level", params={"name": "MyMap", "path": "/Game/Maps"})
-editor(command="create_level", params={"name": "EmptyTest", "template": "empty"})
+editor(command="save_current_level")
+editor(command="open_level", params={"level_path": "/Game/Maps/MyMap"})
 ```
 
 作成後はそのまま `blueprint_node(command=..., params={"target_type": "level_blueprint", "level_path": "/Game/Maps/MyMap", ...})` で LSB 編集可能。
@@ -269,20 +272,22 @@ generate_and_import_texture(
 
 ## 最新の更新
 
-### 2026-04-17: Level Creation (v0.9.4) 🆕
+### 2026-04-17: Level Lifecycle (v0.9.4) 🆕
 
-**`.umap` (Level) をUnrealwise経由で作成可能に**:
+**`.umap` (Level) をUnrealwise経由で create / save / open 可能に**:
 
 | 変更 | 内容 |
 |------|------|
 | **create_level** 🆕 | `editor(command="create_level", params={"name": ..., "path": ..., "template": ..., "overwrite": ...})` で新規 Level を作成。`UEditorLevelLibrary::NewLevel` / `NewLevelFromTemplate` をラップ。ディスクへの保存およびエディタの新レベル切り替えは UE 側が自動実行 |
+| **save_current_level** 🆕 | `editor(command="save_current_level")` で現在開いているレベルを保存 (`UEditorLoadingAndSavingUtils::SaveCurrentLevel`) |
+| **open_level** 🆕 | `editor(command="open_level", params={"level_path": "/Game/..."})` で既存 `.umap` をエディタで開く (`UEditorLevelLibrary::LoadLevel`)。dirty な状態で呼ぶと UE 側で save dialog が出るので、必要なら事前に `save_current_level` |
 | **template 解決** | `"default"` (UE 5.7 既定 = WP有効) / `"empty"` (`/Engine/Maps/Templates/Empty` = 非WP) / `/Game/...` 明示パス (任意の既存レベルをテンプレートに) |
 | **overwrite** | `false` (既定) では既存レベルがあれば fail、`true` で `UEditorAssetLibrary::DeleteAsset` 後に再作成 |
 | **LSB 連携** | 作成直後に v0.9.3 の `target_type="level_blueprint"` + `level_path=作成したパス` ルートがそのまま使える。create → 即 LSB 編集がワンショットで完結 |
 
 **新ファイル**: `SpirrowBridgeLevelCommands.h/.cpp` (2ファイル)
-**コマンド数**: 152 → **153** (+1: `create_level`)
-**editor コマンド数**: 12 → **13**
+**コマンド数**: 152 → **155** (+3: `create_level`, `save_current_level`, `open_level`)
+**editor コマンド数**: 12 → **15**
 
 ---
 

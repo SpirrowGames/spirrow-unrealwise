@@ -6,7 +6,7 @@ Used by the help() tool to provide on-demand parameter info.
 
 COMMAND_SCHEMAS = {
     # =========================================================================
-    # EDITOR (13 commands)
+    # EDITOR (15 commands)
     # =========================================================================
     "editor": {
         "get_actors_in_level": {
@@ -108,6 +108,16 @@ COMMAND_SCHEMAS = {
                 "path": {"type": "str", "default": "/Game/Maps", "desc": "Content folder (must start with /Game/)"},
                 "template": {"type": "str", "default": "default", "desc": "'default' (UE 5.7 default = World Partition enabled), 'empty' (/Engine/Maps/Templates/Empty = non-WP), or an explicit /Game/... path to an existing level asset"},
                 "overwrite": {"type": "bool", "default": False, "desc": "If true, replace any existing level at the same path"},
+            },
+        },
+        "save_current_level": {
+            "brief": "Save the currently-open Level to disk",
+            "params": {},
+        },
+        "open_level": {
+            "brief": "Load an existing Level (.umap) into the editor",
+            "params": {
+                "level_path": {"type": "str", "required": True, "desc": "Asset path (e.g. '/Game/Maps/MyMap'). Must already exist"},
             },
         },
     },

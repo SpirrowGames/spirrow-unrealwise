@@ -2,6 +2,10 @@
 #include "Commands/SpirrowBridgeCommonUtils.h"
 #include "EditorLevelLibrary.h"
 #include "EditorAssetLibrary.h"
+#include "FileHelpers.h"
+#include "Editor.h"
+#include "Engine/World.h"
+#include "Engine/Level.h"
 
 namespace
 {
@@ -40,6 +44,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeLevelCommands::HandleCommand(const FString
     if (CommandType == TEXT("create_level"))
     {
         return HandleCreateLevel(Params);
+    }
+    if (CommandType == TEXT("save_current_level"))
+    {
+        return HandleSaveCurrentLevel(Params);
+    }
+    if (CommandType == TEXT("open_level"))
+    {
+        return HandleOpenLevel(Params);
     }
 
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown level command: %s"), *CommandType));
@@ -147,5 +159,57 @@ TSharedPtr<FJsonObject> FSpirrowBridgeLevelCommands::HandleCreateLevel(const TSh
         Data->SetStringField(TEXT("template_path"), TemplatePath);
     }
     Data->SetBoolField(TEXT("switched_editor"), true);
+    return FSpirrowBridgeCommonUtils::CreateSuccessResponse(Data);
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeLevelCommands::HandleSaveCurrentLevel(const TSharedPtr<FJsonObject>& Params)
+{
+    UWorld* World = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
+    if (!World || !World->PersistentLevel)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("No editor world / persistent level available"));
+    }
+
+    const bool bSuccess = UEditorLoadingAndSavingUtils::SaveCurrentLevel();
+    if (!bSuccess)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("SaveCurrentLevel returned false (save dialog cancelled or write failed)"));
+    }
+
+    TSharedPtr<FJsonObject> Data = MakeShareable(new FJsonObject);
+    if (UPackage* Pkg = World->PersistentLevel->GetOutermost())
+    {
+        Data->SetStringField(TEXT("level_package"), Pkg->GetName());
+    }
+    return FSpirrowBridgeCommonUtils::CreateSuccessResponse(Data);
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeLevelCommands::HandleOpenLevel(const TSharedPtr<FJsonObject>& Params)
+{
+    FString AssetPath;
+    if (!Params->TryGetStringField(TEXT("level_path"), AssetPath) || AssetPath.IsEmpty())
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing required parameter 'level_path'"));
+    }
+    if (!AssetPath.StartsWith(TEXT("/")))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("'level_path' must be an asset path starting with / (got '%s')"), *AssetPath));
+    }
+    if (!UEditorAssetLibrary::DoesAssetExist(AssetPath))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Level not found at '%s'"), *AssetPath));
+    }
+
+    const bool bSuccess = UEditorLevelLibrary::LoadLevel(AssetPath);
+    if (!bSuccess)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("UEditorLevelLibrary::LoadLevel failed for '%s' (user may have cancelled save-prompt)"), *AssetPath));
+    }
+
+    TSharedPtr<FJsonObject> Data = MakeShareable(new FJsonObject);
+    Data->SetStringField(TEXT("level_path"), AssetPath);
     return FSpirrowBridgeCommonUtils::CreateSuccessResponse(Data);
 }

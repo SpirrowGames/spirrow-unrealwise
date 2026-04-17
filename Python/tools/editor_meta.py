@@ -21,6 +21,8 @@ COMMANDS = {
     "spawn_blueprint_actor": "spawn_blueprint_actor",
     "rename_asset": "rename_asset",
     "create_level": "create_level",
+    "save_current_level": "save_current_level",
+    "open_level": "open_level",
 }
 
 RATIONALE_COMMANDS = {
@@ -39,10 +41,12 @@ def register_editor_meta_tool(mcp: FastMCP):
         Commands: get_actors_in_level, find_actors_by_name, spawn_actor, delete_actor,
         set_actor_transform, get_actor_properties, set_actor_property,
         set_actor_component_property, get_actor_components, rename_actor,
-        spawn_blueprint_actor, rename_asset, create_level
+        spawn_blueprint_actor, rename_asset, create_level, save_current_level, open_level
 
-        create_level creates a new .umap on disk and switches the editor to it
-        (closes the current level — callers should save first if needed).
+        Level lifecycle:
+        - create_level: create a new .umap and switch the editor to it
+        - save_current_level: persist the currently-open level to disk
+        - open_level: load an existing .umap into the editor (call save_current_level first if dirty)
         Use help("editor", "command_name") for params.
         """
         from tools.meta_utils import execute_command

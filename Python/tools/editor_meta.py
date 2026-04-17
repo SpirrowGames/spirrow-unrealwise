@@ -20,6 +20,7 @@ COMMANDS = {
     "rename_actor": "rename_actor",
     "spawn_blueprint_actor": "spawn_blueprint_actor",
     "rename_asset": "rename_asset",
+    "create_level": "create_level",
 }
 
 RATIONALE_COMMANDS = {
@@ -34,11 +35,14 @@ def register_editor_meta_tool(mcp: FastMCP):
 
     @mcp.tool()
     def editor(ctx: Context, command: str, params: Dict[str, Any] = {}) -> Dict[str, Any]:
-        """Editor: actors, transforms, properties, components, assets.
+        """Editor: actors, transforms, properties, components, assets, levels.
         Commands: get_actors_in_level, find_actors_by_name, spawn_actor, delete_actor,
         set_actor_transform, get_actor_properties, set_actor_property,
         set_actor_component_property, get_actor_components, rename_actor,
-        spawn_blueprint_actor, rename_asset
+        spawn_blueprint_actor, rename_asset, create_level
+
+        create_level creates a new .umap on disk and switches the editor to it
+        (closes the current level — callers should save first if needed).
         Use help("editor", "command_name") for params.
         """
         from tools.meta_utils import execute_command

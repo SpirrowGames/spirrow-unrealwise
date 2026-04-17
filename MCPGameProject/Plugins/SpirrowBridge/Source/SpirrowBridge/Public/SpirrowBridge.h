@@ -22,6 +22,7 @@
 #include "Commands/SpirrowBridgeAICommands.h"
 #include "Commands/SpirrowBridgeAIPerceptionCommands.h"
 #include "Commands/SpirrowBridgeEQSCommands.h"
+#include "Commands/SpirrowBridgeLevelCommands.h"
 #include "SpirrowBridge.generated.h"
 
 class FMCPServerRunnable;
@@ -79,4 +80,5 @@ private:
 	TSharedPtr<FSpirrowBridgeAICommands> AICommands;
 	TSharedPtr<FSpirrowBridgeAIPerceptionCommands> AIPerceptionCommands;
 	TSharedPtr<FSpirrowBridgeEQSCommands> EQSCommands;
-}; 
+	TSharedPtr<FSpirrowBridgeLevelCommands> LevelCommands;
+};

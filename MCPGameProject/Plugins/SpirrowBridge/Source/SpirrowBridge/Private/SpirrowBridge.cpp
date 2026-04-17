@@ -67,6 +67,7 @@
 #include "Commands/SpirrowBridgeAICommands.h"
 #include "Commands/SpirrowBridgeAIPerceptionCommands.h"
 #include "Commands/SpirrowBridgeEQSCommands.h"
+#include "Commands/SpirrowBridgeLevelCommands.h"
 
 // Default settings
 #define MCP_SERVER_HOST "127.0.0.1"
@@ -88,6 +89,7 @@ USpirrowBridge::USpirrowBridge()
     AICommands = MakeShared<FSpirrowBridgeAICommands>();
     AIPerceptionCommands = MakeShared<FSpirrowBridgeAIPerceptionCommands>();
     EQSCommands = MakeShared<FSpirrowBridgeEQSCommands>();
+    LevelCommands = MakeShared<FSpirrowBridgeLevelCommands>();
 }
 
 USpirrowBridge::~USpirrowBridge()
@@ -106,6 +108,7 @@ USpirrowBridge::~USpirrowBridge()
     AICommands.Reset();
     AIPerceptionCommands.Reset();
     EQSCommands.Reset();
+    LevelCommands.Reset();
 }
 
 // Initialize subsystem
@@ -333,6 +336,11 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("take_screenshot"))
             {
                 ResultJson = EditorCommands->HandleCommand(CommandType, Params);
+            }
+            // Level (.umap) creation commands
+            else if (CommandType == TEXT("create_level"))
+            {
+                ResultJson = LevelCommands->HandleCommand(CommandType, Params);
             }
             // Blueprint Commands
             else if (CommandType == TEXT("create_blueprint") ||

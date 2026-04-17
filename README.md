@@ -9,13 +9,13 @@
 
 An MCP (Model Context Protocol) server that bridges AI assistants (Claude) with Unreal Engine 5. Control Blueprints, design levels, create UI, and build AI systems using natural language.
 
-## Features (25 MCP Tools / 155 Commands)
+## Features (25 MCP Tools / 157 Commands)
 
 Since **v0.9.1**, all tools are consolidated into **meta-tools** for dramatically reduced context usage (~170K → ~22K tokens).
 
 | Meta-Tool | Commands | Description |
 |-----------|----------|-------------|
-| `editor` | 15 | Spawn, transform, properties, components, level (.umap) create/save/open 🆕 |
+| `editor` | 17 | Spawn, transform, properties, components, level (.umap) create/save/open, WorldSettings 🆕 |
 | `blueprint` | 21 | Create, compile, properties, DataAsset (Level BP support) 🆕 |
 | `blueprint_node` | 24 | Event nodes, functions, variables, flow control (Level BP + external UPROPERTY + typed Subsystem) 🆕 |
 | `umg_widget` | 18 | Text, image, button, slider, etc. |

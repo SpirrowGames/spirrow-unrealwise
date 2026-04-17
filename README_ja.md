@@ -9,13 +9,13 @@
 
 AI（Claude）と Unreal Engine 5 を連携させる MCP サーバー。自然言語でBlueprint操作、レベルデザイン、UI作成、AIシステム構築を実現します。
 
-## 機能 (25 MCPツール / 155コマンド)
+## 機能 (25 MCPツール / 157コマンド)
 
 **v0.9.1** でメタツール化を実施。コンテキスト消費量を ~170K → ~22K tokens に大幅削減。
 
 | メタツール | コマンド数 | 説明 |
 |-----------|-----------|------|
-| `editor` | 15 | スポーン、Transform、プロパティ、コンポーネント、レベル(.umap)作成/保存/オープン 🆕 |
+| `editor` | 17 | スポーン、Transform、プロパティ、コンポーネント、レベル(.umap)作成/保存/オープン、WorldSettings 🆕 |
 | `blueprint` | 21 | 作成、コンパイル、プロパティ、DataAsset (LSB対応) 🆕 |
 | `blueprint_node` | 24 | イベントノード、関数、変数、フロー制御 (LSB + 外部UPROPERTY + typed Subsystem) 🆕 |
 | `umg_widget` | 18 | テキスト、画像、ボタン、スライダー等 |

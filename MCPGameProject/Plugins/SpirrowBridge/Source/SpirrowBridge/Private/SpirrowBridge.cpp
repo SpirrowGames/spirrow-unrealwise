@@ -337,10 +337,12 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
             {
                 ResultJson = EditorCommands->HandleCommand(CommandType, Params);
             }
-            // Level (.umap) lifecycle commands
+            // Level (.umap) lifecycle + WorldSettings commands
             else if (CommandType == TEXT("create_level") ||
                      CommandType == TEXT("save_current_level") ||
-                     CommandType == TEXT("open_level"))
+                     CommandType == TEXT("open_level") ||
+                     CommandType == TEXT("get_world_settings") ||
+                     CommandType == TEXT("set_world_properties"))
             {
                 ResultJson = LevelCommands->HandleCommand(CommandType, Params);
             }

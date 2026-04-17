@@ -23,6 +23,8 @@ COMMANDS = {
     "create_level": "create_level",
     "save_current_level": "save_current_level",
     "open_level": "open_level",
+    "get_world_settings": "get_world_settings",
+    "set_world_properties": "set_world_properties",
 }
 
 RATIONALE_COMMANDS = {
@@ -37,16 +39,21 @@ def register_editor_meta_tool(mcp: FastMCP):
 
     @mcp.tool()
     def editor(ctx: Context, command: str, params: Dict[str, Any] = {}) -> Dict[str, Any]:
-        """Editor: actors, transforms, properties, components, assets, levels.
+        """Editor: actors, transforms, properties, components, assets, levels, world settings.
         Commands: get_actors_in_level, find_actors_by_name, spawn_actor, delete_actor,
         set_actor_transform, get_actor_properties, set_actor_property,
         set_actor_component_property, get_actor_components, rename_actor,
-        spawn_blueprint_actor, rename_asset, create_level, save_current_level, open_level
+        spawn_blueprint_actor, rename_asset, create_level, save_current_level, open_level,
+        get_world_settings, set_world_properties
 
         Level lifecycle:
         - create_level: create a new .umap and switch the editor to it
         - save_current_level: persist the currently-open level to disk
         - open_level: load an existing .umap into the editor (call save_current_level first if dirty)
+
+        World Settings (per-level AWorldSettings, current editor world only):
+        - get_world_settings: read properties (curated preset or filter via 'properties' list)
+        - set_world_properties: batch-set properties via dict; marks level dirty (call save_current_level to persist)
         Use help("editor", "command_name") for params.
         """
         from tools.meta_utils import execute_command

@@ -6,7 +6,7 @@ Used by the help() tool to provide on-demand parameter info.
 
 COMMAND_SCHEMAS = {
     # =========================================================================
-    # EDITOR (15 commands)
+    # EDITOR (17 commands)
     # =========================================================================
     "editor": {
         "get_actors_in_level": {
@@ -118,6 +118,18 @@ COMMAND_SCHEMAS = {
             "brief": "Load an existing Level (.umap) into the editor",
             "params": {
                 "level_path": {"type": "str", "required": True, "desc": "Asset path (e.g. '/Game/Maps/MyMap'). Must already exist"},
+            },
+        },
+        "get_world_settings": {
+            "brief": "Read properties from the current level's AWorldSettings (singleton per level)",
+            "params": {
+                "properties": {"type": "list[str]", "default": None, "desc": "Property names to return. If omitted, returns a curated preset of 9 common fields (DefaultGameMode='GameMode Override', DefaultPhysicsVolumeClass, KillZ, KillZDamageType, WorldToMeters, GlobalGravityZ, TimeDilation, bEnableWorldBoundsChecks, bEnableWorldComposition). Unknown names go into 'unknown_properties' array (not an error)"},
+            },
+        },
+        "set_world_properties": {
+            "brief": "Batch-set properties on the current level's AWorldSettings",
+            "params": {
+                "properties": {"type": "dict[str, any]", "required": True, "desc": "Key = UPROPERTY name on AWorldSettings (e.g. 'DefaultGameMode', 'KillZ'), value = typed value (class picker properties take a class path string like '/Game/Blueprints/BP_GM.BP_GM_C'). Partial success: per-property failures are reported in 'failed' array; 'applied' lists successes. success=false only if all failed. Level is marked dirty on any success (call save_current_level to persist)"},
             },
         },
     },

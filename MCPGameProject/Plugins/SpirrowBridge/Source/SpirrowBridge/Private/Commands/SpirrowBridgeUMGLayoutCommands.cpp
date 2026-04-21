@@ -14,8 +14,70 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/PanelWidget.h"
 #include "Kismet2/KismetEditorUtilities.h"
+#include "Kismet2/BlueprintEditorUtils.h"
 #include "Styling/SlateColor.h"
 #include "Layout/Margin.h"
+
+// Recursive search for a widget by name inside a specific panel subtree.
+// Returns first match in traversal order. UWidgetTree::FindWidget returns the
+// LAST match (WidgetTree.cpp:32-44) and searches the entire tree; when callers
+// pass a scoped parent via parent_name, we want deterministic first-match
+// behavior restricted to that subtree.
+static UWidget* FindWidgetInPanelRecursive(UPanelWidget* Panel, const FName& Name)
+{
+	if (!Panel)
+	{
+		return nullptr;
+	}
+	const int32 ChildCount = Panel->GetChildrenCount();
+	for (int32 i = 0; i < ChildCount; ++i)
+	{
+		UWidget* Child = Panel->GetChildAt(i);
+		if (!Child)
+		{
+			continue;
+		}
+		if (Child->GetFName() == Name)
+		{
+			return Child;
+		}
+		if (UPanelWidget* ChildPanel = Cast<UPanelWidget>(Child))
+		{
+			if (UWidget* Found = FindWidgetInPanelRecursive(ChildPanel, Name))
+			{
+				return Found;
+			}
+		}
+	}
+	return nullptr;
+}
+
+// Resolves an element by name, optionally scoped to a parent_name. If
+// parent_name is provided but cannot be resolved to a UPanelWidget, returns
+// an error response through OutError (caller should return it). When
+// parent_name is omitted, falls back to UWidgetTree::FindWidget (last-match).
+static UWidget* ResolveElementScoped(
+	UWidgetTree* WidgetTree,
+	const TSharedPtr<FJsonObject>& Params,
+	const FName& ElementName,
+	TSharedPtr<FJsonObject>& OutError)
+{
+	OutError = nullptr;
+	FString ParentName;
+	if (Params->TryGetStringField(TEXT("parent_name"), ParentName) && !ParentName.IsEmpty())
+	{
+		UPanelWidget* Scope = Cast<UPanelWidget>(WidgetTree->FindWidget(FName(*ParentName)));
+		if (!Scope)
+		{
+			OutError = FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::WidgetElementNotFound,
+				FString::Printf(TEXT("Parent widget '%s' not found or not a panel widget"), *ParentName));
+			return nullptr;
+		}
+		return FindWidgetInPanelRecursive(Scope, ElementName);
+	}
+	return WidgetTree->FindWidget(ElementName);
+}
 
 FSpirrowBridgeUMGLayoutCommands::FSpirrowBridgeUMGLayoutCommands()
 {
@@ -322,8 +384,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetSlotProp
 		return Error;
 	}
 
-	// Find the widget element
-	UWidget* Widget = WidgetBP->WidgetTree->FindWidget(FName(*ElementName));
+	// Find the widget element (optionally scoped by parent_name to avoid
+	// last-match ambiguity when same-name widgets exist in multiple subtrees)
+	TSharedPtr<FJsonObject> ScopeError;
+	UWidget* Widget = ResolveElementScoped(WidgetBP->WidgetTree, Params, FName(*ElementName), ScopeError);
+	if (ScopeError.IsValid())
+	{
+		return ScopeError;
+	}
 	if (!Widget)
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
@@ -538,8 +606,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetElementP
 		return Error;
 	}
 
-	// Find the widget element
-	UWidget* Widget = WidgetBP->WidgetTree->FindWidget(FName(*ElementName));
+	// Find the widget element (optionally scoped by parent_name)
+	TSharedPtr<FJsonObject> ScopeError;
+	UWidget* Widget = ResolveElementScoped(WidgetBP->WidgetTree, Params, FName(*ElementName), ScopeError);
+	if (ScopeError.IsValid())
+	{
+		return ScopeError;
+	}
 	if (!Widget)
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
@@ -1156,8 +1229,15 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleReparentWidgetEle
 			TEXT("WidgetTree not found"));
 	}
 
-	// Find the element to move
-	UWidget* Element = WidgetTree->FindWidget(FName(*ElementName));
+	// Find the element to move (optionally scoped by parent_name = current parent).
+	// Note: parent_name here disambiguates the source widget; new_parent_name is
+	// the destination. This matters when BUG-1-style duplicate widgets exist.
+	TSharedPtr<FJsonObject> ScopeError;
+	UWidget* Element = ResolveElementScoped(WidgetTree, Params, FName(*ElementName), ScopeError);
+	if (ScopeError.IsValid())
+	{
+		return ScopeError;
+	}
 	if (!Element)
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
@@ -1178,24 +1258,42 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleReparentWidgetEle
 	UPanelWidget* OldParent = Element->GetParent();
 	FString OldParentName = OldParent ? OldParent->GetName() : TEXT("None");
 
-	// Remove from old parent
+	// No-op if already a child of the new parent
+	if (OldParent == NewParent)
+	{
+		TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+		ResultObj->SetBoolField(TEXT("success"), true);
+		ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
+		ResultObj->SetStringField(TEXT("element_name"), ElementName);
+		ResultObj->SetStringField(TEXT("old_parent"), OldParentName);
+		ResultObj->SetStringField(TEXT("new_parent"), NewParentName);
+		ResultObj->SetBoolField(TEXT("no_op"), true);
+		return ResultObj;
+	}
+
+	// Canonical reparent sequence (mirrors UMG Designer's drag-drop pattern).
+	// Every affected UObject must call Modify() BEFORE the mutation so the
+	// transaction system records the pre-state. Skipping Modify() leaves
+	// state partially persisted and produces double-parent ghosts (BUG-1).
+	WidgetBP->Modify();
+	WidgetTree->Modify();
+	Element->Modify();
+	if (OldParent)
+	{
+		OldParent->Modify();
+	}
+	NewParent->Modify();
+
+	// RemoveChildAt handles all cleanup: Slots[] entry removed, Slot->Content,
+	// Slot->Parent, Content->Slot all cleared, and per-subclass OnSlotRemoved
+	// syncs the Slate side (see PanelWidget.cpp:93-125).
 	if (OldParent)
 	{
 		OldParent->RemoveChild(Element);
 	}
 
-	// Add to new parent
-	UPanelSlot* NewSlot = nullptr;
-	if (SlotIndex >= 0 && SlotIndex < NewParent->GetChildrenCount())
-	{
-		// Insert at specific index - need to add at end then reorder
-		NewSlot = NewParent->AddChild(Element);
-	}
-	else
-	{
-		NewSlot = NewParent->AddChild(Element);
-	}
-
+	// AddChild only supports append; SlotIndex remains advisory for now.
+	UPanelSlot* NewSlot = NewParent->AddChild(Element);
 	if (!NewSlot)
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
@@ -1203,12 +1301,40 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleReparentWidgetEle
 			TEXT("Failed to add element to new parent"));
 	}
 
-	// Mark as modified and compile
-	WidgetBP->Modify();
+	// Defensive post-checks: confirm full disconnection from old parent and
+	// proper attachment to new parent. If either fails, surface the error
+	// rather than silently leaving a double-parent state.
+	if (OldParent && OldParent->GetChildIndex(Element) != INDEX_NONE)
+	{
+		TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+		Details->SetStringField(TEXT("old_parent"), OldParentName);
+		Details->SetStringField(TEXT("element_name"), ElementName);
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::OperationFailed,
+			FString::Printf(TEXT("Reparent integrity check failed: element '%s' still a child of old parent '%s'"),
+				*ElementName, *OldParentName),
+			Details);
+	}
+	if (Element->GetParent() != NewParent)
+	{
+		TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+		Details->SetStringField(TEXT("new_parent"), NewParentName);
+		Details->SetStringField(TEXT("element_name"), ElementName);
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::OperationFailed,
+			FString::Printf(TEXT("Reparent integrity check failed: element '%s' not attached to new parent '%s'"),
+				*ElementName, *NewParentName),
+			Details);
+	}
+
+	// Structural-change notification is what UMG Designer calls at the tail
+	// of ProcessDropAndAddWidget (SDesignerView.cpp:3237). Required because
+	// FKismetEditorUtilities::CompileBlueprint does NOT rebuild the widget
+	// tree on its own.
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBP);
 	WidgetBP->MarkPackageDirty();
 	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
 
-	// Create success response
 	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
 	ResultObj->SetBoolField(TEXT("success"), true);
 	ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
@@ -1250,8 +1376,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleRemoveWidgetEleme
 			TEXT("WidgetTree not found"));
 	}
 
-	// Find the element to remove
-	UWidget* Element = WidgetTree->FindWidget(FName(*ElementName));
+	// Find the element to remove (optionally scoped by parent_name)
+	TSharedPtr<FJsonObject> ScopeError;
+	UWidget* Element = ResolveElementScoped(WidgetTree, Params, FName(*ElementName), ScopeError);
+	if (ScopeError.IsValid())
+	{
+		return ScopeError;
+	}
 	if (!Element)
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
@@ -1539,8 +1670,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleGetWidgetElementP
 		return Error;
 	}
 
-	// Find the widget element
-	UWidget* Widget = WidgetBP->WidgetTree->FindWidget(FName(*ElementName));
+	// Find the widget element (optionally scoped by parent_name)
+	TSharedPtr<FJsonObject> ScopeError;
+	UWidget* Widget = ResolveElementScoped(WidgetBP->WidgetTree, Params, FName(*ElementName), ScopeError);
+	if (ScopeError.IsValid())
+	{
+		return ScopeError;
+	}
 	if (!Widget)
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(

@@ -616,18 +616,6 @@ COMMAND_SCHEMAS = {
                 "path": {"type": "str", "default": "/Game/UI", "desc": "Content path"},
             },
         },
-        "add_text_block_to_widget": {
-            "brief": "Add a Text Block",
-            "params": {
-                "widget_name": {"type": "str", "required": True, "desc": "Widget name"},
-                "text_block_name": {"type": "str", "required": True, "desc": "Text block name"},
-                "text": {"type": "str", "default": "", "desc": "Text content"},
-                "position": {"type": "list[float]", "default": [0, 0], "desc": "Position [x,y]"},
-                "size": {"type": "list[float]", "default": [200, 50], "desc": "Size [w,h]"},
-                "font_size": {"type": "int", "default": 12, "desc": "Font size"},
-                "color": {"type": "list[float]", "default": [1, 1, 1, 1], "desc": "Text color [r,g,b,a]"},
-            },
-        },
         "bind_widget_event": {
             "brief": "Bind a widget event to a function",
             "params": {
@@ -658,11 +646,12 @@ COMMAND_SCHEMAS = {
             "params": {
                 "widget_name": {"type": "str", "required": True, "desc": "Widget name"},
                 "text_name": {"type": "str", "required": True, "desc": "Text element name"},
+                "parent_name": {"type": "str", "desc": "Parent panel name (defaults to root canvas)"},
                 "text": {"type": "str", "default": "+", "desc": "Text content"},
                 "font_size": {"type": "int", "default": 32, "desc": "Font size"},
                 "color": {"type": "list[float]", "default": [1, 1, 1, 1], "desc": "Text color [r,g,b,a]"},
-                "anchor": {"type": "str", "default": "Center", "desc": "Anchor preset"},
-                "alignment": {"type": "list[float]", "default": [0.5, 0.5], "desc": "Alignment [x,y]"},
+                "anchor": {"type": "str", "default": "Center", "desc": "Anchor preset (CanvasPanel only)"},
+                "alignment": {"type": "list[float]", "default": [0.5, 0.5], "desc": "Alignment [x,y] (CanvasPanel only)"},
                 "path": {"type": "str", "default": "/Game/UI", "desc": "Content path"},
             },
         },
@@ -671,11 +660,12 @@ COMMAND_SCHEMAS = {
             "params": {
                 "widget_name": {"type": "str", "required": True, "desc": "Widget name"},
                 "image_name": {"type": "str", "required": True, "desc": "Image element name"},
+                "parent_name": {"type": "str", "desc": "Parent panel name (defaults to root canvas)"},
                 "texture_path": {"type": "str", "default": "", "desc": "Texture asset path"},
                 "size": {"type": "list[float]", "default": [32, 32], "desc": "Size [w,h]"},
                 "color_tint": {"type": "list[float]", "default": [1, 1, 1, 1], "desc": "Color tint [r,g,b,a]"},
-                "anchor": {"type": "str", "default": "Center", "desc": "Anchor preset"},
-                "alignment": {"type": "list[float]", "default": [0.5, 0.5], "desc": "Alignment [x,y]"},
+                "anchor": {"type": "str", "default": "Center", "desc": "Anchor preset (CanvasPanel only)"},
+                "alignment": {"type": "list[float]", "default": [0.5, 0.5], "desc": "Alignment [x,y] (CanvasPanel only)"},
                 "path": {"type": "str", "default": "/Game/UI", "desc": "Content path"},
             },
         },
@@ -684,6 +674,7 @@ COMMAND_SCHEMAS = {
             "params": {
                 "widget_name": {"type": "str", "required": True, "desc": "Widget name"},
                 "progressbar_name": {"type": "str", "required": True, "desc": "Progress bar name"},
+                "parent_name": {"type": "str", "desc": "Parent panel name (defaults to root canvas)"},
                 "percent": {"type": "float", "default": 0, "desc": "Fill percent (0-1)"},
                 "fill_color": {"type": "list[float]", "default": [0, 0.5, 1, 1], "desc": "Fill color [r,g,b,a]"},
                 "background_color": {"type": "list[float]", "default": [0.1, 0.1, 0.1, 1], "desc": "Background color [r,g,b,a]"},
@@ -725,6 +716,7 @@ COMMAND_SCHEMAS = {
                 "element_name": {"type": "str", "required": True, "desc": "Element name"},
                 "property_name": {"type": "str", "required": True, "desc": "Property name"},
                 "property_value": {"type": "any", "required": True, "desc": "Property value"},
+                "parent_name": {"type": "str", "desc": "Optional: restrict element lookup to this panel's subtree (disambiguates when same-name widgets exist in multiple parents)"},
                 "path": {"type": "str", "default": "/Game/UI", "desc": "Content path"},
             },
         },
@@ -733,6 +725,7 @@ COMMAND_SCHEMAS = {
             "params": {
                 "widget_name": {"type": "str", "required": True, "desc": "Widget name"},
                 "button_name": {"type": "str", "required": True, "desc": "Button name"},
+                "parent_name": {"type": "str", "desc": "Parent panel name (defaults to root canvas)"},
                 "text": {"type": "str", "default": "", "desc": "Button text"},
                 "font_size": {"type": "int", "default": 14, "desc": "Font size"},
                 "text_color": {"type": "list[float]", "default": [1, 1, 1, 1], "desc": "Text color [r,g,b,a]"},
@@ -761,6 +754,7 @@ COMMAND_SCHEMAS = {
             "params": {
                 "widget_name": {"type": "str", "required": True, "desc": "Widget name"},
                 "slider_name": {"type": "str", "required": True, "desc": "Slider name"},
+                "parent_name": {"type": "str", "desc": "Parent panel name (defaults to root canvas)"},
                 "value": {"type": "float", "default": 0, "desc": "Initial value"},
                 "min_value": {"type": "float", "default": 0, "desc": "Minimum value"},
                 "max_value": {"type": "float", "default": 1, "desc": "Maximum value"},
@@ -779,6 +773,7 @@ COMMAND_SCHEMAS = {
             "params": {
                 "widget_name": {"type": "str", "required": True, "desc": "Widget name"},
                 "checkbox_name": {"type": "str", "required": True, "desc": "Checkbox name"},
+                "parent_name": {"type": "str", "desc": "Parent panel name (defaults to root canvas)"},
                 "is_checked": {"type": "bool", "default": False, "desc": "Initial checked state"},
                 "label_text": {"type": "str", "default": "", "desc": "Label text"},
                 "checked_color": {"type": "list[float]", "desc": "Checked state color"},
@@ -793,6 +788,7 @@ COMMAND_SCHEMAS = {
             "params": {
                 "widget_name": {"type": "str", "required": True, "desc": "Widget name"},
                 "combobox_name": {"type": "str", "required": True, "desc": "Combobox name"},
+                "parent_name": {"type": "str", "desc": "Parent panel name (defaults to root canvas)"},
                 "options": {"type": "list[str]", "default": [], "desc": "Dropdown options"},
                 "selected_index": {"type": "int", "default": 0, "desc": "Default selected index"},
                 "font_size": {"type": "int", "default": 14, "desc": "Font size"},
@@ -807,6 +803,7 @@ COMMAND_SCHEMAS = {
             "params": {
                 "widget_name": {"type": "str", "required": True, "desc": "Widget name"},
                 "text_name": {"type": "str", "required": True, "desc": "Text field name"},
+                "parent_name": {"type": "str", "desc": "Parent panel name (defaults to root canvas)"},
                 "hint_text": {"type": "str", "default": "", "desc": "Placeholder hint text"},
                 "is_password": {"type": "bool", "default": False, "desc": "Mask as password"},
                 "is_multiline": {"type": "bool", "default": False, "desc": "Allow multiple lines"},
@@ -823,6 +820,7 @@ COMMAND_SCHEMAS = {
             "params": {
                 "widget_name": {"type": "str", "required": True, "desc": "Widget name"},
                 "spinbox_name": {"type": "str", "required": True, "desc": "Spin box name"},
+                "parent_name": {"type": "str", "desc": "Parent panel name (defaults to root canvas)"},
                 "value": {"type": "float", "default": 0, "desc": "Initial value"},
                 "min_value": {"type": "float", "default": 0, "desc": "Minimum value"},
                 "max_value": {"type": "float", "default": 100, "desc": "Maximum value"},
@@ -838,6 +836,7 @@ COMMAND_SCHEMAS = {
             "params": {
                 "widget_name": {"type": "str", "required": True, "desc": "Widget name"},
                 "element_name": {"type": "str", "required": True, "desc": "Element name to remove"},
+                "parent_name": {"type": "str", "desc": "Optional: restrict lookup to this panel's subtree"},
                 "path": {"type": "str", "default": "/Game/UI", "desc": "Content path"},
             },
         },
@@ -874,12 +873,13 @@ COMMAND_SCHEMAS = {
             },
         },
         "reparent_widget_element": {
-            "brief": "Move element to a different parent",
+            "brief": "Move element to a different parent (v0.9.7: full canonical pattern + integrity checks prevent double-parent corruption)",
             "params": {
                 "widget_name": {"type": "str", "required": True, "desc": "Widget name"},
                 "element_name": {"type": "str", "required": True, "desc": "Element to move"},
                 "new_parent_name": {"type": "str", "required": True, "desc": "New parent element name"},
-                "slot_index": {"type": "int", "default": -1, "desc": "Slot index (-1 = append)"},
+                "parent_name": {"type": "str", "desc": "Optional: restrict source-element lookup to this panel's subtree (current parent)"},
+                "slot_index": {"type": "int", "default": -1, "desc": "Slot index (-1 = append; other values currently accepted but append-only)"},
                 "path": {"type": "str", "default": "/Game/UI", "desc": "Content path"},
             },
         },
@@ -902,6 +902,7 @@ COMMAND_SCHEMAS = {
             "params": {
                 "widget_name": {"type": "str", "required": True, "desc": "Widget name"},
                 "element_name": {"type": "str", "required": True, "desc": "Element name"},
+                "parent_name": {"type": "str", "desc": "Optional: restrict element lookup to this panel's subtree"},
                 "position": {"type": "list[float]", "desc": "Position [x,y]"},
                 "size": {"type": "list[float]", "desc": "Size [w,h]"},
                 "anchor": {"type": "str", "desc": "Anchor preset (TopLeft/TopCenter/.../BottomRight). Takes precedence over anchor_min/max."},
@@ -922,6 +923,7 @@ COMMAND_SCHEMAS = {
             "params": {
                 "widget_name": {"type": "str", "required": True, "desc": "Widget name"},
                 "scrollbox_name": {"type": "str", "required": True, "desc": "Scroll box name"},
+                "parent_name": {"type": "str", "desc": "Parent panel name (defaults to root canvas)"},
                 "orientation": {"type": "str", "default": "Vertical", "desc": "Scroll orientation"},
                 "scroll_bar_visibility": {"type": "str", "default": "Visible", "desc": "Scroll bar visibility"},
                 "size": {"type": "list[float]", "desc": "Size [w,h]"},

@@ -28,10 +28,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetBasicCommands::HandleCommand(cons
 	{
 		return HandleAddTextToWidget(Params);
 	}
-	else if (CommandName == TEXT("add_text_block_to_widget"))
-	{
-		return HandleAddTextBlockToWidget(Params);
-	}
 	else if (CommandName == TEXT("add_image_to_widget"))
 	{
 		return HandleAddImageToWidget(Params);
@@ -97,19 +93,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetBasicCommands::HandleAddTextToWid
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
-	if (!WidgetTree)
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::WidgetTreeNotFound,
-			TEXT("WidgetTree not found"));
-	}
 
-	// Get or create root Canvas Panel
-	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
-	if (!RootCanvas)
+	// Resolve parent (parent_name or root canvas)
+	TSharedPtr<FJsonObject> ParentError;
+	UPanelWidget* Parent = FSpirrowBridgeUMGWidgetCoreCommands::ResolveAddTarget(WidgetTree, Params, ParentError);
+	if (ParentError.IsValid())
 	{
-		RootCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("RootCanvas"));
-		WidgetTree->RootWidget = RootCanvas;
+		return ParentError;
 	}
 
 	// Create TextBlock
@@ -132,14 +122,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetBasicCommands::HandleAddTextToWid
 	// Set color
 	TextBlock->SetColorAndOpacity(FSlateColor(Color));
 
-	// Add to Canvas Panel
-	UCanvasPanelSlot* Slot = RootCanvas->AddChildToCanvas(TextBlock);
-	if (Slot)
+	// Add to parent; apply CanvasPanelSlot-specific layout only when parent is a canvas
+	UPanelSlot* AddedSlot = Parent->AddChild(TextBlock);
+	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(AddedSlot))
 	{
-		Slot->SetAnchors(Anchors);
-		Slot->SetAlignment(Alignment);
-		Slot->SetPosition(FVector2D(0, 0));
-		Slot->SetAutoSize(true);
+		CanvasSlot->SetAnchors(Anchors);
+		CanvasSlot->SetAlignment(Alignment);
+		CanvasSlot->SetPosition(FVector2D(0, 0));
+		CanvasSlot->SetAutoSize(true);
 	}
 
 	// Mark as modified and compile
@@ -153,85 +143,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetBasicCommands::HandleAddTextToWid
 	ResultObj->SetStringField(TEXT("text_name"), TextName);
 	ResultObj->SetStringField(TEXT("text"), Text);
 	ResultObj->SetNumberField(TEXT("font_size"), FontSize);
-	ResultObj->SetBoolField(TEXT("success"), true);
-	return ResultObj;
-}
-
-TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetBasicCommands::HandleAddTextBlockToWidget(const TSharedPtr<FJsonObject>& Params)
-{
-	// Validate required parameters
-	FString BlueprintName, WidgetName;
-	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-	{
-		return Error;
-	}
-	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
-	{
-		return Error;
-	}
-
-	// Find the Widget Blueprint (legacy path)
-	FString FullPath = TEXT("/Game/Widgets/") + BlueprintName;
-	UWidgetBlueprint* WidgetBlueprint = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(FullPath));
-	if (!WidgetBlueprint)
-	{
-		TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
-		Details->SetStringField(TEXT("blueprint_name"), BlueprintName);
-		Details->SetStringField(TEXT("path"), TEXT("/Game/Widgets"));
-		Details->SetStringField(TEXT("full_path"), FullPath);
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::WidgetNotFound,
-			FString::Printf(TEXT("Widget Blueprint '%s' not found"), *BlueprintName),
-			Details);
-	}
-
-	// Get optional parameters
-	FString InitialText;
-	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("text"), InitialText, TEXT("New Text Block"));
-
-	FVector2D Position(0.0f, 0.0f);
-	if (Params->HasField(TEXT("position")))
-	{
-		const TArray<TSharedPtr<FJsonValue>>* PosArray;
-		if (Params->TryGetArrayField(TEXT("position"), PosArray) && PosArray->Num() >= 2)
-		{
-			Position.X = (*PosArray)[0]->AsNumber();
-			Position.Y = (*PosArray)[1]->AsNumber();
-		}
-	}
-
-	// Create Text Block widget
-	UTextBlock* TextBlock = WidgetBlueprint->WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), *WidgetName);
-	if (!TextBlock)
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::WidgetCreationFailed,
-			FString::Printf(TEXT("Failed to create TextBlock '%s'"), *WidgetName));
-	}
-
-	// Set initial text
-	TextBlock->SetText(FText::FromString(InitialText));
-
-	// Add to canvas panel
-	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetBlueprint->WidgetTree->RootWidget);
-	if (!RootCanvas)
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::CanvasPanelNotFound,
-			TEXT("Root Canvas Panel not found"));
-	}
-
-	UCanvasPanelSlot* PanelSlot = RootCanvas->AddChildToCanvas(TextBlock);
-	PanelSlot->SetPosition(Position);
-
-	// Mark the package dirty and compile
-	WidgetBlueprint->MarkPackageDirty();
-	FKismetEditorUtilities::CompileBlueprint(WidgetBlueprint);
-
-	// Create success response
-	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
-	ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
-	ResultObj->SetStringField(TEXT("text"), InitialText);
+	ResultObj->SetStringField(TEXT("parent"), Parent->GetName());
 	ResultObj->SetBoolField(TEXT("success"), true);
 	return ResultObj;
 }
@@ -292,19 +204,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetBasicCommands::HandleAddImageToWi
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
-	if (!WidgetTree)
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::WidgetTreeNotFound,
-			TEXT("WidgetTree not found"));
-	}
 
-	// Get or create root Canvas Panel
-	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
-	if (!RootCanvas)
+	// Resolve parent (parent_name or root canvas)
+	TSharedPtr<FJsonObject> ParentError;
+	UPanelWidget* Parent = FSpirrowBridgeUMGWidgetCoreCommands::ResolveAddTarget(WidgetTree, Params, ParentError);
+	if (ParentError.IsValid())
 	{
-		RootCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("RootCanvas"));
-		WidgetTree->RootWidget = RootCanvas;
+		return ParentError;
 	}
 
 	// Create Image widget
@@ -332,14 +238,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetBasicCommands::HandleAddImageToWi
 	// Set color tint
 	ImageWidget->SetColorAndOpacity(ColorTint);
 
-	// Add to Canvas Panel
-	UCanvasPanelSlot* Slot = RootCanvas->AddChildToCanvas(ImageWidget);
-	if (Slot)
+	// Add to parent; apply CanvasPanelSlot-specific layout only when parent is a canvas
+	UPanelSlot* AddedSlot = Parent->AddChild(ImageWidget);
+	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(AddedSlot))
 	{
-		Slot->SetAnchors(Anchors);
-		Slot->SetAlignment(Alignment);
-		Slot->SetPosition(FVector2D(0, 0));
-		Slot->SetSize(Size);
+		CanvasSlot->SetAnchors(Anchors);
+		CanvasSlot->SetAlignment(Alignment);
+		CanvasSlot->SetPosition(FVector2D(0, 0));
+		CanvasSlot->SetSize(Size);
 	}
 
 	// Mark as modified and compile
@@ -352,6 +258,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetBasicCommands::HandleAddImageToWi
 	ResultObj->SetStringField(TEXT("widget"), WidgetName);
 	ResultObj->SetStringField(TEXT("image_name"), ImageName);
 	ResultObj->SetStringField(TEXT("texture_path"), TexturePath);
+	ResultObj->SetStringField(TEXT("parent"), Parent->GetName());
 	ResultObj->SetBoolField(TEXT("success"), true);
 	return ResultObj;
 }
@@ -415,19 +322,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetBasicCommands::HandleAddProgressB
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
-	if (!WidgetTree)
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::WidgetTreeNotFound,
-			TEXT("WidgetTree not found"));
-	}
 
-	// Get or create root Canvas Panel
-	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
-	if (!RootCanvas)
+	// Resolve parent (parent_name or root canvas)
+	TSharedPtr<FJsonObject> ParentError;
+	UPanelWidget* Parent = FSpirrowBridgeUMGWidgetCoreCommands::ResolveAddTarget(WidgetTree, Params, ParentError);
+	if (ParentError.IsValid())
 	{
-		RootCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("RootCanvas"));
-		WidgetTree->RootWidget = RootCanvas;
+		return ParentError;
 	}
 
 	// Create ProgressBar widget
@@ -450,14 +351,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetBasicCommands::HandleAddProgressB
 	Style.BackgroundImage.TintColor = FSlateColor(BackgroundColor);
 	ProgressBarWidget->SetWidgetStyle(Style);
 
-	// Add to Canvas Panel
-	UCanvasPanelSlot* Slot = RootCanvas->AddChildToCanvas(ProgressBarWidget);
-	if (Slot)
+	// Add to parent; apply CanvasPanelSlot-specific layout only when parent is a canvas
+	UPanelSlot* AddedSlot = Parent->AddChild(ProgressBarWidget);
+	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(AddedSlot))
 	{
-		Slot->SetAnchors(Anchors);
-		Slot->SetAlignment(Alignment);
-		Slot->SetPosition(FVector2D(0, 0));
-		Slot->SetSize(Size);
+		CanvasSlot->SetAnchors(Anchors);
+		CanvasSlot->SetAlignment(Alignment);
+		CanvasSlot->SetPosition(FVector2D(0, 0));
+		CanvasSlot->SetSize(Size);
 	}
 
 	// Mark as modified and compile
@@ -470,6 +371,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetBasicCommands::HandleAddProgressB
 	ResultObj->SetStringField(TEXT("widget"), WidgetName);
 	ResultObj->SetStringField(TEXT("progressbar_name"), ProgressBarName);
 	ResultObj->SetNumberField(TEXT("percent"), Percent);
+	ResultObj->SetStringField(TEXT("parent"), Parent->GetName());
 	ResultObj->SetBoolField(TEXT("success"), true);
 	return ResultObj;
 }

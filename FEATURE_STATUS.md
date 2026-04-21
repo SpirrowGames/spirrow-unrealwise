@@ -1,8 +1,8 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: v0.9.6 (UMG Extensions — WidgetSwitcher / Border / 明示的 Anchors / parent_class 汎用化)
+> **バージョン**: v0.9.7 (Reparent Safety — BUG-1/BUG-5 修正 + 全 add_*_to_widget に parent_name + add_text_block_to_widget 廃止)
 > **ステータス**: Beta
-> **最終更新**: 2026-04-21
+> **最終更新**: 2026-04-22
 
 ---
 
@@ -34,8 +34,8 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 | `editor` | Actor操作、トランスフォーム、プロパティ、レベル作成/保存/オープン、WorldSettings 🆕 | 17 | ✅ |
 | `blueprint` | BP作成、コンパイル、プロパティ、DataAsset (LSB対応) 🆕 | 21 | ✅ |
 | `blueprint_node` | イベント、関数、変数、フロー制御、数学 (LSB + 外部UPROPERTY + typed Subsystem) 🆕 | 24 | ✅ |
-| `umg_widget` | テキスト、画像、ボタン、スライダー、Border 🆕 等 | 19 | ✅ |
-| `umg_layout` | VBox/HBox、WidgetSwitcher 🆕、ScrollBox、リペアレント | 6 | ✅ |
+| `umg_widget` | テキスト、画像、ボタン、スライダー、Border 等 (全て parent_name 対応 🆕 v0.9.7) | 18 | ✅ |
+| `umg_layout` | VBox/HBox、WidgetSwitcher、ScrollBox、リペアレント (reparent 整合性強化 🆕 v0.9.7) | 6 | ✅ |
 | `umg_variable` | Widget変数、関数、イベント | 5 | ✅ |
 | `umg_animation` | アニメーション、トラック、キーフレーム | 4 | ✅ |
 | `project` | Input Mapping、アセット、フォルダ、テクスチャ | 13 | ✅ |
@@ -65,7 +65,7 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 | | 数 |
 |---|---|
 | **MCP登録ツール合計** | **25** |
-| **内包コマンド合計** | **159** |
+| **内包コマンド合計** | **158** |
 
 ---
 
@@ -296,7 +296,26 @@ generate_and_import_texture(
 
 ## 最新の更新
 
-### 2026-04-21: UMG Extensions — WidgetSwitcher / Border / 明示的 Anchors / parent_class 汎用化 (v0.9.6) 🆕
+### 2026-04-22: Reparent Safety — BUG fixes + 全 add_*_to_widget に parent_name (v0.9.7) 🆕
+
+**WBP_MainMenu 実装検証で判明した致命的バグの修正 + 全 add_*_to_widget への parent_name 追加**:
+
+| 変更 | 内容 |
+|------|------|
+| **BUG-1 修正 (reparent_widget_element)** 🔴 | 旧実装は `OldParent->RemoveChild` は呼ぶが `Modify()` / `MarkBlueprintAsStructurallyModified` 未呼出のため serialization で double-parent 状態が残っていた。v0.9.7 では UMG Designer の drag-drop reparent と同じ canonical pattern に揃える (`WidgetBP/WidgetTree/Element/OldParent/NewParent` 全てに `Modify()` → `RemoveChild` → `AddChild` → defensive post-check → `MarkBlueprintAsStructurallyModified` → `CompileBlueprint`)。旧親からの切断が確認できない場合は integrity check エラーを返す (無言成功を廃止) |
+| **BUG-5 修正 (element_name ambiguity)** 🔴 | `UWidgetTree::FindWidget(FName)` は**最後に一致した widget**を返す (WidgetTree.cpp:32-44) 挙動が ue-investigator で確認された。BUG-1 で生じた同名 widget 重複時に意図しない widget が操作される問題に対応。`set_widget_element_property` / `set_widget_slot_property` / `remove_widget_element` / `reparent_widget_element` に optional `parent_name` を追加 → 検索範囲を指定パネル配下の sub-tree に絞れる (第一一致を返す決定論的な動作) |
+| **BUG-2 廃止 (add_text_block_to_widget)** 🔴 | help は `widget_name` 必須と表示するが実装は `blueprint_name` を要求し `/Game/Widgets/` ハードコードパスしか受けない壊れた legacy コマンド。v0.9.7 で削除。`add_text_to_widget` への移行を推奨 (完全な互換な上位互換) |
+| **FR-1 新機能 (全 add_*_to_widget に parent_name)** 🆕 | 9 個の leaf widget 追加コマンド (button / text / image / progressbar / slider / checkbox / combobox / editabletext / spinbox / scrollbox) が optional `parent_name` を受け取れるように。**reparent 依存を排除**し BUG-1 に遭遇する機会を根本的に減らす。共通ヘルパ `FSpirrowBridgeUMGWidgetCoreCommands::ResolveAddTarget` で実装を DRY 化 |
+| **FR-4 (bind_widget_to_variable 削除)** | help list に載っていたが C++ 実装がない stale 参照を削除 |
+
+**コマンド数**: 159 → **158** (-1: add_text_block_to_widget 廃止。bind_widget_to_variable は元々 non-functional だったので実質の機能減はなし)
+**umg_widget コマンド数**: 19 → **18**
+
+**UE 5.7 ソース解析**: `ue-investigator` で 5 件の深層調査を実施 (`UPanelWidget::RemoveChildAt` 完全性確認 / UMG Designer drag-drop canonical pattern / `UWidgetTree::FindWidget` 最後一致挙動 / `GetAllSourceWidgets` 配列保持 / `CompileBlueprint` が WidgetTree 整合性 rebuild しない確認)。BUG-1/BUG-5 の原因特定とほぼ全ての修正方針がこの解析から得られた。
+
+---
+
+### 2026-04-21: UMG Extensions — WidgetSwitcher / Border / 明示的 Anchors / parent_class 汎用化 (v0.9.6)
 
 **WBP レイアウト表現力を拡張**:
 

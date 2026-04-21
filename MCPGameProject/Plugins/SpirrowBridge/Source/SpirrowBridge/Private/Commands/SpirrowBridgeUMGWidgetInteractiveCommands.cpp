@@ -19,6 +19,7 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
+#include "Components/PanelWidget.h"
 #include "Kismet2/KismetEditorUtilities.h"
 
 FSpirrowBridgeUMGWidgetInteractiveCommands::FSpirrowBridgeUMGWidgetInteractiveCommands()
@@ -119,18 +120,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddBut
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
-	if (!WidgetTree)
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::WidgetTreeNotFound,
-			TEXT("WidgetTree not found"));
-	}
 
-	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
-	if (!RootCanvas)
+	// Resolve parent (parent_name or root canvas)
+	TSharedPtr<FJsonObject> ParentError;
+	UPanelWidget* Parent = FSpirrowBridgeUMGWidgetCoreCommands::ResolveAddTarget(WidgetTree, Params, ParentError);
+	if (ParentError.IsValid())
 	{
-		RootCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("RootCanvas"));
-		WidgetTree->RootWidget = RootCanvas;
+		return ParentError;
 	}
 
 	UButton* ButtonWidget = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), FName(*ButtonName));
@@ -162,13 +158,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddBut
 		}
 	}
 
-	UCanvasPanelSlot* Slot = RootCanvas->AddChildToCanvas(ButtonWidget);
-	if (Slot)
+	UPanelSlot* AddedSlot = Parent->AddChild(ButtonWidget);
+	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(AddedSlot))
 	{
-		Slot->SetAnchors(Anchors);
-		Slot->SetAlignment(Alignment);
-		Slot->SetPosition(FVector2D(0, 0));
-		Slot->SetSize(Size);
+		CanvasSlot->SetAnchors(Anchors);
+		CanvasSlot->SetAlignment(Alignment);
+		CanvasSlot->SetPosition(FVector2D(0, 0));
+		CanvasSlot->SetSize(Size);
 	}
 
 	WidgetBP->Modify();
@@ -239,18 +235,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddSli
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
-	if (!WidgetTree)
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::WidgetTreeNotFound,
-			TEXT("WidgetTree not found"));
-	}
 
-	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
-	if (!RootCanvas)
+	// Resolve parent (parent_name or root canvas)
+	TSharedPtr<FJsonObject> ParentError;
+	UPanelWidget* Parent = FSpirrowBridgeUMGWidgetCoreCommands::ResolveAddTarget(WidgetTree, Params, ParentError);
+	if (ParentError.IsValid())
 	{
-		RootCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("RootCanvas"));
-		WidgetTree->RootWidget = RootCanvas;
+		return ParentError;
 	}
 
 	USlider* SliderWidget = WidgetTree->ConstructWidget<USlider>(USlider::StaticClass(), FName(*SliderName));
@@ -274,13 +265,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddSli
 	SliderStyle.HoveredThumbImage.TintColor = FSlateColor(HandleColor);
 	SliderWidget->SetWidgetStyle(SliderStyle);
 
-	UCanvasPanelSlot* Slot = RootCanvas->AddChildToCanvas(SliderWidget);
-	if (Slot)
+	UPanelSlot* AddedSlot = Parent->AddChild(SliderWidget);
+	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(AddedSlot))
 	{
-		Slot->SetAnchors(Anchors);
-		Slot->SetAlignment(Alignment);
-		Slot->SetPosition(FVector2D(0, 0));
-		Slot->SetSize(Size);
+		CanvasSlot->SetAnchors(Anchors);
+		CanvasSlot->SetAlignment(Alignment);
+		CanvasSlot->SetPosition(FVector2D(0, 0));
+		CanvasSlot->SetSize(Size);
 	}
 
 	WidgetBP->Modify();
@@ -335,18 +326,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddChe
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
-	if (!WidgetTree)
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::WidgetTreeNotFound,
-			TEXT("WidgetTree not found"));
-	}
 
-	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
-	if (!RootCanvas)
+	// Resolve parent (parent_name or root canvas)
+	TSharedPtr<FJsonObject> ParentError;
+	UPanelWidget* Parent = FSpirrowBridgeUMGWidgetCoreCommands::ResolveAddTarget(WidgetTree, Params, ParentError);
+	if (ParentError.IsValid())
 	{
-		RootCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("RootCanvas"));
-		WidgetTree->RootWidget = RootCanvas;
+		return ParentError;
 	}
 
 	UCheckBox* CheckBoxWidget = WidgetTree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass(), FName(*CheckBoxName));
@@ -382,13 +368,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddChe
 		WidgetToAdd = Container;
 	}
 
-	UCanvasPanelSlot* Slot = RootCanvas->AddChildToCanvas(WidgetToAdd);
-	if (Slot)
+	UPanelSlot* AddedSlot = Parent->AddChild(WidgetToAdd);
+	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(AddedSlot))
 	{
-		Slot->SetAnchors(Anchors);
-		Slot->SetAlignment(Alignment);
-		Slot->SetPosition(FVector2D(0, 0));
-		Slot->SetAutoSize(true);
+		CanvasSlot->SetAnchors(Anchors);
+		CanvasSlot->SetAlignment(Alignment);
+		CanvasSlot->SetPosition(FVector2D(0, 0));
+		CanvasSlot->SetAutoSize(true);
 	}
 
 	WidgetBP->Modify();
@@ -461,19 +447,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddCom
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
-	if (!WidgetTree)
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::WidgetTreeNotFound,
-			TEXT("WidgetTree not found"));
-	}
 
-	UCanvasPanel* Canvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
-	if (!Canvas)
+	// Resolve parent (parent_name or root canvas)
+	TSharedPtr<FJsonObject> ParentError;
+	UPanelWidget* Parent = FSpirrowBridgeUMGWidgetCoreCommands::ResolveAddTarget(WidgetTree, Params, ParentError);
+	if (ParentError.IsValid())
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::CanvasPanelNotFound,
-			TEXT("Root widget is not a Canvas Panel"));
+		return ParentError;
 	}
 
 	UComboBoxString* ComboBoxWidget = WidgetTree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass(), FName(*ComboBoxName));
@@ -494,8 +474,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddCom
 		ComboBoxWidget->SetSelectedIndex(SelectedIndex);
 	}
 
-	UCanvasPanelSlot* CanvasSlot = Canvas->AddChildToCanvas(ComboBoxWidget);
-	if (CanvasSlot)
+	UPanelSlot* AddedSlot = Parent->AddChild(ComboBoxWidget);
+	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(AddedSlot))
 	{
 		CanvasSlot->SetAnchors(Anchors);
 		CanvasSlot->SetAlignment(Alignment);
@@ -563,19 +543,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddEdi
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
-	if (!WidgetTree)
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::WidgetTreeNotFound,
-			TEXT("WidgetTree not found"));
-	}
 
-	UCanvasPanel* Canvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
-	if (!Canvas)
+	// Resolve parent (parent_name or root canvas)
+	TSharedPtr<FJsonObject> ParentError;
+	UPanelWidget* Parent = FSpirrowBridgeUMGWidgetCoreCommands::ResolveAddTarget(WidgetTree, Params, ParentError);
+	if (ParentError.IsValid())
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::CanvasPanelNotFound,
-			TEXT("Root widget is not a Canvas Panel"));
+		return ParentError;
 	}
 
 	UWidget* TextWidget = nullptr;
@@ -608,8 +582,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddEdi
 		TextWidget = SingleLineWidget;
 	}
 
-	UCanvasPanelSlot* CanvasSlot = Canvas->AddChildToCanvas(TextWidget);
-	if (CanvasSlot)
+	UPanelSlot* AddedSlot = Parent->AddChild(TextWidget);
+	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(AddedSlot))
 	{
 		CanvasSlot->SetAnchors(Anchors);
 		CanvasSlot->SetAlignment(Alignment);
@@ -678,19 +652,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddSpi
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
-	if (!WidgetTree)
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::WidgetTreeNotFound,
-			TEXT("WidgetTree not found"));
-	}
 
-	UCanvasPanel* Canvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
-	if (!Canvas)
+	// Resolve parent (parent_name or root canvas)
+	TSharedPtr<FJsonObject> ParentError;
+	UPanelWidget* Parent = FSpirrowBridgeUMGWidgetCoreCommands::ResolveAddTarget(WidgetTree, Params, ParentError);
+	if (ParentError.IsValid())
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::CanvasPanelNotFound,
-			TEXT("Root widget is not a Canvas Panel"));
+		return ParentError;
 	}
 
 	USpinBox* SpinBoxWidget = WidgetTree->ConstructWidget<USpinBox>(USpinBox::StaticClass(), FName(*SpinBoxName));
@@ -706,8 +674,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddSpi
 	SpinBoxWidget->SetMaxValue(MaxValue);
 	SpinBoxWidget->SetDelta(Delta);
 
-	UCanvasPanelSlot* CanvasSlot = Canvas->AddChildToCanvas(SpinBoxWidget);
-	if (CanvasSlot)
+	UPanelSlot* AddedSlot = Parent->AddChild(SpinBoxWidget);
+	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(AddedSlot))
 	{
 		CanvasSlot->SetAnchors(Anchors);
 		CanvasSlot->SetAlignment(Alignment);
@@ -772,19 +740,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddScr
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
-	if (!WidgetTree)
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::WidgetTreeNotFound,
-			TEXT("WidgetTree not found"));
-	}
 
-	UCanvasPanel* Canvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
-	if (!Canvas)
+	// Resolve parent (parent_name or root canvas)
+	TSharedPtr<FJsonObject> ParentError;
+	UPanelWidget* Parent = FSpirrowBridgeUMGWidgetCoreCommands::ResolveAddTarget(WidgetTree, Params, ParentError);
+	if (ParentError.IsValid())
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::CanvasPanelNotFound,
-			TEXT("Root widget is not a Canvas Panel"));
+		return ParentError;
 	}
 
 	UScrollBox* ScrollBoxWidget = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), FName(*ScrollBoxName));
@@ -809,8 +771,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddScr
 	}
 	ScrollBoxWidget->SetScrollBarVisibility(ScrollBarVisibility);
 
-	UCanvasPanelSlot* CanvasSlot = Canvas->AddChildToCanvas(ScrollBoxWidget);
-	if (CanvasSlot)
+	UPanelSlot* AddedSlot = Parent->AddChild(ScrollBoxWidget);
+	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(AddedSlot))
 	{
 		CanvasSlot->SetAnchors(Anchors);
 		CanvasSlot->SetAlignment(Alignment);

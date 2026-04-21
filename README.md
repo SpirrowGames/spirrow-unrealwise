@@ -34,6 +34,12 @@ Since **v0.9.1**, all tools are consolidated into **meta-tools** for dramaticall
 
 > See [FEATURE_STATUS.md](FEATURE_STATUS.md) for detailed feature documentation.
 
+### End-user templates (Claude Code skills + cheatsheet)
+
+Drop-in templates for your UE project's `.claude/` and `Docs/` folders so Claude Code/Desktop knows how to use this MCP correctly: 4 invocable Skills (`/ue-level-bootstrap`, `/ue-blueprint-scaffold`, `/ue-hud-bootstrap`, `/ue-input-bootstrap`), a 25-meta-tool cheatsheet, and a CLAUDE.md section with help-first / compile-required / retry-strategy rules.
+
+> Install instructions: [`templates/end-user/README.md`](templates/end-user/README.md)
+
 ---
 
 ## Quick Start

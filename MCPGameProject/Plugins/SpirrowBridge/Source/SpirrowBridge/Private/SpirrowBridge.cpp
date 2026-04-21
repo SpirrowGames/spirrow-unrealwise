@@ -436,6 +436,7 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("add_text_block_to_widget") ||
                      CommandType == TEXT("add_image_to_widget") ||
                      CommandType == TEXT("add_progressbar_to_widget") ||
+                     CommandType == TEXT("add_border_to_widget") ||
                      CommandType == TEXT("add_button_to_widget") ||
                      CommandType == TEXT("add_slider_to_widget") ||
                      CommandType == TEXT("add_checkbox_to_widget") ||
@@ -450,6 +451,7 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
             // UMG Layout Commands
             else if (CommandType == TEXT("add_vertical_box_to_widget") ||
                      CommandType == TEXT("add_horizontal_box_to_widget") ||
+                     CommandType == TEXT("add_widget_switcher_to_widget") ||
                      CommandType == TEXT("get_widget_elements") ||
                      CommandType == TEXT("set_widget_slot_property") ||
                      CommandType == TEXT("set_widget_element_property") ||

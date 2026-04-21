@@ -7,12 +7,16 @@
 #include "Components/TextBlock.h"
 #include "Components/Image.h"
 #include "Components/ProgressBar.h"
+#include "Components/Border.h"
+#include "Components/PanelWidget.h"
 #include "Engine/Texture2D.h"
 #include "WidgetBlueprint.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Kismet2/KismetEditorUtilities.h"
+#include "Layout/Margin.h"
+#include "Types/SlateEnums.h"
 
 FSpirrowBridgeUMGWidgetBasicCommands::FSpirrowBridgeUMGWidgetBasicCommands()
 {
@@ -35,6 +39,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetBasicCommands::HandleCommand(cons
 	else if (CommandName == TEXT("add_progressbar_to_widget"))
 	{
 		return HandleAddProgressBarToWidget(Params);
+	}
+	else if (CommandName == TEXT("add_border_to_widget"))
+	{
+		return HandleAddBorderToWidget(Params);
 	}
 
 	// Not handled by this class
@@ -463,5 +471,147 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetBasicCommands::HandleAddProgressB
 	ResultObj->SetStringField(TEXT("progressbar_name"), ProgressBarName);
 	ResultObj->SetNumberField(TEXT("percent"), Percent);
 	ResultObj->SetBoolField(TEXT("success"), true);
+	return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetBasicCommands::HandleAddBorderToWidget(const TSharedPtr<FJsonObject>& Params)
+{
+	FString WidgetName, BorderName;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
+	{
+		return Error;
+	}
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("border_name"), BorderName))
+	{
+		return Error;
+	}
+
+	FString Path, ParentName, AnchorStr, HAlignStr, VAlignStr;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("anchor"), AnchorStr, TEXT("Center"));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("horizontal_alignment"), HAlignStr, TEXT("Fill"));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("vertical_alignment"), VAlignStr, TEXT("Fill"));
+	bool bHasParent = Params->TryGetStringField(TEXT("parent_name"), ParentName);
+
+	FLinearColor BrushColor = FSpirrowBridgeCommonUtils::GetLinearColorFromJson(Params, TEXT("brush_color"), FLinearColor::White);
+	FLinearColor ContentTint = FSpirrowBridgeCommonUtils::GetLinearColorFromJson(Params, TEXT("content_color_and_opacity"), FLinearColor::White);
+
+	FMargin Padding(0.0f);
+	const TArray<TSharedPtr<FJsonValue>>* PadArr;
+	if (Params->TryGetArrayField(TEXT("padding"), PadArr) && PadArr->Num() >= 4)
+	{
+		Padding = FMargin(
+			static_cast<float>((*PadArr)[0]->AsNumber()),
+			static_cast<float>((*PadArr)[1]->AsNumber()),
+			static_cast<float>((*PadArr)[2]->AsNumber()),
+			static_cast<float>((*PadArr)[3]->AsNumber()));
+	}
+
+	UWidgetBlueprint* WidgetBP = nullptr;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
+	{
+		return Error;
+	}
+
+	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
+	if (!WidgetTree)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetTreeNotFound,
+			TEXT("WidgetTree not found"));
+	}
+
+	UBorder* Border = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), FName(*BorderName));
+	if (!Border)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetCreationFailed,
+			FString::Printf(TEXT("Failed to create Border '%s'"), *BorderName));
+	}
+
+	Border->SetBrushColor(BrushColor);
+	Border->SetContentColorAndOpacity(ContentTint);
+	Border->SetPadding(Padding);
+
+	EHorizontalAlignment HAlign = HAlign_Fill;
+	if (HAlignStr == TEXT("Left")) HAlign = HAlign_Left;
+	else if (HAlignStr == TEXT("Center")) HAlign = HAlign_Center;
+	else if (HAlignStr == TEXT("Right")) HAlign = HAlign_Right;
+	Border->SetHorizontalAlignment(HAlign);
+
+	EVerticalAlignment VAlign = VAlign_Fill;
+	if (VAlignStr == TEXT("Top")) VAlign = VAlign_Top;
+	else if (VAlignStr == TEXT("Center")) VAlign = VAlign_Center;
+	else if (VAlignStr == TEXT("Bottom")) VAlign = VAlign_Bottom;
+	Border->SetVerticalAlignment(VAlign);
+
+	UPanelWidget* Parent = nullptr;
+	if (bHasParent && !ParentName.IsEmpty())
+	{
+		Parent = Cast<UPanelWidget>(WidgetTree->FindWidget(FName(*ParentName)));
+		if (!Parent)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::WidgetElementNotFound,
+				FString::Printf(TEXT("Parent widget '%s' not found or not a panel"), *ParentName));
+		}
+	}
+	else
+	{
+		Parent = Cast<UCanvasPanel>(WidgetTree->RootWidget);
+		if (!Parent)
+		{
+			Parent = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("RootCanvas"));
+			WidgetTree->RootWidget = Parent;
+		}
+	}
+
+	UPanelSlot* Slot = Parent->AddChild(Border);
+
+	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Slot))
+	{
+		FAnchors Anchors = FSpirrowBridgeUMGWidgetCoreCommands::ParseAnchorPreset(AnchorStr);
+		CanvasSlot->SetAnchors(Anchors);
+
+		FVector2D Alignment(0.5f, 0.5f);
+		const TArray<TSharedPtr<FJsonValue>>* AlignArray;
+		if (Params->TryGetArrayField(TEXT("alignment"), AlignArray) && AlignArray->Num() >= 2)
+		{
+			Alignment.X = (*AlignArray)[0]->AsNumber();
+			Alignment.Y = (*AlignArray)[1]->AsNumber();
+		}
+		CanvasSlot->SetAlignment(Alignment);
+
+		FVector2D Position(0.0f, 0.0f);
+		const TArray<TSharedPtr<FJsonValue>>* PosArray;
+		if (Params->TryGetArrayField(TEXT("position"), PosArray) && PosArray->Num() >= 2)
+		{
+			Position.X = (*PosArray)[0]->AsNumber();
+			Position.Y = (*PosArray)[1]->AsNumber();
+		}
+		CanvasSlot->SetPosition(Position);
+
+		const TArray<TSharedPtr<FJsonValue>>* SizeArray;
+		if (Params->TryGetArrayField(TEXT("size"), SizeArray) && SizeArray->Num() >= 2)
+		{
+			FVector2D Size((*SizeArray)[0]->AsNumber(), (*SizeArray)[1]->AsNumber());
+			CanvasSlot->SetSize(Size);
+			CanvasSlot->SetAutoSize(false);
+		}
+		else
+		{
+			CanvasSlot->SetAutoSize(true);
+		}
+	}
+
+	WidgetBP->Modify();
+	WidgetBP->MarkPackageDirty();
+	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetBoolField(TEXT("success"), true);
+	ResultObj->SetStringField(TEXT("widget"), WidgetName);
+	ResultObj->SetStringField(TEXT("border_name"), BorderName);
+	ResultObj->SetStringField(TEXT("parent"), Parent->GetName());
 	return ResultObj;
 }

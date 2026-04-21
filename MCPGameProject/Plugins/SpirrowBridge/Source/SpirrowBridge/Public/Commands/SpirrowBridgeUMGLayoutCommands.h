@@ -18,6 +18,7 @@ private:
     // Layout Containers
     TSharedPtr<FJsonObject> HandleAddVerticalBoxToWidget(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleAddHorizontalBoxToWidget(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleAddWidgetSwitcherToWidget(const TSharedPtr<FJsonObject>& Params);
 
     // Element Operations
     TSharedPtr<FJsonObject> HandleGetWidgetElements(const TSharedPtr<FJsonObject>& Params);

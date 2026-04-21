@@ -1,8 +1,8 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: v0.9.5 (WorldSettings Configuration)
+> **バージョン**: v0.9.6 (UMG Extensions — WidgetSwitcher / Border / 明示的 Anchors / parent_class 汎用化)
 > **ステータス**: Beta
-> **最終更新**: 2026-04-12
+> **最終更新**: 2026-04-21
 
 ---
 
@@ -34,8 +34,8 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 | `editor` | Actor操作、トランスフォーム、プロパティ、レベル作成/保存/オープン、WorldSettings 🆕 | 17 | ✅ |
 | `blueprint` | BP作成、コンパイル、プロパティ、DataAsset (LSB対応) 🆕 | 21 | ✅ |
 | `blueprint_node` | イベント、関数、変数、フロー制御、数学 (LSB + 外部UPROPERTY + typed Subsystem) 🆕 | 24 | ✅ |
-| `umg_widget` | テキスト、画像、ボタン、スライダー等 | 18 | ✅ |
-| `umg_layout` | VBox/HBox、ScrollBox、リペアレント | 5 | ✅ |
+| `umg_widget` | テキスト、画像、ボタン、スライダー、Border 🆕 等 | 19 | ✅ |
+| `umg_layout` | VBox/HBox、WidgetSwitcher 🆕、ScrollBox、リペアレント | 6 | ✅ |
 | `umg_variable` | Widget変数、関数、イベント | 5 | ✅ |
 | `umg_animation` | アニメーション、トラック、キーフレーム | 4 | ✅ |
 | `project` | Input Mapping、アセット、フォルダ、テクスチャ | 13 | ✅ |
@@ -65,7 +65,7 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 | | 数 |
 |---|---|
 | **MCP登録ツール合計** | **25** |
-| **内包コマンド合計** | **157** |
+| **内包コマンド合計** | **159** |
 
 ---
 
@@ -205,13 +205,16 @@ blueprint_node(command="add_external_property_set_node", params={
 # → VariableSetノードが生成される。MaxClusterForPhysics入力ピンにset_node_pin_valueで値を設定可能。
 ```
 
-### UMG Widget (30)
+### UMG Widget (32)
 - **Core (3)**: create, viewport, anchor
-- **Basic (4)**: text, image, progressbar
+- **Basic (5)**: text, image, progressbar, `add_border_to_widget` 🆕
 - **Interactive (7)**: button, slider, checkbox, combobox, editabletext, spinbox, scrollbox
-- **Layout (8)**: vertical/horizontal box, slot, reparent, remove, `get_widget_element_property` 🆕
+- **Layout (9)**: vertical/horizontal box, `add_widget_switcher_to_widget` 🆕, slot, reparent, remove, `get_widget_element_property`
 - **Variable/Function (5)**: variable, array, function, event, binding
 - **Animation (4)**: create, track, keyframe, list
+
+**set_widget_slot_property 拡張 🆕 (v0.9.6)**: `anchor_min` / `anchor_max` (0-1 UV) と `offset_left` / `offset_top` / `offset_right` / `offset_bottom` (FMargin LTRB) を追加。`anchor` プリセット文字列は後方互換維持。
+**create_umg_widget_blueprint.parent_class 汎用化 🆕 (v0.9.6)**: `/Script/Module.Class`、`/Game/Path.Asset_C`、bare name、全て受理。UUserWidget 継承チェック + 解決不能時は `ClassNotFound` (1211) / 型不一致は `InvalidParamValue` (1005) をハードエラー返却。
 
 **get_widget_elements強化**: `include_properties`, `class_filter`, `property_filter`, `exclude_default_values` オプション追加 🆕
 **set_widget_element_property強化**: ネストプロパティ対応（`Brush.TintColor` 形式） 🆕
@@ -293,7 +296,23 @@ generate_and_import_texture(
 
 ## 最新の更新
 
-### 2026-04-17: WorldSettings Configuration (v0.9.5) 🆕
+### 2026-04-21: UMG Extensions — WidgetSwitcher / Border / 明示的 Anchors / parent_class 汎用化 (v0.9.6) 🆕
+
+**WBP レイアウト表現力を拡張**:
+
+| 変更 | 内容 |
+|------|------|
+| **add_widget_switcher_to_widget** 🆕 | `umg_layout` に UWidgetSwitcher コンテナ追加。`active_widget_index` でデザイン時のアクティブページ指定、`parent_name` で任意パネルへのネスト対応。ランタイム切替は `set_widget_element_property(property_name="ActiveWidgetIndex", ...)` (リフレクション fallback で既に動作) |
+| **add_border_to_widget** 🆕 | `umg_widget` に UBorder 追加 (単一子コンテナ + 背景ブラシ)。`brush_color` / `content_color_and_opacity` / `padding` (FMargin LTRB) / `horizontal_alignment` / `vertical_alignment` を露出。`parent_name` で任意パネルへのネスト対応 |
+| **set_widget_slot_property** 拡張 🆕 | CanvasPanelSlot に対して `anchor_min` / `anchor_max` (0-1 UV 空間で任意の FAnchors) と `offset_left/top/right/bottom` (FMargin LTRB 差分更新) を追加。既存の `anchor` プリセット文字列は優先されて後方互換。全画面ストレッチ `anchor_min=[0,0], anchor_max=[1,1]` が表現可能に |
+| **create_umg_widget_blueprint.parent_class** 汎用化 🆕 | 従来は `"UserWidget"` ハードコード + 不安全な FindFirstObject + 無音 fallback だった。v0.9.6 では `/Script/Module.Class` (C++ 派生)、`/Game/Path.Asset_C` (Blueprint 派生)、bare name を全て受理。解決不能は `ClassNotFound` (1211)、UUserWidget 非継承は `InvalidParamValue` (1005) のハードエラー。成功時の `parent_class` レスポンスは `GetPathName()` で解決済みフルパスを返す |
+
+**コマンド数**: 157 → **159** (+2)
+**umg_widget コマンド数**: 18 → **19** / **umg_layout コマンド数**: 5 → **6**
+
+---
+
+### 2026-04-17: WorldSettings Configuration (v0.9.5)
 
 **レベル毎の `AWorldSettings` を Unrealwise から読み書き可能に**:
 

@@ -97,7 +97,12 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetCoreCommands::HandleCreateUMGWidg
 		PackagePath = PackagePath.LeftChop(1);
 	}
 
-	// Find the parent class
+	// Resolve parent class. Accepts:
+	//   - Bare shortcut "UserWidget"
+	//   - C++ class path "/Script/Module.Class"
+	//   - Blueprint class path "/Game/Path.Asset_C" or asset path "/Game/Path.Asset"
+	//   - Bare class name (falls back to legacy /Script/UMG.<Name> lookup)
+	// Resolution mirrors FSpirrowBridgeCommonUtils::SetObjectProperty's FClassProperty branch.
 	UClass* ParentClass = nullptr;
 	if (ParentClassName == TEXT("UserWidget"))
 	{
@@ -105,18 +110,66 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetCoreCommands::HandleCreateUMGWidg
 	}
 	else
 	{
-		ParentClass = FindFirstObject<UClass>(*ParentClassName, EFindFirstObjectOptions::None);
+		// 1. Direct class path load (handles /Script/Module.Class and /Game/Path.Asset_C)
+		ParentClass = LoadClass<UObject>(nullptr, *ParentClassName);
+
+		// 2. Try asset load, extract Blueprint->GeneratedClass (handles /Game/Path.Asset form)
 		if (!ParentClass)
 		{
-			FString FullParentPath = FString::Printf(TEXT("/Script/UMG.%s"), *ParentClassName);
-			ParentClass = LoadObject<UClass>(nullptr, *FullParentPath);
+			UObject* Loaded = UEditorAssetLibrary::LoadAsset(ParentClassName);
+			if (UBlueprint* BP = Cast<UBlueprint>(Loaded))
+			{
+				ParentClass = BP->GeneratedClass;
+			}
+			else if (UClass* DirectClass = Cast<UClass>(Loaded))
+			{
+				ParentClass = DirectClass;
+			}
 		}
+
+		// 3. Suffix-completion: "/Game/UI/BP_Foo" -> "/Game/UI/BP_Foo.BP_Foo"
+		if (!ParentClass && !ParentClassName.Contains(TEXT(".")))
+		{
+			FString AssetName = FPackageName::GetShortName(ParentClassName);
+			FString AltPath = ParentClassName + TEXT(".") + AssetName;
+			UObject* Loaded = UEditorAssetLibrary::LoadAsset(AltPath);
+			if (UBlueprint* BP = Cast<UBlueprint>(Loaded))
+			{
+				ParentClass = BP->GeneratedClass;
+			}
+		}
+
+		// 4. Legacy /Script/UMG.<Name> backwards-compat fallback
 		if (!ParentClass)
 		{
-			FSpirrowBridgeCommonUtils::LogCommandWarning(TEXT("create_umg_widget_blueprint"),
-				FString::Printf(TEXT("Parent class '%s' not found, using UserWidget"), *ParentClassName));
-			ParentClass = UUserWidget::StaticClass();
+			FString ScriptPath = FString::Printf(TEXT("/Script/UMG.%s"), *ParentClassName);
+			ParentClass = LoadClass<UObject>(nullptr, *ScriptPath);
 		}
+
+		// 5. Unresolved -> hard error (no silent fallback)
+		if (!ParentClass)
+		{
+			TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+			Details->SetStringField(TEXT("parent_class"), ParentClassName);
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::ClassNotFound,
+				FString::Printf(TEXT("Parent class '%s' not found (tried direct load, asset load, and /Script/UMG.%s)"),
+					*ParentClassName, *ParentClassName),
+				Details);
+		}
+	}
+
+	// Validate that resolved class descends from UUserWidget
+	if (!ParentClass->IsChildOf(UUserWidget::StaticClass()))
+	{
+		TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+		Details->SetStringField(TEXT("parent_class"), ParentClassName);
+		Details->SetStringField(TEXT("resolved_class"), ParentClass->GetPathName());
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::InvalidParamValue,
+			FString::Printf(TEXT("Parent class '%s' does not descend from UUserWidget (resolved: %s)"),
+				*ParentClassName, *ParentClass->GetPathName()),
+			Details);
 	}
 
 	// Create the full asset path
@@ -187,7 +240,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetCoreCommands::HandleCreateUMGWidg
 	ResultObj->SetBoolField(TEXT("success"), true);
 	ResultObj->SetStringField(TEXT("name"), BlueprintName);
 	ResultObj->SetStringField(TEXT("path"), FullPath);
-	ResultObj->SetStringField(TEXT("parent_class"), ParentClass->GetName());
+	ResultObj->SetStringField(TEXT("parent_class"), ParentClass->GetPathName());
 	return ResultObj;
 }
 

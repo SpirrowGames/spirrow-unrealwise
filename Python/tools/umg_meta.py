@@ -19,6 +19,7 @@ WIDGET_COMMANDS = {
     "add_text_to_widget": "add_text_to_widget",
     "add_image_to_widget": "add_image_to_widget",
     "add_progressbar_to_widget": "add_progressbar_to_widget",
+    "add_border_to_widget": "add_border_to_widget",
     "get_widget_elements": "get_widget_elements",
     "set_widget_element_property": "set_widget_element_property",
     "add_button_to_widget": "add_button_to_widget",
@@ -36,6 +37,7 @@ WIDGET_COMMANDS = {
 LAYOUT_COMMANDS = {
     "add_vertical_box_to_widget": "add_vertical_box_to_widget",
     "add_horizontal_box_to_widget": "add_horizontal_box_to_widget",
+    "add_widget_switcher_to_widget": "add_widget_switcher_to_widget",
     "reparent_widget_element": "reparent_widget_element",
     "set_widget_slot_property": "set_widget_slot_property",
     "add_scrollbox_to_widget": "add_scrollbox_to_widget",
@@ -69,14 +71,14 @@ def register_umg_meta_tools(mcp: FastMCP):
 
     @mcp.tool()
     def umg_widget(ctx: Context, command: str, params: Dict[str, Any] = {}) -> Dict[str, Any]:
-        """UMG widgets: create, text, image, button, slider, checkbox, combobox, etc.
+        """UMG widgets: create, text, image, button, slider, checkbox, combobox, border, etc.
         Commands: create_umg_widget_blueprint, add_text_block_to_widget,
         bind_widget_event, add_widget_to_viewport, set_text_block_binding,
         add_text_to_widget, add_image_to_widget, add_progressbar_to_widget,
-        get_widget_elements, set_widget_element_property, add_button_to_widget,
-        bind_widget_component_event, add_slider_to_widget, add_checkbox_to_widget,
-        add_combobox_to_widget, add_editabletext_to_widget, add_spinbox_to_widget,
-        remove_widget_element, bind_widget_to_variable
+        add_border_to_widget, get_widget_elements, set_widget_element_property,
+        add_button_to_widget, bind_widget_component_event, add_slider_to_widget,
+        add_checkbox_to_widget, add_combobox_to_widget, add_editabletext_to_widget,
+        add_spinbox_to_widget, remove_widget_element, bind_widget_to_variable
         Use help("umg_widget", "command_name") for params.
         """
         from tools.meta_utils import execute_command
@@ -97,9 +99,10 @@ def register_umg_meta_tools(mcp: FastMCP):
 
     @mcp.tool()
     def umg_layout(ctx: Context, command: str, params: Dict[str, Any] = {}) -> Dict[str, Any]:
-        """UMG layout: vertical/horizontal boxes, scroll boxes, reparenting, slots.
+        """UMG layout: vertical/horizontal boxes, widget switchers, scroll boxes, reparenting, slots.
         Commands: add_vertical_box_to_widget, add_horizontal_box_to_widget,
-        reparent_widget_element, set_widget_slot_property, add_scrollbox_to_widget
+        add_widget_switcher_to_widget, reparent_widget_element, set_widget_slot_property,
+        add_scrollbox_to_widget
         Use help("umg_layout", "command_name") for params.
         """
         from tools.meta_utils import execute_command

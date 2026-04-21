@@ -249,13 +249,200 @@ class TestUMGWidgetInteractive:
             "size": [300, 200],
             "path": "/Game/Test"
         })
-        
+
         assert_success(result, "ScrollBox追加")
         assert_response_has(result, "success", True)
-        
+
         test_suite.add_cleanup("delete_asset", {
             "asset_path": f"/Game/Test/{self.widget_name}"
         })
+
+
+@pytest.mark.umg
+class TestUMGV096Extensions:
+    """v0.9.6 で追加された WidgetSwitcher / Border / 明示的 Anchors / parent_class 汎用化の検証"""
+
+    @pytest.fixture(autouse=True)
+    def setup_widget(self, test_suite, unique_name):
+        """各テスト前に Widget を作成"""
+        self.widget_name = unique_name("WBP_V096")
+        test_suite.run_command("create_umg_widget_blueprint", {
+            "widget_name": self.widget_name,
+            "path": "/Game/Test"
+        })
+        yield
+
+    def test_add_widget_switcher(self, test_suite):
+        """WidgetSwitcher 追加テスト (P0 #1)"""
+        result = test_suite.run_command("add_widget_switcher_to_widget", {
+            "widget_name": self.widget_name,
+            "switcher_name": "Pager",
+            "active_widget_index": 0,
+            "anchor": "Center",
+            "size": [400, 300],
+            "path": "/Game/Test"
+        })
+
+        assert_success(result, "WidgetSwitcher 追加")
+        assert_response_has(result, "success", True)
+        assert_response_has(result, "switcher_name", "Pager")
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+    def test_set_active_widget_index_via_reflection(self, test_suite):
+        """set_widget_element_property が ActiveWidgetIndex (int32) を
+        リフレクション fallback 経由で扱えることを検証 (P0 #4)"""
+        # Switcher + 2 つの子パネル (VerticalBox) を用意
+        test_suite.run_command("add_widget_switcher_to_widget", {
+            "widget_name": self.widget_name,
+            "switcher_name": "Pager",
+            "path": "/Game/Test"
+        })
+        test_suite.run_command("add_vertical_box_to_widget", {
+            "widget_name": self.widget_name,
+            "box_name": "Page0",
+            "parent_name": "Pager",
+            "path": "/Game/Test"
+        })
+        test_suite.run_command("add_vertical_box_to_widget", {
+            "widget_name": self.widget_name,
+            "box_name": "Page1",
+            "parent_name": "Pager",
+            "path": "/Game/Test"
+        })
+
+        result = test_suite.run_command("set_widget_element_property", {
+            "widget_name": self.widget_name,
+            "element_name": "Pager",
+            "property_name": "ActiveWidgetIndex",
+            "property_value": "1",
+            "path": "/Game/Test"
+        })
+
+        assert_success(result, "ActiveWidgetIndex 設定")
+        assert_response_has(result, "success", True)
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+    def test_add_border(self, test_suite):
+        """Border 追加テスト (P0 #2)"""
+        result = test_suite.run_command("add_border_to_widget", {
+            "widget_name": self.widget_name,
+            "border_name": "BgFrame",
+            "brush_color": [0.1, 0.1, 0.1, 0.8],
+            "padding": [8, 8, 8, 8],
+            "size": [300, 200],
+            "path": "/Game/Test"
+        })
+
+        assert_success(result, "Border 追加")
+        assert_response_has(result, "success", True)
+        assert_response_has(result, "border_name", "BgFrame")
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+    def test_border_nested_in_panel(self, test_suite):
+        """Border を別のパネルの子として追加できること (parent_name)"""
+        test_suite.run_command("add_vertical_box_to_widget", {
+            "widget_name": self.widget_name,
+            "box_name": "OuterVB",
+            "path": "/Game/Test"
+        })
+
+        result = test_suite.run_command("add_border_to_widget", {
+            "widget_name": self.widget_name,
+            "border_name": "InnerBorder",
+            "parent_name": "OuterVB",
+            "brush_color": [0.2, 0.2, 0.2, 1.0],
+            "padding": [4, 4, 4, 4],
+            "path": "/Game/Test"
+        })
+
+        assert_success(result, "Border ネスト追加")
+        assert_response_has(result, "success", True)
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+    def test_explicit_anchors_and_offsets(self, test_suite):
+        """set_widget_slot_property の anchor_min/max + LTRB offsets 拡張 (P0 #3)"""
+        # 何らかの要素を追加 (Border を流用)
+        test_suite.run_command("add_border_to_widget", {
+            "widget_name": self.widget_name,
+            "border_name": "StretchFrame",
+            "path": "/Game/Test"
+        })
+
+        # 全画面ストレッチ + 16px inset
+        result = test_suite.run_command("set_widget_slot_property", {
+            "widget_name": self.widget_name,
+            "element_name": "StretchFrame",
+            "anchor_min": [0, 0],
+            "anchor_max": [1, 1],
+            "offset_left": 16,
+            "offset_top": 16,
+            "offset_right": 16,
+            "offset_bottom": 16,
+            "path": "/Game/Test"
+        })
+
+        assert_success(result, "明示的 anchor_min/max + LTRB offsets")
+        assert_response_has(result, "success", True)
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+    def test_parent_class_script_path(self, test_suite, unique_name):
+        """parent_class に /Script/UMG.UserWidget フルパス指定 (Fix A)"""
+        wbp = unique_name("WBP_ScriptParent")
+        result = test_suite.run_command("create_umg_widget_blueprint", {
+            "widget_name": wbp,
+            "path": "/Game/Test",
+            "parent_class": "/Script/UMG.UserWidget"
+        })
+
+        assert_success(result, "/Script/ パスでの parent_class 解決")
+        assert_response_has(result, "success", True)
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{wbp}"
+        })
+
+    def test_parent_class_unresolvable_errors(self, test_suite, unique_name):
+        """解決不能な parent_class は ClassNotFound (1211) を返すこと"""
+        wbp = unique_name("WBP_BadParent")
+        result = test_suite.run_command("create_umg_widget_blueprint", {
+            "widget_name": wbp,
+            "path": "/Game/Test",
+            "parent_class": "DoesNotExistAnywhere_XYZ"
+        })
+
+        # 成功せず、エラーコード 1211 (ClassNotFound) が返ること
+        assert result.get("success") is not True, "存在しない parent_class で成功してはならない"
+        # error_code または code フィールド経由でチェック (実装依存)
+        err_code = result.get("error_code") or result.get("code")
+        assert err_code == 1211, f"期待 error_code=1211 (ClassNotFound), 実際: {err_code}"
+
+    def test_parent_class_non_user_widget_errors(self, test_suite, unique_name):
+        """UUserWidget 以外のクラスは InvalidParamValue (1005) を返すこと"""
+        wbp = unique_name("WBP_NonUserWidget")
+        result = test_suite.run_command("create_umg_widget_blueprint", {
+            "widget_name": wbp,
+            "path": "/Game/Test",
+            "parent_class": "/Script/Engine.Actor"
+        })
+
+        assert result.get("success") is not True, "Actor 親で成功してはならない"
+        err_code = result.get("error_code") or result.get("code")
+        assert err_code == 1005, f"期待 error_code=1005 (InvalidParamValue), 実際: {err_code}"
 
 
 @pytest.mark.umg

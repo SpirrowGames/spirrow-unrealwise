@@ -4,6 +4,101 @@
 
 ---
 
+## 2026-04-21: UMG Extensions (v0.9.6)
+
+**概要**: UMG の WBP レイアウト表現力を拡張。WidgetSwitcher / Border コマンドを追加、CanvasPanelSlot で任意の FAnchors と LTRB オフセットを指定可能に、`create_umg_widget_blueprint` の parent_class 解決を汎用化。
+
+### 新コマンド (2)
+
+#### `add_widget_switcher_to_widget` (umg_layout)
+
+UWidgetSwitcher をウィジェットツリーに追加。ページ切替 UI の中核。
+
+**パラメータ**:
+- `widget_name` (required): Widget Blueprint 名
+- `switcher_name` (required): Switcher 要素名
+- `parent_name` (optional): 親パネル名 (省略時 root canvas)
+- `active_widget_index` (int, default 0): 初期 ActiveWidgetIndex
+- `anchor` / `alignment` / `position` / `size`: CanvasPanelSlot プロパティ
+- `path` (default `/Game/UI`): Content path
+
+**ランタイム切替**: `umg_widget(command="set_widget_element_property", params={"element_name": "Switcher1", "property_name": "ActiveWidgetIndex", "property_value": "1"})` で切替可能 (リフレクション fallback 経由で int32 UPROPERTY 全般に適用される)。
+
+#### `add_border_to_widget` (umg_widget)
+
+UBorder (単一子コンテナ + 背景ブラシ) を追加。HUD やメニューの半透明背景レイヤ、パディング付きパネルに有用。
+
+**パラメータ**:
+- `widget_name` / `border_name` (required)
+- `parent_name` (optional): 任意パネルへのネスト
+- `brush_color` [r,g,b,a]: 背景ブラシ色
+- `content_color_and_opacity` [r,g,b,a]: 子要素の tint
+- `padding` [L,T,R,B]: FMargin (コンテンツの内側余白)
+- `horizontal_alignment` / `vertical_alignment`: Left/Center/Right/Fill, Top/Center/Bottom/Fill
+- CanvasPanelSlot プロパティ: `anchor` / `alignment` / `position` / `size`
+
+UBorder は `UPanelWidget` (子 1 つ) のため、`reparent_widget_element` で既存要素を中に入れるか、`parent_name=BorderName` で直接子コマンドを追加できる。
+
+### API 拡張 (2)
+
+#### `set_widget_slot_property`: 任意の FAnchors + LTRB オフセット
+
+従来は `anchor` 文字列プリセット (TopLeft/Center/BottomRight 等 9 種) のみ。新規:
+- `anchor_min: [x, y]` / `anchor_max: [x, y]` — 0-1 UV 空間で任意の FAnchors (例: 全画面ストレッチ `[0,0]`-`[1,1]`)
+- `offset_left / offset_top / offset_right / offset_bottom` — 個別の FMargin LTRB 差分更新
+
+**優先順位**: `anchor` プリセットが指定されると `anchor_min/max` は無視される (後方互換)。`anchor_min/max` は片方だけの更新も可能 (もう一方は `GetAnchors()` の既存値を保持)。offsets は `GetOffsets()` 基点の差分更新。
+
+**用途例**:
+```
+# 全画面ストレッチ + 16px inset
+set_widget_slot_property(element_name="Panel",
+    anchor_min=[0,0], anchor_max=[1,1],
+    offset_left=16, offset_top=16, offset_right=16, offset_bottom=16)
+```
+
+#### `create_umg_widget_blueprint.parent_class` 汎用化
+
+**従来の問題**:
+- ハードコードで `"UserWidget"` だけ特別扱い
+- `FindFirstObject` による不安全な検索 (複数マッチ時に不定)
+- `/Script/UMG.<Name>` にしか対応せず C++ 派生クラスや BP 派生クラスを親にできない
+- 解決失敗時に無音で `UUserWidget` にフォールバック (caller は気づかない)
+
+**v0.9.6 修正**: `FSpirrowBridgeCommonUtils::SetObjectProperty` の FClassProperty 解決ロジックに揃えた順序で解決:
+1. `"UserWidget"` shortcut → `UUserWidget::StaticClass()`
+2. `LoadClass<UObject>(nullptr, *Path)` — `/Script/Module.Class` や `/Game/Path.Asset_C` 直接
+3. `UEditorAssetLibrary::LoadAsset(Path)` → `UBlueprint::GeneratedClass` 抽出 (`/Game/Path.Asset` 形式)
+4. サフィックス補完 (`/Game/UI/BP_Foo` → `/Game/UI/BP_Foo.BP_Foo`)
+5. `/Script/UMG.<Name>` 後方互換 fallback
+6. 失敗 → **ハードエラー** `ESpirrowErrorCode::ClassNotFound` (1211)
+
+さらに解決後に `IsChildOf(UUserWidget::StaticClass())` を検証。失敗 → `InvalidParamValue` (1005) をハードエラー返却。
+
+成功レスポンスの `parent_class` フィールドは `GetPathName()` (フルパス) を返すようになった。caller は実際に採用された解決済みクラスパスを確認できる。
+
+### 変更ファイル
+
+**C++**:
+- `MCPGameProject/Plugins/SpirrowBridge/Source/SpirrowBridge/Public/Commands/SpirrowBridgeUMGLayoutCommands.h` — `HandleAddWidgetSwitcherToWidget` 宣言追加
+- `MCPGameProject/Plugins/SpirrowBridge/Source/SpirrowBridge/Public/Commands/SpirrowBridgeUMGWidgetBasicCommands.h` — `HandleAddBorderToWidget` 宣言追加
+- `MCPGameProject/Plugins/SpirrowBridge/Source/SpirrowBridge/Private/Commands/SpirrowBridgeUMGLayoutCommands.cpp` — WidgetSwitcher 実装 + set_widget_slot_property 拡張 (anchor_min/max + LTRB offsets)
+- `MCPGameProject/Plugins/SpirrowBridge/Source/SpirrowBridge/Private/Commands/SpirrowBridgeUMGWidgetBasicCommands.cpp` — Border 実装
+- `MCPGameProject/Plugins/SpirrowBridge/Source/SpirrowBridge/Private/Commands/SpirrowBridgeUMGWidgetCoreCommands.cpp` — parent_class 汎用化
+- `MCPGameProject/Plugins/SpirrowBridge/Source/SpirrowBridge/Private/SpirrowBridge.cpp` — routing 2 コマンド追加
+
+**Python**:
+- `Python/tools/umg_meta.py` — LAYOUT_COMMANDS / WIDGET_COMMANDS に追加
+- `Python/tools/command_schemas.py` — 4 コマンドの schema 更新 (2 新規 + 2 拡張)
+- `Python/tests/test_umg_widgets.py` — `TestUMGV096Extensions` クラス追加 (7 テスト: switcher / ActiveWidgetIndex / border / border nested / 明示的 anchors / parent_class /Script path / parent_class 不正形式)
+
+**ドキュメント**:
+- `FEATURE_STATUS.md` — バージョン v0.9.6、コマンド数 157 → 159
+- `Docs/DEV_CHEATSHEET.md` — v0.9.6 新機能を追記
+- `templates/end-user/SPIRROW_CHEATSHEET.md` — end-user 向けに新 UI 作成例を追加
+
+---
+
 ## 2026-01-07: Feature - Volume Actor Support in spawn_actor (v0.8.2)
 
 **概要**: `spawn_actor`コマンドで8種類のVolumeアクターを生成可能に

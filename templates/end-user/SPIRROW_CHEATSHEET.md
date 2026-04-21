@@ -4,7 +4,7 @@
 >
 > **Companion**: `.claude/skills/ue-*-bootstrap/SKILL.md` (具体的タスク手順) · `CLAUDE.md` § "Spirrow-UnrealWise の使い方" (常時ルール)
 >
-> **As of**: Spirrow-UnrealWise v0.9.5 — 25 MCP tools, 157 commands, UE 5.7
+> **As of**: Spirrow-UnrealWise v0.9.6 — 25 MCP tools, 159 commands, UE 5.7
 
 ---
 
@@ -37,8 +37,8 @@ help(category="blueprint", command="create_blueprint")  # 特定コマンドの 
 | `editor` | アクター操作・レベル作成・WorldSettings | 17 | `spawn_actor` / `create_level` / `save_current_level` / `set_world_properties` |
 | `blueprint` | BP 作成・コンパイル・プロパティ・DataAsset | 21 | `create_blueprint` / `add_component_to_blueprint` / `compile_blueprint` |
 | `blueprint_node` | BP グラフのノード操作 | 24 | `add_blueprint_event_node` / `connect_blueprint_nodes` / `add_branch_node` |
-| `umg_widget` | Widget BP・UI 要素 | 18 | `create_umg_widget_blueprint` / `add_text_block_to_widget` / `add_widget_to_viewport` |
-| `umg_layout` | UMG レイアウト | 5 | `add_vertical_box_to_widget` / `reparent_widget_element` |
+| `umg_widget` | Widget BP・UI 要素 (v0.9.6: Border 追加) | 19 | `create_umg_widget_blueprint` / `add_text_block_to_widget` / `add_border_to_widget` / `add_widget_to_viewport` |
+| `umg_layout` | UMG レイアウト (v0.9.6: WidgetSwitcher 追加) | 6 | `add_vertical_box_to_widget` / `add_widget_switcher_to_widget` / `reparent_widget_element` / `set_widget_slot_property` |
 | `umg_variable` | Widget 変数・関数・イベント | 5 | `add_widget_variable` / `add_widget_function` |
 | `umg_animation` | Widget アニメーション | 4 | `create_widget_animation` / `add_animation_keyframe` |
 | `project` | Input Mapping・アセット・テクスチャ | 13 | `create_input_action` / `create_input_mapping_context` / `add_action_to_mapping_context` / `set_default_mapping_context` |
@@ -99,6 +99,43 @@ umg_widget.add_widget_to_viewport (player BP の BeginPlay に挿入)
 blueprint.compile_blueprint (player BP)
 ```
 詳細: `.claude/skills/ue-hud-bootstrap/SKILL.md`
+
+### C-2. マルチページメニュー (WidgetSwitcher) 🆕 v0.9.6
+
+```
+umg_widget.create_umg_widget_blueprint
+  ↓
+umg_widget.add_border_to_widget (name="Backdrop", brush_color=[0,0,0,0.8])
+  ↓ 背景を全画面ストレッチ
+umg_layout.set_widget_slot_property (element_name="Backdrop",
+    anchor_min=[0,0], anchor_max=[1,1],
+    offset_left=0, offset_top=0, offset_right=0, offset_bottom=0)
+  ↓
+umg_layout.add_widget_switcher_to_widget (name="Pager", parent_name="Backdrop")
+  ↓
+umg_layout.add_vertical_box_to_widget (name="Page_Main", parent_name="Pager")
+umg_layout.add_vertical_box_to_widget (name="Page_Options", parent_name="Pager")
+umg_layout.add_vertical_box_to_widget (name="Page_Credits", parent_name="Pager")
+  ↓ 各ページにボタン・テキスト
+umg_widget.add_button_to_widget / add_text_to_widget × N
+  ↓ ランタイム切替 (Widget BP 関数から)
+umg_widget.set_widget_element_property (element_name="Pager",
+    property_name="ActiveWidgetIndex", property_value="1")
+```
+
+**カスタム UserWidget 親クラス** 🆕 v0.9.6: C++ 派生クラスを親にしたい場合:
+```
+umg_widget.create_umg_widget_blueprint(
+    widget_name="WBP_MainMenu",
+    parent_class="/Script/MyGame.MyBaseMenuWidget"  # C++ クラスパス
+)
+
+# または既存 BP を親に (継承):
+umg_widget.create_umg_widget_blueprint(
+    widget_name="WBP_OptionsMenu",
+    parent_class="/Game/UI/WBP_MainMenu.WBP_MainMenu_C"
+)
+```
 
 ### D. Enhanced Input
 

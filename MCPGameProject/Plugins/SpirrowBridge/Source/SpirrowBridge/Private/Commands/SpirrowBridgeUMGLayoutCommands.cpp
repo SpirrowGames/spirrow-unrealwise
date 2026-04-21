@@ -7,6 +7,7 @@
 #include "Components/ProgressBar.h"
 #include "Components/VerticalBox.h"
 #include "Components/HorizontalBox.h"
+#include "Components/WidgetSwitcher.h"
 #include "WidgetBlueprint.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
@@ -29,6 +30,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleCommand(const FSt
 	else if (CommandName == TEXT("add_horizontal_box_to_widget"))
 	{
 		return HandleAddHorizontalBoxToWidget(Params);
+	}
+	else if (CommandName == TEXT("add_widget_switcher_to_widget"))
+	{
+		return HandleAddWidgetSwitcherToWidget(Params);
 	}
 	else if (CommandName == TEXT("get_widget_elements"))
 	{
@@ -403,6 +408,63 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetSlotProp
 			}
 
 			CanvasSlot->SetAnchors(Anchors);
+		}
+	}
+	else
+	{
+		// Apply explicit anchor_min / anchor_max (only when no preset is supplied)
+		FAnchors Current = CanvasSlot->GetAnchors();
+		FVector2D MinVec(Current.Minimum);
+		FVector2D MaxVec(Current.Maximum);
+		bool bAnchorsChanged = false;
+
+		const TArray<TSharedPtr<FJsonValue>>* MinArr;
+		if (Params->TryGetArrayField(TEXT("anchor_min"), MinArr) && MinArr->Num() >= 2)
+		{
+			MinVec = FVector2D((*MinArr)[0]->AsNumber(), (*MinArr)[1]->AsNumber());
+			bAnchorsChanged = true;
+		}
+		const TArray<TSharedPtr<FJsonValue>>* MaxArr;
+		if (Params->TryGetArrayField(TEXT("anchor_max"), MaxArr) && MaxArr->Num() >= 2)
+		{
+			MaxVec = FVector2D((*MaxArr)[0]->AsNumber(), (*MaxArr)[1]->AsNumber());
+			bAnchorsChanged = true;
+		}
+		if (bAnchorsChanged)
+		{
+			CanvasSlot->SetAnchors(FAnchors(MinVec.X, MinVec.Y, MaxVec.X, MaxVec.Y));
+		}
+	}
+
+	// Apply explicit LTRB offsets (diff-updates existing offsets). These are applied
+	// independently of anchor/position/size so callers can fine-tune slot geometry.
+	{
+		FMargin Offsets = CanvasSlot->GetOffsets();
+		bool bOffsetsChanged = false;
+		double Tmp;
+		if (Params->TryGetNumberField(TEXT("offset_left"), Tmp))
+		{
+			Offsets.Left = static_cast<float>(Tmp);
+			bOffsetsChanged = true;
+		}
+		if (Params->TryGetNumberField(TEXT("offset_top"), Tmp))
+		{
+			Offsets.Top = static_cast<float>(Tmp);
+			bOffsetsChanged = true;
+		}
+		if (Params->TryGetNumberField(TEXT("offset_right"), Tmp))
+		{
+			Offsets.Right = static_cast<float>(Tmp);
+			bOffsetsChanged = true;
+		}
+		if (Params->TryGetNumberField(TEXT("offset_bottom"), Tmp))
+		{
+			Offsets.Bottom = static_cast<float>(Tmp);
+			bOffsetsChanged = true;
+		}
+		if (bOffsetsChanged)
+		{
+			CanvasSlot->SetOffsets(Offsets);
 		}
 	}
 
@@ -792,6 +854,133 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleAddVerticalBoxToW
 	ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
 	ResultObj->SetStringField(TEXT("box_name"), BoxName);
 	ResultObj->SetStringField(TEXT("parent"), Parent->GetName());
+	return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleAddWidgetSwitcherToWidget(const TSharedPtr<FJsonObject>& Params)
+{
+	FString WidgetName, SwitcherName;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
+	{
+		return Error;
+	}
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("switcher_name"), SwitcherName))
+	{
+		return Error;
+	}
+
+	FString Path, ParentName, AnchorStr;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("anchor"), AnchorStr, TEXT("Center"));
+	bool bHasParent = Params->TryGetStringField(TEXT("parent_name"), ParentName);
+
+	double ActiveIdxDouble = 0.0;
+	FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("active_widget_index"), ActiveIdxDouble, 0.0);
+	int32 ActiveIndex = static_cast<int32>(ActiveIdxDouble);
+
+	UWidgetBlueprint* WidgetBP = nullptr;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
+	{
+		return Error;
+	}
+
+	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
+	if (!WidgetTree)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetTreeNotFound,
+			TEXT("WidgetTree not found"));
+	}
+
+	UWidgetSwitcher* Switcher = WidgetTree->ConstructWidget<UWidgetSwitcher>(UWidgetSwitcher::StaticClass(), FName(*SwitcherName));
+	if (!Switcher)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetCreationFailed,
+			FString::Printf(TEXT("Failed to create WidgetSwitcher '%s'"), *SwitcherName));
+	}
+
+	UPanelWidget* Parent = nullptr;
+	if (bHasParent && !ParentName.IsEmpty())
+	{
+		Parent = Cast<UPanelWidget>(WidgetTree->FindWidget(FName(*ParentName)));
+		if (!Parent)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::WidgetElementNotFound,
+				FString::Printf(TEXT("Parent widget '%s' not found or not a panel"), *ParentName));
+		}
+	}
+	else
+	{
+		Parent = Cast<UCanvasPanel>(WidgetTree->RootWidget);
+		if (!Parent)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::CanvasPanelNotFound,
+				TEXT("Root Canvas Panel not found"));
+		}
+	}
+
+	UPanelSlot* Slot = Parent->AddChild(Switcher);
+
+	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Slot))
+	{
+		FAnchors Anchors(0.5f, 0.5f, 0.5f, 0.5f);
+		if (AnchorStr == TEXT("TopLeft")) Anchors = FAnchors(0.0f, 0.0f, 0.0f, 0.0f);
+		else if (AnchorStr == TEXT("TopCenter")) Anchors = FAnchors(0.5f, 0.0f, 0.5f, 0.0f);
+		else if (AnchorStr == TEXT("TopRight")) Anchors = FAnchors(1.0f, 0.0f, 1.0f, 0.0f);
+		else if (AnchorStr == TEXT("MiddleLeft")) Anchors = FAnchors(0.0f, 0.5f, 0.0f, 0.5f);
+		else if (AnchorStr == TEXT("Center")) Anchors = FAnchors(0.5f, 0.5f, 0.5f, 0.5f);
+		else if (AnchorStr == TEXT("MiddleRight")) Anchors = FAnchors(1.0f, 0.5f, 1.0f, 0.5f);
+		else if (AnchorStr == TEXT("BottomLeft")) Anchors = FAnchors(0.0f, 1.0f, 0.0f, 1.0f);
+		else if (AnchorStr == TEXT("BottomCenter")) Anchors = FAnchors(0.5f, 1.0f, 0.5f, 1.0f);
+		else if (AnchorStr == TEXT("BottomRight")) Anchors = FAnchors(1.0f, 1.0f, 1.0f, 1.0f);
+		CanvasSlot->SetAnchors(Anchors);
+
+		FVector2D Alignment(0.5f, 0.5f);
+		const TArray<TSharedPtr<FJsonValue>>* AlignArray;
+		if (Params->TryGetArrayField(TEXT("alignment"), AlignArray) && AlignArray->Num() >= 2)
+		{
+			Alignment.X = (*AlignArray)[0]->AsNumber();
+			Alignment.Y = (*AlignArray)[1]->AsNumber();
+		}
+		CanvasSlot->SetAlignment(Alignment);
+
+		FVector2D Position(0.0f, 0.0f);
+		const TArray<TSharedPtr<FJsonValue>>* PosArray;
+		if (Params->TryGetArrayField(TEXT("position"), PosArray) && PosArray->Num() >= 2)
+		{
+			Position.X = (*PosArray)[0]->AsNumber();
+			Position.Y = (*PosArray)[1]->AsNumber();
+		}
+		CanvasSlot->SetPosition(Position);
+
+		const TArray<TSharedPtr<FJsonValue>>* SizeArray;
+		if (Params->TryGetArrayField(TEXT("size"), SizeArray) && SizeArray->Num() >= 2)
+		{
+			FVector2D Size((*SizeArray)[0]->AsNumber(), (*SizeArray)[1]->AsNumber());
+			CanvasSlot->SetSize(Size);
+			CanvasSlot->SetAutoSize(false);
+		}
+		else
+		{
+			CanvasSlot->SetAutoSize(true);
+		}
+	}
+
+	Switcher->SetActiveWidgetIndex(ActiveIndex);
+
+	WidgetBP->Modify();
+	WidgetBP->MarkPackageDirty();
+	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetBoolField(TEXT("success"), true);
+	ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
+	ResultObj->SetStringField(TEXT("switcher_name"), SwitcherName);
+	ResultObj->SetStringField(TEXT("parent"), Parent->GetName());
+	ResultObj->SetNumberField(TEXT("active_widget_index"), ActiveIndex);
 	return ResultObj;
 }
 

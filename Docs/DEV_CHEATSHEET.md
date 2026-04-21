@@ -4,7 +4,7 @@
 >
 > **Companion docs**: [`AGENTS.md`](../AGENTS.md) (workflow rules) · [`Docs/IMPLEMENTATION_SUMMARY.md`](IMPLEMENTATION_SUMMARY.md) (file-level prose) · [`FEATURE_STATUS.md`](../FEATURE_STATUS.md) (user-visible command list)
 >
-> **Generated against**: v0.9.5 · 25 MCP tools · 157 commands · UE 5.7
+> **Generated against**: v0.9.6 · 25 MCP tools · 159 commands · UE 5.7
 
 ---
 
@@ -42,8 +42,8 @@ Adding a new command means touching exactly:
 
 | Meta-tool | Commands | Python | C++ router | C++ implementation files |
 |---|---|---|---|---|
-| `umg_widget` | 18 | `umg_meta.py` | `FSpirrowBridgeUMGWidgetCommands` (`SpirrowBridgeUMGWidgetCommands.cpp`, ~1.5 KB) | `SpirrowBridgeUMGWidgetCoreCommands.cpp` (create widget / viewport / anchor), `SpirrowBridgeUMGWidgetBasicCommands.cpp` (text / image / progressbar), `SpirrowBridgeUMGWidgetInteractiveCommands.cpp` (button / slider / checkbox / etc.) |
-| `umg_layout` | 5 | `umg_meta.py` | — | `SpirrowBridgeUMGLayoutCommands.cpp` (vbox / hbox / scrollbox / reparent / get-elements / set-slot / remove) |
+| `umg_widget` | 19 | `umg_meta.py` | `FSpirrowBridgeUMGWidgetCommands` (`SpirrowBridgeUMGWidgetCommands.cpp`, ~1.5 KB) | `SpirrowBridgeUMGWidgetCoreCommands.cpp` (create widget / viewport / anchor + parent_class generalized in v0.9.6), `SpirrowBridgeUMGWidgetBasicCommands.cpp` (text / image / progressbar / **border** 🆕 v0.9.6), `SpirrowBridgeUMGWidgetInteractiveCommands.cpp` (button / slider / checkbox / etc.) |
+| `umg_layout` | 6 | `umg_meta.py` | — | `SpirrowBridgeUMGLayoutCommands.cpp` (vbox / hbox / **widget_switcher** 🆕 v0.9.6 / scrollbox / reparent / get-elements / set-slot [extended with anchor_min/max + LTRB offsets 🆕 v0.9.6] / remove) |
 | `umg_variable` | 5 | `umg_meta.py` | — | `SpirrowBridgeUMGVariableCommands.cpp` (widget variables / array vars / functions / events) |
 | `umg_animation` | 4 | `umg_meta.py` | — | `SpirrowBridgeUMGAnimationCommands.cpp` (create animation / track / keyframe / list) |
 

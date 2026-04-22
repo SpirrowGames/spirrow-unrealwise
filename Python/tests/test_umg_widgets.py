@@ -703,6 +703,153 @@ class TestUMGV098PropertyValueTypes:
 
 
 @pytest.mark.umg
+class TestUMGV099LayoutPolish:
+    """v0.9.9: FR-2 (box slot property) + FR-3 (get_widget_elements dedupe)"""
+
+    @pytest.fixture(autouse=True)
+    def setup_widget(self, test_suite, unique_name):
+        self.widget_name = unique_name("WBP_V099")
+        test_suite.run_command("create_umg_widget_blueprint", {
+            "widget_name": self.widget_name,
+            "path": "/Game/Test"
+        })
+        yield
+
+    def test_vbox_slot_padding_and_alignment(self, test_suite):
+        """FR-2: VerticalBoxSlot に padding + horizontal_alignment を設定できること"""
+        test_suite.run_command("add_vertical_box_to_widget", {
+            "widget_name": self.widget_name,
+            "box_name": "VBox",
+            "path": "/Game/Test"
+        })
+        test_suite.run_command("add_button_to_widget", {
+            "widget_name": self.widget_name,
+            "button_name": "Btn",
+            "parent_name": "VBox",
+            "text": "Click",
+            "path": "/Game/Test"
+        })
+        result = test_suite.run_command("set_widget_slot_property", {
+            "widget_name": self.widget_name,
+            "element_name": "Btn",
+            "padding": [0, 6, 0, 6],
+            "horizontal_alignment": "Fill",
+            "path": "/Game/Test"
+        })
+        assert_success(result, "VerticalBoxSlot padding + h-align")
+        assert_response_has(result, "slot_type", "VerticalBoxSlot")
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+    def test_vbox_slot_fill_size(self, test_suite):
+        """FR-2: VerticalBoxSlot の Size.Rule=Fill + Value を設定できること"""
+        test_suite.run_command("add_vertical_box_to_widget", {
+            "widget_name": self.widget_name,
+            "box_name": "VBox",
+            "path": "/Game/Test"
+        })
+        test_suite.run_command("add_text_to_widget", {
+            "widget_name": self.widget_name,
+            "text_name": "T1",
+            "parent_name": "VBox",
+            "text": "Filled",
+            "path": "/Game/Test"
+        })
+        result = test_suite.run_command("set_widget_slot_property", {
+            "widget_name": self.widget_name,
+            "element_name": "T1",
+            "size_rule": "Fill",
+            "size_value": 2.0,
+            "path": "/Game/Test"
+        })
+        assert_success(result, "VBoxSlot Size.Fill weight")
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+    def test_hbox_slot_property(self, test_suite):
+        """FR-2: HorizontalBoxSlot にも同じ API で設定できること"""
+        test_suite.run_command("add_horizontal_box_to_widget", {
+            "widget_name": self.widget_name,
+            "box_name": "HBox",
+            "path": "/Game/Test"
+        })
+        test_suite.run_command("add_button_to_widget", {
+            "widget_name": self.widget_name,
+            "button_name": "HBtn",
+            "parent_name": "HBox",
+            "text": "H",
+            "path": "/Game/Test"
+        })
+        result = test_suite.run_command("set_widget_slot_property", {
+            "widget_name": self.widget_name,
+            "element_name": "HBtn",
+            "padding": [8, 0, 8, 0],
+            "vertical_alignment": "Center",
+            "size_rule": "Auto",
+            "path": "/Game/Test"
+        })
+        assert_success(result, "HorizontalBoxSlot padding + v-align + Size.Auto")
+        assert_response_has(result, "slot_type", "HorizontalBoxSlot")
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+    def test_border_slot_property(self, test_suite):
+        """FR-2: BorderSlot (UBorder の唯一の子) にも padding + alignment を設定できること"""
+        test_suite.run_command("add_border_to_widget", {
+            "widget_name": self.widget_name,
+            "border_name": "Frame",
+            "path": "/Game/Test"
+        })
+        test_suite.run_command("add_text_to_widget", {
+            "widget_name": self.widget_name,
+            "text_name": "Content",
+            "parent_name": "Frame",
+            "text": "Inside",
+            "path": "/Game/Test"
+        })
+        result = test_suite.run_command("set_widget_slot_property", {
+            "widget_name": self.widget_name,
+            "element_name": "Content",
+            "padding": [4, 4, 4, 4],
+            "horizontal_alignment": "Center",
+            "vertical_alignment": "Center",
+            "path": "/Game/Test"
+        })
+        assert_success(result, "BorderSlot padding + alignment")
+        assert_response_has(result, "slot_type", "BorderSlot")
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+    def test_get_widget_elements_has_duplicate_names_field(self, test_suite):
+        """FR-3: get_widget_elements レスポンスに duplicate_names フィールドが含まれること"""
+        test_suite.run_command("add_vertical_box_to_widget", {
+            "widget_name": self.widget_name,
+            "box_name": "VBox",
+            "path": "/Game/Test"
+        })
+        result = test_suite.run_command("get_widget_elements", {
+            "widget_name": self.widget_name,
+            "path": "/Game/Test"
+        })
+        assert_success(result, "get_widget_elements")
+        assert "duplicate_names" in result, "duplicate_names 配列フィールドが無い"
+        # 健全な tree では空リスト
+        assert isinstance(result.get("duplicate_names"), list)
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+
+@pytest.mark.umg
 @pytest.mark.integration
 class TestUMGWidgetIntegration:
     """UMG統合テスト - 複数コマンドの連携"""

@@ -1,6 +1,6 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: v0.9.8 (JSON Property Value — set_widget_element_property が array / object / number / bool 受理)
+> **バージョン**: v0.9.9 (Layout Polish — VBox/HBox slot property 対応 + get_widget_elements dedupe + IPC UTF-8 バグ修正)
 > **ステータス**: Beta
 > **最終更新**: 2026-04-22
 
@@ -296,7 +296,32 @@ generate_and_import_texture(
 
 ## 最新の更新
 
-### 2026-04-22: JSON Property Value — set_widget_element_property 型拡張 (v0.9.8) 🆕
+### 2026-04-22: Layout Polish — VBox/HBox Slot + get_widget_elements dedupe + IPC UTF-8 修正 (v0.9.9) 🆕
+
+**FR-2**: `set_widget_slot_property` が slot 型を動的ディスパッチ。CanvasPanelSlot だけでなく VerticalBoxSlot / HorizontalBoxSlot / OverlaySlot / BorderSlot / WidgetSwitcherSlot に対応。
+
+| Slot 型 | 新規対応パラメータ |
+|---|---|
+| VerticalBoxSlot / HorizontalBoxSlot | `padding` [L,T,R,B] / `horizontal_alignment` / `vertical_alignment` / `size_rule` ("Auto"/"Fill") / `size_value` |
+| OverlaySlot | `padding` / `horizontal_alignment` / `vertical_alignment` |
+| BorderSlot | `padding` / `horizontal_alignment` / `vertical_alignment` |
+| WidgetSwitcherSlot | (no layout fields — dispatch のみ) |
+| CanvasPanelSlot | (v0.9.6/7 と同じ — position/size/anchor/offsets/alignment/z_order/auto_size) |
+
+Response に `slot_type` フィールドを追加。caller がどの型として認識されたかを明示。
+
+**FR-3**: `get_widget_elements` が `TSet<UWidget*>` で pointer dedupe + 同名 widget 検出。Response に `duplicate_names` 配列を追加 — BUG-1 類の重複 parent 状態や意図的な同名設計を検出するデバッグ支援。
+
+**BUG-3/4 修正**: MCP IPC の UTF-8 バウンダリバグを 3 箇所で修正:
+1. **UE 送信側 (critical)**: `ClientSocket->Send(...TCHAR_TO_UTF8(*Response), Response.Len(), ...)` が TCHAR 文字数を渡していた。日本語等の非 ASCII Response では UTF-8 バイト数が多いため末尾が切れて Python 側で partial UTF-8 エラー。→ `FTCHARToUTF8::Length()` で正確なバイト数を渡すよう修正
+2. **UE 受信側**: Buffer サイズ 8192 → 65536 (socket `SO_RCVBUF` 設定と揃える)、`UTF8_TO_TCHAR` を明示的バイト長 `FUTF8ToTCHAR(bytes, BytesRead)` に変更 — null terminator 依存を排除
+3. **Python 受信側**: `receive_full_response` で `data.decode('utf-8')` を try/except で囲み、partial UTF-8 (マルチバイトシーケンス途中) は次の recv まで待つように変更 — 旧コードは decode error で loop が死んでいた
+
+**コマンド数**: 変更なし (**158**)。既存コマンドの拡張と IPC 層のバグ修正のみ。
+
+---
+
+### 2026-04-22: JSON Property Value — set_widget_element_property 型拡張 (v0.9.8)
 
 **BUG-6 修正**: `set_widget_element_property.property_value` が string のみ受理だった制限を撤廃。
 

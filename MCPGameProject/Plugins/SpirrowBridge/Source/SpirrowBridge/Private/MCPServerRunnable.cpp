@@ -53,11 +53,16 @@ uint32 FMCPServerRunnable::Run()
                 ClientSocket->SetSendBufferSize(SocketBufferSize, SocketBufferSize);
                 ClientSocket->SetReceiveBufferSize(SocketBufferSize, SocketBufferSize);
                 
-                uint8 Buffer[8192];
+                // v0.9.9 BUG-3 fix: 8192 was too small for commands with Japanese text
+                // or large structs. Match the 65536 socket buffer set above, and leave
+                // 1 byte headroom for the null terminator to avoid out-of-bounds writes
+                // when Recv fills the buffer exactly.
+                constexpr int32 RecvBufferCapacity = 65536;
+                uint8 Buffer[RecvBufferCapacity + 1];
                 while (bRunning)
                 {
                     int32 BytesRead = 0;
-                    if (ClientSocket->Recv(Buffer, sizeof(Buffer), BytesRead))
+                    if (ClientSocket->Recv(Buffer, RecvBufferCapacity, BytesRead))
                     {
                         if (BytesRead == 0)
                         {
@@ -65,9 +70,12 @@ uint32 FMCPServerRunnable::Run()
                             break;
                         }
 
-                        // Convert received data to string
+                        // Convert received data to string using explicit byte length,
+                        // avoiding null-terminator reliance (which can clip the string
+                        // at the first 0x00 byte inside a binary UTF-8 sequence and
+                        // also prevents out-of-bounds read when BytesRead == buffer size).
                         Buffer[BytesRead] = '\0';
-                        FString ReceivedText = UTF8_TO_TCHAR(Buffer);
+                        FString ReceivedText = FString(FUTF8ToTCHAR(reinterpret_cast<const ANSICHAR*>(Buffer), BytesRead));
                         UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Received: %s"), *ReceivedText);
 
                         // Parse JSON
@@ -86,9 +94,14 @@ uint32 FMCPServerRunnable::Run()
                                 // Log response for debugging
                                 UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Sending response: %s"), *Response);
                                 
-                                // Send response
+                                // Send response. v0.9.9 BUG-3 fix: use the UTF-8 BYTE length,
+                                // not Response.Len() which returns TCHAR count. For Japanese
+                                // / emoji / any non-ASCII content the UTF-8 byte count is >
+                                // TCHAR count, so sending Len() alone truncates the payload
+                                // mid-character and Python's receive loop dies on partial UTF-8.
+                                FTCHARToUTF8 ResponseUtf8(*Response);
                                 int32 BytesSent = 0;
-                                if (!ClientSocket->Send((uint8*)TCHAR_TO_UTF8(*Response), Response.Len(), BytesSent))
+                                if (!ClientSocket->Send(reinterpret_cast<const uint8*>(ResponseUtf8.Get()), ResponseUtf8.Length(), BytesSent))
                                 {
                                     UE_LOG(LogTemp, Warning, TEXT("MCPServerRunnable: Failed to send response"));
                                 }
@@ -305,14 +318,15 @@ void FMCPServerRunnable::ProcessMessage(TSharedPtr<FSocket> Client, const FStrin
     // Execute command
     FString Response = Bridge->ExecuteCommand(CommandType, Params);
     
-    // Send response with newline terminator
+    // Send response with newline terminator. v0.9.9 BUG-3 fix: use UTF-8 byte length.
     Response += TEXT("\n");
+    FTCHARToUTF8 ResponseUtf8(*Response);
     int32 BytesSent = 0;
-    
+
     UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Sending response: %s"), *Response);
-    
-    if (!Client->Send((uint8*)TCHAR_TO_UTF8(*Response), Response.Len(), BytesSent))
+
+    if (!Client->Send(reinterpret_cast<const uint8*>(ResponseUtf8.Get()), ResponseUtf8.Length(), BytesSent))
     {
         UE_LOG(LogTemp, Error, TEXT("MCPServerRunnable: Failed to send response"));
     }
-} 
+}

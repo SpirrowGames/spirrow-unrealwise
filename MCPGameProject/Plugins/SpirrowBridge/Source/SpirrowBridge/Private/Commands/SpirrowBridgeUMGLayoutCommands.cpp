@@ -12,6 +12,11 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
+#include "Components/HorizontalBoxSlot.h"
+#include "Components/VerticalBoxSlot.h"
+#include "Components/OverlaySlot.h"
+#include "Components/WidgetSwitcherSlot.h"
+#include "Components/BorderSlot.h"
 #include "Components/PanelWidget.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Kismet2/BlueprintEditorUtils.h"
@@ -50,6 +55,102 @@ static UWidget* FindWidgetInPanelRecursive(UPanelWidget* Panel, const FName& Nam
 		}
 	}
 	return nullptr;
+}
+
+// Shared helpers for slot layout parsing (used by HandleSetWidgetSlotProperty
+// when the slot is a VBox/HBox/Overlay/Border slot rather than CanvasPanel).
+
+static EHorizontalAlignment ParseHAlign(const FString& Str, EHorizontalAlignment Default = HAlign_Fill)
+{
+	if (Str == TEXT("Left")) return HAlign_Left;
+	if (Str == TEXT("Center")) return HAlign_Center;
+	if (Str == TEXT("Right")) return HAlign_Right;
+	if (Str == TEXT("Fill")) return HAlign_Fill;
+	return Default;
+}
+
+static EVerticalAlignment ParseVAlign(const FString& Str, EVerticalAlignment Default = VAlign_Fill)
+{
+	if (Str == TEXT("Top")) return VAlign_Top;
+	if (Str == TEXT("Center")) return VAlign_Center;
+	if (Str == TEXT("Bottom")) return VAlign_Bottom;
+	if (Str == TEXT("Fill")) return VAlign_Fill;
+	return Default;
+}
+
+static bool TryParseFMarginFromParams(const TSharedPtr<FJsonObject>& Params, const FString& Key, FMargin& OutMargin)
+{
+	const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+	if (Params->TryGetArrayField(Key, Arr) && Arr && Arr->Num() >= 4)
+	{
+		OutMargin = FMargin(
+			static_cast<float>((*Arr)[0]->AsNumber()),
+			static_cast<float>((*Arr)[1]->AsNumber()),
+			static_cast<float>((*Arr)[2]->AsNumber()),
+			static_cast<float>((*Arr)[3]->AsNumber()));
+		return true;
+	}
+	return false;
+}
+
+// Applies the shared Padding / HorizontalAlignment / VerticalAlignment layout
+// fields on slot classes that have those setters (VBox / HBox / Overlay / Border).
+// Returns true if any field was applied.
+template <typename SlotT>
+static bool ApplyBoxLikeSlotFields(SlotT* Slot, const TSharedPtr<FJsonObject>& Params)
+{
+	bool bApplied = false;
+	FMargin Padding;
+	if (TryParseFMarginFromParams(Params, TEXT("padding"), Padding))
+	{
+		Slot->SetPadding(Padding);
+		bApplied = true;
+	}
+	FString HAlignStr;
+	if (Params->TryGetStringField(TEXT("horizontal_alignment"), HAlignStr))
+	{
+		Slot->SetHorizontalAlignment(ParseHAlign(HAlignStr));
+		bApplied = true;
+	}
+	FString VAlignStr;
+	if (Params->TryGetStringField(TEXT("vertical_alignment"), VAlignStr))
+	{
+		Slot->SetVerticalAlignment(ParseVAlign(VAlignStr));
+		bApplied = true;
+	}
+	return bApplied;
+}
+
+// VBox / HBox slots additionally support FSlateChildSize (Size.Rule = Auto|Fill, Size.Value).
+template <typename BoxSlotT>
+static bool ApplyBoxChildSize(BoxSlotT* Slot, const TSharedPtr<FJsonObject>& Params)
+{
+	bool bApplied = false;
+	FSlateChildSize CurrentSize = Slot->GetSize();
+	FString SizeRuleStr;
+	if (Params->TryGetStringField(TEXT("size_rule"), SizeRuleStr))
+	{
+		if (SizeRuleStr == TEXT("Auto") || SizeRuleStr == TEXT("Automatic"))
+		{
+			CurrentSize.SizeRule = ESlateSizeRule::Automatic;
+		}
+		else if (SizeRuleStr == TEXT("Fill"))
+		{
+			CurrentSize.SizeRule = ESlateSizeRule::Fill;
+		}
+		bApplied = true;
+	}
+	double SizeValue;
+	if (Params->TryGetNumberField(TEXT("size_value"), SizeValue))
+	{
+		CurrentSize.Value = static_cast<float>(SizeValue);
+		bApplied = true;
+	}
+	if (bApplied)
+	{
+		Slot->SetSize(CurrentSize);
+	}
+	return bApplied;
 }
 
 // Resolves an element by name, optionally scoped to a parent_name. If
@@ -188,14 +289,26 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleGetWidgetElements
 			TEXT("WidgetTree not found"));
 	}
 
-	// Collect all widgets
+	// Collect all widgets. v0.9.9 dedupes by pointer — UWidgetTree::GetAllWidgets
+	// *should* return distinct pointers but defensive dedup protects against
+	// potential corrupt-tree states (BUG-1 class ghosts) and duplicate parents.
 	TArray<TSharedPtr<FJsonValue>> ElementsArray;
 	TArray<UWidget*> AllWidgets;
 	WidgetTree->GetAllWidgets(AllWidgets);
 
+	TSet<UWidget*> SeenWidgets;
+	TMap<FName, int32> NameCounts;  // name → count; flags collisions across distinct pointers
+
 	for (UWidget* Widget : AllWidgets)
 	{
 		if (!Widget) continue;
+		if (SeenWidgets.Contains(Widget))
+		{
+			// Same pointer twice in GetAllWidgets — skip to avoid duplicate entries
+			continue;
+		}
+		SeenWidgets.Add(Widget);
+		NameCounts.FindOrAdd(Widget->GetFName())++;
 
 		// ★ Apply class_filter ★
 		if (ClassFilter.Num() > 0)
@@ -350,6 +463,18 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleGetWidgetElements
 		ElementsArray.Add(MakeShared<FJsonValueObject>(ElementObj));
 	}
 
+	// Detect name collisions (distinct widget pointers sharing a name).
+	// Indicates BUG-1-class corruption or intentional design where disambiguation
+	// via parent_name is required.
+	TArray<TSharedPtr<FJsonValue>> DuplicateNames;
+	for (const auto& Pair : NameCounts)
+	{
+		if (Pair.Value > 1)
+		{
+			DuplicateNames.Add(MakeShared<FJsonValueString>(Pair.Key.ToString()));
+		}
+	}
+
 	// Create success response
 	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
 	ResultObj->SetBoolField(TEXT("success"), true);
@@ -357,6 +482,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleGetWidgetElements
 	ResultObj->SetStringField(TEXT("root"), WidgetTree->RootWidget ? WidgetTree->RootWidget->GetName() : TEXT(""));
 	ResultObj->SetNumberField(TEXT("element_count"), ElementsArray.Num());
 	ResultObj->SetArrayField(TEXT("elements"), ElementsArray);
+	ResultObj->SetArrayField(TEXT("duplicate_names"), DuplicateNames);
 	return ResultObj;
 }
 
@@ -399,14 +525,73 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetSlotProp
 			FString::Printf(TEXT("Widget element '%s' not found"), *ElementName));
 	}
 
-	// Get Canvas Slot
+	if (!Widget->Slot)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::InvalidOperation,
+			FString::Printf(TEXT("Widget element '%s' has no slot (not attached to a panel)"), *ElementName));
+	}
+
+	FString AppliedSlotType;
+
+	// --- VBox / HBox slots (Padding / H-VAlign / Size [Auto/Fill + Value]) ---
+	if (UVerticalBoxSlot* VBoxSlot = Cast<UVerticalBoxSlot>(Widget->Slot))
+	{
+		ApplyBoxLikeSlotFields(VBoxSlot, Params);
+		ApplyBoxChildSize(VBoxSlot, Params);
+		AppliedSlotType = TEXT("VerticalBoxSlot");
+	}
+	else if (UHorizontalBoxSlot* HBoxSlot = Cast<UHorizontalBoxSlot>(Widget->Slot))
+	{
+		ApplyBoxLikeSlotFields(HBoxSlot, Params);
+		ApplyBoxChildSize(HBoxSlot, Params);
+		AppliedSlotType = TEXT("HorizontalBoxSlot");
+	}
+	else if (UOverlaySlot* OverlaySlot = Cast<UOverlaySlot>(Widget->Slot))
+	{
+		ApplyBoxLikeSlotFields(OverlaySlot, Params);
+		AppliedSlotType = TEXT("OverlaySlot");
+	}
+	else if (UBorderSlot* BorderSlot = Cast<UBorderSlot>(Widget->Slot))
+	{
+		ApplyBoxLikeSlotFields(BorderSlot, Params);
+		AppliedSlotType = TEXT("BorderSlot");
+	}
+	// --- WidgetSwitcherSlot: no layout fields beyond what a basic UPanelSlot has ---
+	else if (Cast<UWidgetSwitcherSlot>(Widget->Slot))
+	{
+		AppliedSlotType = TEXT("WidgetSwitcherSlot");
+		// no-op; switcher slots don't expose layout properties
+	}
+
+	// --- CanvasPanelSlot: full existing layout options ---
 	UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Widget->Slot);
 	if (!CanvasSlot)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			ESpirrowErrorCode::CanvasPanelNotFound,
-			FString::Printf(TEXT("Widget element '%s' is not in a Canvas Panel"), *ElementName));
+		if (AppliedSlotType.IsEmpty())
+		{
+			TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+			Details->SetStringField(TEXT("slot_type"), Widget->Slot->GetClass()->GetName());
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::NotSupported,
+				FString::Printf(TEXT("Widget element '%s' slot type '%s' is not supported by set_widget_slot_property"),
+					*ElementName, *Widget->Slot->GetClass()->GetName()),
+				Details);
+		}
+
+		// Successfully handled by a non-CanvasPanel branch above; finalize and return.
+		WidgetBP->Modify();
+		WidgetBP->MarkPackageDirty();
+		FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+		TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+		ResultObj->SetBoolField(TEXT("success"), true);
+		ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
+		ResultObj->SetStringField(TEXT("element_name"), ElementName);
+		ResultObj->SetStringField(TEXT("slot_type"), AppliedSlotType);
+		return ResultObj;
 	}
+	AppliedSlotType = TEXT("CanvasPanelSlot");
 
 	// Apply position if provided
 	if (Params->HasField(TEXT("position")))
@@ -571,6 +756,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetSlotProp
 	ResultObj->SetBoolField(TEXT("success"), true);
 	ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
 	ResultObj->SetStringField(TEXT("element_name"), ElementName);
+	ResultObj->SetStringField(TEXT("slot_type"), AppliedSlotType);
 	return ResultObj;
 }
 

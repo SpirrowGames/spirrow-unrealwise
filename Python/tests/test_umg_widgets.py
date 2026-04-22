@@ -592,6 +592,117 @@ class TestUMGV097ReparentSafety:
 
 
 @pytest.mark.umg
+class TestUMGV098PropertyValueTypes:
+    """v0.9.8: BUG-6 — property_value が string のみだった制限を撤廃。
+    list/dict/number/bool を受け取れるようにする。"""
+
+    @pytest.fixture(autouse=True)
+    def setup_widget(self, test_suite, unique_name):
+        self.widget_name = unique_name("WBP_V098")
+        test_suite.run_command("create_umg_widget_blueprint", {
+            "widget_name": self.widget_name,
+            "path": "/Game/Test"
+        })
+        yield
+
+    def test_color_and_opacity_as_array_on_image(self, test_suite):
+        """ColorAndOpacity に [r,g,b,a] 配列を直接渡せること (UImage)"""
+        test_suite.run_command("add_image_to_widget", {
+            "widget_name": self.widget_name,
+            "image_name": "Img",
+            "size": [100, 100],
+            "path": "/Game/Test"
+        })
+        result = test_suite.run_command("set_widget_element_property", {
+            "widget_name": self.widget_name,
+            "element_name": "Img",
+            "property_name": "ColorAndOpacity",
+            "property_value": [1.0, 0.5, 0.2, 1.0],
+            "path": "/Game/Test"
+        })
+        assert_success(result, "ColorAndOpacity as [r,g,b,a] array")
+        assert_response_has(result, "success", True)
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+    def test_padding_as_array_on_border(self, test_suite):
+        """Padding に [L,T,R,B] 配列を直接渡せること (UBorder の FMargin)"""
+        test_suite.run_command("add_border_to_widget", {
+            "widget_name": self.widget_name,
+            "border_name": "Frame",
+            "path": "/Game/Test"
+        })
+        result = test_suite.run_command("set_widget_element_property", {
+            "widget_name": self.widget_name,
+            "element_name": "Frame",
+            "property_name": "Padding",
+            "property_value": [16, 8, 16, 8],
+            "path": "/Game/Test"
+        })
+        assert_success(result, "Padding as [L,T,R,B] FMargin array")
+        assert_response_has(result, "success", True)
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+    def test_property_value_as_number(self, test_suite):
+        """数値 (JSON number) を int32 プロパティに直接渡せること (文字列化不要)"""
+        test_suite.run_command("add_widget_switcher_to_widget", {
+            "widget_name": self.widget_name,
+            "switcher_name": "Switcher",
+            "path": "/Game/Test"
+        })
+        test_suite.run_command("add_vertical_box_to_widget", {
+            "widget_name": self.widget_name,
+            "box_name": "Page0",
+            "parent_name": "Switcher",
+            "path": "/Game/Test"
+        })
+        test_suite.run_command("add_vertical_box_to_widget", {
+            "widget_name": self.widget_name,
+            "box_name": "Page1",
+            "parent_name": "Switcher",
+            "path": "/Game/Test"
+        })
+        result = test_suite.run_command("set_widget_element_property", {
+            "widget_name": self.widget_name,
+            "element_name": "Switcher",
+            "property_name": "ActiveWidgetIndex",
+            "property_value": 1,
+            "path": "/Game/Test"
+        })
+        assert_success(result, "ActiveWidgetIndex as int")
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+    def test_string_fast_path_preserved(self, test_suite):
+        """v0.9.7 以前の string-based 呼び出しが壊れていないこと (Visibility 等)"""
+        test_suite.run_command("add_text_to_widget", {
+            "widget_name": self.widget_name,
+            "text_name": "Label",
+            "text": "Hello",
+            "path": "/Game/Test"
+        })
+        result = test_suite.run_command("set_widget_element_property", {
+            "widget_name": self.widget_name,
+            "element_name": "Label",
+            "property_name": "Visibility",
+            "property_value": "Collapsed",
+            "path": "/Game/Test"
+        })
+        assert_success(result, "Visibility string alias (backward compat)")
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+
+@pytest.mark.umg
 @pytest.mark.integration
 class TestUMGWidgetIntegration:
     """UMG統合テスト - 複数コマンドの連携"""

@@ -710,12 +710,21 @@ COMMAND_SCHEMAS = {
             },
         },
         "set_widget_element_property": {
-            "brief": "Set a property on a widget element",
+            "brief": "Set a property on a widget element (property_value accepts string / array / object / number / bool)",
             "params": {
                 "widget_name": {"type": "str", "required": True, "desc": "Widget name"},
                 "element_name": {"type": "str", "required": True, "desc": "Element name"},
-                "property_name": {"type": "str", "required": True, "desc": "Property name"},
-                "property_value": {"type": "any", "required": True, "desc": "Property value"},
+                "property_name": {"type": "str", "required": True, "desc": "Property name (nested paths like 'Brush.TintColor' require string property_value)"},
+                "property_value": {
+                    "type": "any",
+                    "required": True,
+                    "desc": "Property value. Accepted forms: "
+                            "(a) string — for special aliases (Visibility/Text/Justification/Percent) and ImportText_Direct fallback; "
+                            "(b) list[float] — FLinearColor [r,g,b,a], FMargin [L,T,R,B], FVector [x,y,z], FVector2D [x,y]; "
+                            "(c) dict — struct field assignment {\"R\":1, \"G\":0.5, ...}; "
+                            "(d) number/bool — primitive UPROPERTY (int, float, bool). "
+                            "ColorAndOpacity on TextBlock/Image accepts [r,g,b,a] arrays directly (v0.9.8 🆕)."
+                },
                 "parent_name": {"type": "str", "desc": "Optional: restrict element lookup to this panel's subtree (disambiguates when same-name widgets exist in multiple parents)"},
                 "path": {"type": "str", "default": "/Game/UI", "desc": "Content path"},
             },

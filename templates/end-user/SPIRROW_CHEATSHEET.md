@@ -4,7 +4,7 @@
 >
 > **Companion**: `.claude/skills/ue-*-bootstrap/SKILL.md` (具体的タスク手順) · `CLAUDE.md` § "Spirrow-UnrealWise の使い方" (常時ルール)
 >
-> **As of**: Spirrow-UnrealWise v0.9.7 — 25 MCP tools, 158 commands, UE 5.7
+> **As of**: Spirrow-UnrealWise v0.9.8 — 25 MCP tools, 158 commands, UE 5.7
 
 ---
 

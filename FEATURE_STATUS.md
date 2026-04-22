@@ -1,6 +1,6 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: v0.9.7 (Reparent Safety — BUG-1/BUG-5 修正 + 全 add_*_to_widget に parent_name + add_text_block_to_widget 廃止)
+> **バージョン**: v0.9.8 (JSON Property Value — set_widget_element_property が array / object / number / bool 受理)
 > **ステータス**: Beta
 > **最終更新**: 2026-04-22
 
@@ -296,7 +296,29 @@ generate_and_import_texture(
 
 ## 最新の更新
 
-### 2026-04-22: Reparent Safety — BUG fixes + 全 add_*_to_widget に parent_name (v0.9.7) 🆕
+### 2026-04-22: JSON Property Value — set_widget_element_property 型拡張 (v0.9.8) 🆕
+
+**BUG-6 修正**: `set_widget_element_property.property_value` が string のみ受理だった制限を撤廃。
+
+| 旧 (v0.9.7 まで) | 新 (v0.9.8) |
+|---|---|
+| `property_value: "1"` (string stringified) | `property_value: 1` (int 直接) |
+| ColorAndOpacity が `"[1,0.5,0.2,1]"` string パース | `[1.0, 0.5, 0.2, 1.0]` 配列直接 |
+| FMargin (Padding) は設定不可 | `[16, 8, 16, 8]` 配列直接 |
+| FVector / FVector2D struct 不可 | `[x, y]` / `[x, y, z]` 配列 |
+| 色・padding・スタイル系が MCP 経由で触れない | 触れる |
+
+**実装**: `HandleSetWidgetElementProperty` に非 string 分岐を追加。既存の string-based fast path (Visibility / Text / Justification / Percent / ImportText fallback) は完全後方互換で保持。非 string 値は `FSpirrowBridgeCommonUtils::SetObjectProperty` にデリゲート (既存の FLinearColor / FMargin / FVector / FRotator / FColor / FTransform struct ハンドリングを再利用)。
+
+**ColorAndOpacity 特例**: `UTextBlock::ColorAndOpacity` は `FSlateColor` (FLinearColor ラッパー)、`UImage::ColorAndOpacity` は `FLinearColor` 直接。`[r,g,b,a]` array が渡された場合は明示的な変換を経由して両方対応。
+
+**nested path 制限**: `"Brush.TintColor"` のようなネストパスは現状 `ImportText_Direct` 経由のため string のみ。非 string を渡すと `InvalidParamType` エラー返却。
+
+**コマンド数**: 変更なし (**158**)。既存コマンドの入力型拡張のみ。
+
+---
+
+### 2026-04-22: Reparent Safety — BUG fixes + 全 add_*_to_widget に parent_name (v0.9.7)
 
 **WBP_MainMenu 実装検証で判明した致命的バグの修正 + 全 add_*_to_widget への parent_name 追加**:
 

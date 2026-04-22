@@ -4,6 +4,51 @@
 
 ---
 
+## 2026-04-22: JSON Property Value — set_widget_element_property 型拡張 (v0.9.8)
+
+**概要**: BUG-6 修正。`set_widget_element_property.property_value` が string のみ受理だった制限を撤廃し、UE struct (FLinearColor / FMargin / FVector 等) を JSON array で、primitive を JSON number/bool で直接渡せるようにする。色・padding・スタイル系プロパティが MCP 経由で初めて扱えるようになる。
+
+### BUG-6 症状
+
+- help は `type: any` と記載
+- 実装は string 固定で list/dict を送ると `Parameter 'property_value' must be a string` エラー
+- 結果として UE 構造体 (FLinearColor, FMargin, FVector 等) を MCP 経由で設定できず、色・padding・スタイル系 UPROPERTY が全て手詰まりだった
+
+### 修正
+
+**SpirrowBridgeUMGLayoutCommands.cpp — `HandleSetWidgetElementProperty`**: `property_value` を `TSharedPtr<FJsonValue>` として取得、文字列化試行 + 3 分岐:
+
+- **nested path** (`"Foo.Bar"`): `ImportText_Direct` が string 必須なので非 string は `InvalidParamType` エラー返却
+- **string value**: 既存の全 widget-specific alias (`Visibility` / `Text` / `ColorAndOpacity` string / `Justification` / `Percent`) + `ImportText_Direct` fallback を**完全後方互換で保持**
+- **non-string value** (array / object / number / bool): 新パス — `ColorAndOpacity` + array は明示的な FLinearColor 変換、それ以外は `FSpirrowBridgeCommonUtils::SetObjectProperty` にデリゲート (既存の FLinearColor / FMargin / FVector / FVector2D / FRotator / FColor / FTransform struct ハンドリング再利用、primitive 自動変換、TSubclassOf 対応)
+
+### 使用例
+
+```python
+# v0.9.7 まで (string 強制) → v0.9.8 (直接)
+"property_value": "1"            → "property_value": 1
+"property_value": "[1,0.5,0.2,1]"   → "property_value": [1.0, 0.5, 0.2, 1.0]
+
+# 色の設定 (v0.9.7 以前は不可能)
+set_widget_element_property(element_name="HealthBar", property_name="ColorAndOpacity",
+    property_value=[1.0, 0.2, 0.2, 1.0])
+
+# Padding の設定 (v0.9.7 以前は不可能)
+set_widget_element_property(element_name="BgFrame", property_name="Padding",
+    property_value=[16, 8, 16, 8])  # FMargin [L, T, R, B]
+```
+
+### 変更ファイル
+
+- `SpirrowBridgeUMGLayoutCommands.cpp` — `HandleSetWidgetElementProperty` の validate/dispatch 再構築
+- `command_schemas.py` — `set_widget_element_property.property_value` の desc に受理型リストと例を追加
+- `test_umg_widgets.py` — `TestUMGV098PropertyValueTypes` 追加 (4 テスト)
+- `FEATURE_STATUS.md` / `Docs/DEV_CHEATSHEET.md` / `templates/end-user/SPIRROW_CHEATSHEET.md` — version bump
+
+**コマンド数**: 変更なし (**158**)。既存コマンドの入力型拡張のみ。
+
+---
+
 ## 2026-04-22: Reparent Safety + parent_name on all leaf adds (v0.9.7)
 
 **概要**: WBP_MainMenu 実装検証で判明した致命的バグ 3 件 + 重要バグ 1 件 + 機能要望 2 件をまとめて解決。`ue-investigator` で UE 5.7 の UMG 内部を 5 ラウンド解析した結果に基づく。

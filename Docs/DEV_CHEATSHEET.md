@@ -4,7 +4,7 @@
 >
 > **Companion docs**: [`AGENTS.md`](../AGENTS.md) (workflow rules) · [`Docs/IMPLEMENTATION_SUMMARY.md`](IMPLEMENTATION_SUMMARY.md) (file-level prose) · [`FEATURE_STATUS.md`](../FEATURE_STATUS.md) (user-visible command list)
 >
-> **Generated against**: v0.9.8 · 25 MCP tools · 158 commands · UE 5.7
+> **Generated against**: v0.9.9 · 25 MCP tools · 158 commands · UE 5.7
 
 ---
 

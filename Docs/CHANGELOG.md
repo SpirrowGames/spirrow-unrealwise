@@ -4,6 +4,118 @@
 
 ---
 
+## 2026-04-22: Layout Polish — VBox/HBox Slot + get_widget_elements dedupe + IPC UTF-8 修正 (v0.9.9)
+
+**概要**: バックログ残タスク (FR-2 / FR-3 / BUG-3 / BUG-4) をまとめて解消。
+
+### FR-2: set_widget_slot_property の slot 型ディスパッチ
+
+`set_widget_slot_property` が `UCanvasPanelSlot` 専用だったため、VBox/HBox/Overlay/Border の子に対しては slot 設定が全くできなかった。v0.9.9 で slot 型検出 → 型別適用に変更:
+
+- **UVerticalBoxSlot / UHorizontalBoxSlot**: `padding` [L,T,R,B] (FMargin) / `horizontal_alignment` / `vertical_alignment` / `size_rule` ("Auto"/"Fill") / `size_value` (Fill 重み)
+- **UOverlaySlot / UBorderSlot**: `padding` / `horizontal_alignment` / `vertical_alignment`
+- **UWidgetSwitcherSlot**: レイアウトフィールドなし (dispatch のみ)
+- **UCanvasPanelSlot**: 既存の全機能 (v0.9.6/7 と互換) — position/size/anchor/anchor_min/anchor_max/offset_*/alignment/z_order/auto_size
+
+共通ヘルパ:
+- `ParseHAlign(str)` / `ParseVAlign(str)` — "Left/Center/Right/Fill" → `EHorizontalAlignment`
+- `TryParseFMarginFromParams(params, key, out)` — `[L,T,R,B]` 配列 → FMargin
+- `ApplyBoxLikeSlotFields<SlotT>(slot, params)` — Padding/H-V Align を SFINAE-free テンプレで共通適用
+- `ApplyBoxChildSize<SlotT>(slot, params)` — FSlateChildSize (ESlateSizeRule: Automatic/Fill + Value) を VBox/HBox 限定で適用
+
+Response に `slot_type` フィールド追加 (`"VerticalBoxSlot"` / `"HorizontalBoxSlot"` / `"OverlaySlot"` / `"BorderSlot"` / `"WidgetSwitcherSlot"` / `"CanvasPanelSlot"`)。
+
+未サポート slot 型は `NotSupported` エラーに (slot_type を details に含める) — 旧 `CanvasPanelNotFound` より意図が明確。
+
+### FR-3: get_widget_elements dedupe + duplicate_names
+
+`WidgetTree->GetAllWidgets` が内部配列で dedupe しているはずだが、BUG-1 クラスの corrupt tree state では同一 pointer が複数回現れうる。v0.9.9 で明示的に `TSet<UWidget*>` で pointer dedupe。また同名 widget (異なる pointer) を `TMap<FName, int32>` で検出し、Response に `duplicate_names` 配列として露出。caller は重複 parent 問題や意図的な同名設計を検出可能に。
+
+### BUG-3 / BUG-4: IPC UTF-8 境界 + timeout 修正 (3 箇所の根本原因)
+
+**再現条件**: 日本語テキスト入り `add_button_to_widget` の並列送信で "utf-8 codec can't decode byte 0xe3 in position 153" エラー、または "Timeout receiving Unreal response"。
+
+**調査結果と修正**:
+
+1. **UE 送信側 (最も critical)** — `MCPServerRunnable.cpp` の `Run()` ループと `ProcessMessage`:
+   ```cpp
+   // BEFORE (buggy)
+   ClientSocket->Send((uint8*)TCHAR_TO_UTF8(*Response), Response.Len(), BytesSent);
+   //                                                   ^^^^^^^^^^^^^^
+   // Response.Len() は TCHAR 文字数。日本語や emoji 入りの Response では
+   // UTF-8 バイト数が TCHAR 数の 2-3 倍になるため、末尾が切れて送信される。
+   // Python 側で partial UTF-8 を受信 → json.loads 失敗 → timeout
+
+   // AFTER (fixed)
+   FTCHARToUTF8 ResponseUtf8(*Response);
+   ClientSocket->Send(reinterpret_cast<const uint8*>(ResponseUtf8.Get()),
+                      ResponseUtf8.Length(), BytesSent);
+   //                 ^^^^^^^^^^^^^^^^^^^^^^^^
+   //                 正確な UTF-8 バイト数
+   ```
+
+2. **UE 受信側** — Buffer 8192 → 65536 (socket `SO_RCVBUF` 設定と揃える)。加えて null-terminator 依存を排除:
+   ```cpp
+   // BEFORE
+   uint8 Buffer[8192];
+   Buffer[BytesRead] = '\0';  // Recv が full で埋めると OOB 書込み!
+   FString ReceivedText = UTF8_TO_TCHAR(Buffer);  // 暗黙 null 終端依存
+
+   // AFTER
+   constexpr int32 RecvBufferCapacity = 65536;
+   uint8 Buffer[RecvBufferCapacity + 1];  // +1 は null 終端の headroom
+   Buffer[BytesRead] = '\0';  // 今は常に inside bounds
+   FString ReceivedText = FString(FUTF8ToTCHAR(
+       reinterpret_cast<const ANSICHAR*>(Buffer), BytesRead));
+   //                                   ^^^^^^^^^^^^^^^^^^^^ 明示バイト長
+   ```
+
+3. **Python 受信側** — `unreal_mcp_server.py::receive_full_response`:
+   ```python
+   # BEFORE (buggy)
+   data = b''.join(chunks)
+   decoded_data = data.decode('utf-8')   # partial UTF-8 で UnicodeDecodeError
+   try:
+       json.loads(decoded_data)
+       return data
+   except json.JSONDecodeError:
+       continue
+   # 問題: decode() が先に raise すると外側 except で timeout 扱い
+
+   # AFTER (fixed)
+   data = b''.join(chunks)
+   try:
+       decoded_data = data.decode('utf-8')
+   except UnicodeDecodeError:
+       # マルチバイト境界で切れた → 次の recv を待つ
+       continue
+   try:
+       json.loads(decoded_data)
+       return data
+   except json.JSONDecodeError:
+       continue
+   ```
+
+これら 3 箇所の複合的な不整合が BUG-3/4 を生んでいた。
+
+### 変更ファイル
+
+**C++** (2 files):
+- `SpirrowBridgeUMGLayoutCommands.cpp` — FR-2 slot dispatch + helper templates + FR-3 dedupe/duplicate_names + slot header includes
+- `MCPServerRunnable.cpp` — BUG-3 UE 送受信 UTF-8 修正
+
+**Python** (2 files):
+- `command_schemas.py` — set_widget_slot_property schema 拡張 (padding / h-v align / size_rule / size_value)
+- `unreal_mcp_server.py` — BUG-3 受信側 partial UTF-8 許容
+- `test_umg_widgets.py` — `TestUMGV099LayoutPolish` 追加 (5 テスト)
+
+**ドキュメント** (3 files):
+- `FEATURE_STATUS.md` / `Docs/DEV_CHEATSHEET.md` / `templates/end-user/SPIRROW_CHEATSHEET.md` — version bump + FR-2 usage example
+
+**コマンド数**: 変更なし (**158**)。既存コマンドの機能拡張と IPC 層のバグ修正のみ。
+
+---
+
 ## 2026-04-22: JSON Property Value — set_widget_element_property 型拡張 (v0.9.8)
 
 **概要**: BUG-6 修正。`set_widget_element_property.property_value` が string のみ受理だった制限を撤廃し、UE struct (FLinearColor / FMargin / FVector 等) を JSON array で、primitive を JSON number/bool で直接渡せるようにする。色・padding・スタイル系プロパティが MCP 経由で初めて扱えるようになる。

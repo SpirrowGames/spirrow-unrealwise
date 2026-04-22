@@ -90,7 +90,16 @@ class UnrealConnection:
         self.connected = False
 
     def receive_full_response(self, sock, buffer_size=4096) -> bytes:
-        """Receive a complete response from Unreal, handling chunked data."""
+        """Receive a complete response from Unreal, handling chunked data.
+
+        v0.9.9 BUG-3 fix: tolerate UTF-8 multi-byte boundary splits across recv()
+        chunks. Previously `data.decode('utf-8')` would raise UnicodeDecodeError
+        when the current byte buffer ended mid-character (common with Japanese
+        text), the outer except would re-raise, and the connection would die
+        with "utf-8 codec can't decode byte 0xe3" even though more bytes were
+        pending. Now we retry on UnicodeDecodeError — partial UTF-8 just means
+        more bytes are coming.
+        """
         chunks = []
         sock.settimeout(30)  # 30 second timeout for heavy operations
         try:
@@ -101,11 +110,16 @@ class UnrealConnection:
                         raise Exception("Connection closed before receiving data")
                     break
                 chunks.append(chunk)
-                
+
                 # Process the data received so far
                 data = b''.join(chunks)
-                decoded_data = data.decode('utf-8')
-                
+                try:
+                    decoded_data = data.decode('utf-8')
+                except UnicodeDecodeError:
+                    # Likely partial UTF-8 multi-byte sequence at tail; wait for next recv()
+                    logger.debug("Partial UTF-8 at buffer tail, waiting for more data...")
+                    continue
+
                 # Try to parse as JSON to check if complete
                 try:
                     json.loads(decoded_data)
@@ -124,7 +138,7 @@ class UnrealConnection:
                 # If we have some data already, try to use it
                 data = b''.join(chunks)
                 try:
-                    json.loads(data.decode('utf-8'))
+                    json.loads(data.decode('utf-8', errors='replace'))
                     logger.info(f"Using partial response after timeout ({len(data)} bytes)")
                     return data
                 except:

@@ -43,7 +43,7 @@ umg_layout(command="add_vertical_box_to_widget", params={
 })
 
 # 3. Add elements (each goes into RootVBox by default if it's the only container)
-umg_widget(command="add_text_block_to_widget", params={
+umg_widget(command="add_text_to_widget", params={
     "widget_name": "<widget_name>",
     "text_name": "HealthLabel",
     "text": "Health",
@@ -91,7 +91,7 @@ blueprint(command="compile_blueprint", params={"blueprint_name": "<player_bp>", 
 umg_widget(command="create_umg_widget_blueprint", params={"widget_name": "WBP_HUD_Game", "path": "/Game/UI"})
 umg_layout(command="add_vertical_box_to_widget", params={"widget_name": "WBP_HUD_Game", "vbox_name": "Root", ...})
 umg_widget(command="add_progressbar_to_widget", params={"widget_name": "WBP_HUD_Game", "progressbar_name": "Health", ...})
-umg_widget(command="add_text_block_to_widget", params={"widget_name": "WBP_HUD_Game", "text_name": "AmmoLabel", "text": "30 / 90", ...})
+umg_widget(command="add_text_to_widget", params={"widget_name": "WBP_HUD_Game", "text_name": "AmmoLabel", "text": "30 / 90", ...})
 ```
 
 ### Pause menu (Buttons)

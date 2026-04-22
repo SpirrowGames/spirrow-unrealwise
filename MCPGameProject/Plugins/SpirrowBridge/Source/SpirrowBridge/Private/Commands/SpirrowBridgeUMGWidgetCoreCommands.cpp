@@ -7,6 +7,7 @@
 #include "WidgetBlueprint.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
+#include "Components/PanelWidget.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Misc/PackageName.h"
 #include "UObject/SavePackage.h"
@@ -28,6 +29,45 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetCoreCommands::HandleCommand(const
 
 	// Not handled by this class
 	return nullptr;
+}
+
+UPanelWidget* FSpirrowBridgeUMGWidgetCoreCommands::ResolveAddTarget(
+	UWidgetTree* WidgetTree,
+	const TSharedPtr<FJsonObject>& Params,
+	TSharedPtr<FJsonObject>& OutError)
+{
+	OutError = nullptr;
+	if (!WidgetTree)
+	{
+		OutError = FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetTreeNotFound,
+			TEXT("WidgetTree not found"));
+		return nullptr;
+	}
+
+	// Explicit parent_name: look it up and require UPanelWidget
+	FString ParentName;
+	if (Params->TryGetStringField(TEXT("parent_name"), ParentName) && !ParentName.IsEmpty())
+	{
+		UPanelWidget* Parent = Cast<UPanelWidget>(WidgetTree->FindWidget(FName(*ParentName)));
+		if (!Parent)
+		{
+			OutError = FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::WidgetElementNotFound,
+				FString::Printf(TEXT("Parent widget '%s' not found or not a panel widget"), *ParentName));
+			return nullptr;
+		}
+		return Parent;
+	}
+
+	// Default: root CanvasPanel (construct if absent, matching legacy behavior)
+	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
+	if (!RootCanvas)
+	{
+		RootCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("RootCanvas"));
+		WidgetTree->RootWidget = RootCanvas;
+	}
+	return RootCanvas;
 }
 
 FAnchors FSpirrowBridgeUMGWidgetCoreCommands::ParseAnchorPreset(const FString& AnchorStr)

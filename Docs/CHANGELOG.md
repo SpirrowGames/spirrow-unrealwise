@@ -4,6 +4,87 @@
 
 ---
 
+## 2026-04-22: Reparent Safety + parent_name on all leaf adds (v0.9.7)
+
+**概要**: WBP_MainMenu 実装検証で判明した致命的バグ 3 件 + 重要バグ 1 件 + 機能要望 2 件をまとめて解決。`ue-investigator` で UE 5.7 の UMG 内部を 5 ラウンド解析した結果に基づく。
+
+### BUG-1 修正: `reparent_widget_element` の double-parent corruption
+
+**症状**: `reparent_widget_element(Button, new_parent=VBox)` 実行後、旧親 (CanvasPanel_0) の `children` 配列に widget 参照が残存。UE Hierarchy で実際に 2 箇所に表示され、BindWidget 付き widget は UE が削除を拒否するため MCP からの復旧が不可能になる致命的バグ。
+
+**根本原因** (ue-investigator Q1/Q2/Q5 で確定):
+- `UPanelWidget::RemoveChildAt` 自体は完全に動作 (PanelWidget.cpp:93-125 — Slots 配列除去 + Slot/Content/Parent 参照全クリア + OnSlotRemoved で Slate 側も同期)
+- 旧実装は `Modify()` を関連 UObject (WidgetTree / OldParent / NewParent / Element) で呼んでいなかった → transaction system が pre-state を記録できず、serialization に反映されない
+- 旧実装は `FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified` を呼んでいなかった → UMG Designer canonical pattern (SDesignerView.cpp:3237-3238) と乖離
+- `FKismetEditorUtilities::CompileBlueprint` は **WidgetTree 整合性チェックをしない** (`UWidgetTree::RebuildTree` を呼ばない)。壊れた状態がそのまま焼き付く
+
+**修正** (SpirrowBridgeUMGLayoutCommands.cpp:1178-1255 前後):
+1. 全関連 UObject で `Modify()` 呼出 (WidgetBP / WidgetTree / Element / OldParent / NewParent)
+2. `RemoveChild` → `AddChild`
+3. **Defensive post-check**: `OldParent->GetChildIndex(Element) != INDEX_NONE` なら integrity エラー、`Element->GetParent() != NewParent` でも integrity エラー
+4. `FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBP)` 追加
+5. `OldParent == NewParent` の no-op ケースを早期 return で検出
+6. 無言 fallback を廃止 — 整合性違反は `ESpirrowErrorCode::Unknown` で返却
+
+### BUG-5 修正: element_name ambiguity in lookup commands
+
+**症状**: 同名 widget が複数存在すると `set_widget_element_property(element_name="Label")` などがどの widget を操作するか不定。特に BUG-1 で生じた重複状態では「VerticalBoxSlot 側が先にヒット → Canvas 側にアクセスできない」という挙動で詰む。
+
+**根本原因** (ue-investigator Q3 で確定): `UWidgetTree::FindWidget(FName)` は早期 `break` せず **最後に一致した widget を返す** (`WidgetTree.cpp:32-44`)。走査順依存で決定論的だが、caller 側からは制御不能。
+
+**修正**:
+- 新ヘルパー `FindWidgetInPanelRecursive(UPanelWidget*, FName)` を SpirrowBridgeUMGLayoutCommands.cpp 先頭に追加 — 指定パネル配下を走査して**最初に一致した widget**を返す (決定論的)
+- 新ヘルパー `ResolveElementScoped(WidgetTree, Params, ElementName, OutError)` — Params に `parent_name` があればそのパネル配下を走査、なければ既存の WidgetTree->FindWidget (last-match) に fallback
+- 適用先: `set_widget_slot_property` / `set_widget_element_property` / `get_widget_element_property` / `reparent_widget_element` / `remove_widget_element` (5 コマンド)
+
+### BUG-2 修正: `add_text_block_to_widget` 廃止
+
+**症状**: help 出力は `widget_name` を要求するが実装は `blueprint_name` 必須 + `/Game/Widgets/` ハードコードパスを強制する壊れた legacy コマンド。
+
+**修正**: 完全削除。`add_text_to_widget` への移行を推奨 (feature 的に完全な上位互換)。削除対象は:
+- Python `umg_meta.py` WIDGET_COMMANDS dict
+- Python `command_schemas.py` スキーマ
+- C++ `SpirrowBridgeUMGWidgetBasicCommands` header + implementation
+- C++ `SpirrowBridge.cpp` routing
+- end-user docs (SPIRROW_CHEATSHEET.md / ue-hud-bootstrap/SKILL.md) を `add_text_to_widget` に更新
+
+### FR-1: 全 `add_*_to_widget` に `parent_name` 追加
+
+**動機**: BUG-1 の発生機会を根本的に減らすため、「Canvas に作成 → reparent」パターンを排除し「任意パネルに直接追加」できる API に。
+
+**実装**:
+- 共通ヘルパー `FSpirrowBridgeUMGWidgetCoreCommands::ResolveAddTarget(WidgetTree, Params, OutError)` 新設
+  - `parent_name` が Params にあれば UPanelWidget として解決 (見つからない/パネルでない場合はエラー返却)
+  - なければ root CanvasPanel (欠損時は自動構築、legacy 動作維持)
+- 9 コマンドの handler を `RootCanvas->AddChildToCanvas(X)` → `Parent->AddChild(X)` + `Cast<UCanvasPanelSlot>` パターンに変換
+- 対象: button / text / image / progressbar / slider / checkbox / combobox / editabletext / spinbox / scrollbox (+ border は v0.9.6 で既対応)
+- `UCanvasPanelSlot` 固有プロパティ (anchor / alignment / position / size) は親がキャンバスの場合のみ適用 (VBox/HBox 配下では無視される = UE Designer の挙動と一致)
+
+### FR-4: `bind_widget_to_variable` の stale 参照削除
+
+`umg_widget` docstring と WIDGET_COMMANDS dict に残っていたが C++ handler が存在せず `Unknown command` エラーを返す状態だった。削除。
+
+### 変更ファイル
+
+**C++** (4 files):
+- `SpirrowBridgeUMGLayoutCommands.cpp` — reparent canonical pattern + ResolveElementScoped + 5 コマンドの lookup scope 対応
+- `SpirrowBridgeUMGWidgetBasicCommands.{h,cpp}` — add_text/image/progressbar を ResolveAddTarget 経由に + HandleAddTextBlockToWidget 削除
+- `SpirrowBridgeUMGWidgetInteractiveCommands.cpp` — 7 コマンド (button/slider/checkbox/combobox/editabletext/spinbox/scrollbox) を ResolveAddTarget 経由に
+- `SpirrowBridgeUMGWidgetCoreCommands.{h,cpp}` — `ResolveAddTarget` 静的ヘルパー追加
+- `SpirrowBridge.cpp` — add_text_block_to_widget routing 削除
+
+**Python** (3 files):
+- `umg_meta.py` — add_text_block_to_widget / bind_widget_to_variable を WIDGET_COMMANDS / docstring から削除
+- `command_schemas.py` — add_text_block_to_widget schema 削除 / 9 leaf adds + 5 lookup コマンドに parent_name 追加 / reparent brief 更新
+- `test_umg_widgets.py` — `TestUMGV097ReparentSafety` クラス追加 (5 テスト: reparent duplicate 検証 / parent_name on add / lookup scope / unresolvable parent)
+
+**ドキュメント** (3 files):
+- `FEATURE_STATUS.md` — v0.9.7 section + コマンド数 159→158
+- `templates/end-user/SPIRROW_CHEATSHEET.md` — add_text_block → add_text 置換
+- `templates/end-user/skills/ue-hud-bootstrap/SKILL.md` — 同上
+
+---
+
 ## 2026-04-21: UMG Extensions (v0.9.6)
 
 **概要**: UMG の WBP レイアウト表現力を拡張。WidgetSwitcher / Border コマンドを追加、CanvasPanelSlot で任意の FAnchors と LTRB オフセットを指定可能に、`create_umg_widget_blueprint` の parent_class 解決を汎用化。

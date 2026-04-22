@@ -4,7 +4,7 @@
 >
 > **Companion**: `.claude/skills/ue-*-bootstrap/SKILL.md` (具体的タスク手順) · `CLAUDE.md` § "Spirrow-UnrealWise の使い方" (常時ルール)
 >
-> **As of**: Spirrow-UnrealWise v0.9.6 — 25 MCP tools, 159 commands, UE 5.7
+> **As of**: Spirrow-UnrealWise v0.9.7 — 25 MCP tools, 158 commands, UE 5.7
 
 ---
 
@@ -37,8 +37,8 @@ help(category="blueprint", command="create_blueprint")  # 特定コマンドの 
 | `editor` | アクター操作・レベル作成・WorldSettings | 17 | `spawn_actor` / `create_level` / `save_current_level` / `set_world_properties` |
 | `blueprint` | BP 作成・コンパイル・プロパティ・DataAsset | 21 | `create_blueprint` / `add_component_to_blueprint` / `compile_blueprint` |
 | `blueprint_node` | BP グラフのノード操作 | 24 | `add_blueprint_event_node` / `connect_blueprint_nodes` / `add_branch_node` |
-| `umg_widget` | Widget BP・UI 要素 (v0.9.6: Border 追加) | 19 | `create_umg_widget_blueprint` / `add_text_block_to_widget` / `add_border_to_widget` / `add_widget_to_viewport` |
-| `umg_layout` | UMG レイアウト (v0.9.6: WidgetSwitcher 追加) | 6 | `add_vertical_box_to_widget` / `add_widget_switcher_to_widget` / `reparent_widget_element` / `set_widget_slot_property` |
+| `umg_widget` | Widget BP・UI 要素 (v0.9.7: 全 add_*_to_widget に parent_name 対応) | 18 | `create_umg_widget_blueprint` / `add_text_to_widget` / `add_border_to_widget` / `add_widget_to_viewport` |
+| `umg_layout` | UMG レイアウト (v0.9.7: reparent 整合性強化 + parent_name scope 対応) | 6 | `add_vertical_box_to_widget` / `add_widget_switcher_to_widget` / `reparent_widget_element` / `set_widget_slot_property` |
 | `umg_variable` | Widget 変数・関数・イベント | 5 | `add_widget_variable` / `add_widget_function` |
 | `umg_animation` | Widget アニメーション | 4 | `create_widget_animation` / `add_animation_keyframe` |
 | `project` | Input Mapping・アセット・テクスチャ | 13 | `create_input_action` / `create_input_mapping_context` / `add_action_to_mapping_context` / `set_default_mapping_context` |
@@ -88,7 +88,7 @@ umg_widget.create_umg_widget_blueprint
   ↓
 umg_layout.add_vertical_box_to_widget (root)
   ↓
-umg_widget.add_text_block_to_widget / add_progressbar_to_widget × N
+umg_widget.add_text_to_widget / add_progressbar_to_widget × N
   ↓
 umg_variable.add_widget_variable (動的バインド用)
   ↓
@@ -208,7 +208,7 @@ blueprint_node(command="add_blueprint_event_node", params={
 | 20 | `blueprint_node.add_blueprint_variable` | BP 変数作成 |
 | 21 | `blueprint_node.set_node_pin_value` | デフォルト値設定 |
 | 22 | `umg_widget.create_umg_widget_blueprint` | Widget BP |
-| 23 | `umg_widget.add_text_block_to_widget` | TextBlock |
+| 23 | `umg_widget.add_text_to_widget` | TextBlock |
 | 24 | `umg_widget.add_progressbar_to_widget` | ProgressBar |
 | 25 | `umg_widget.add_widget_to_viewport` | 画面表示 |
 | 26 | `umg_layout.add_vertical_box_to_widget` | VBox レイアウト |

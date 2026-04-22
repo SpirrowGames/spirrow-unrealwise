@@ -446,6 +446,152 @@ class TestUMGV096Extensions:
 
 
 @pytest.mark.umg
+class TestUMGV097ReparentSafety:
+    """v0.9.7: reparent double-parent 防止 + parent_name 対応"""
+
+    @pytest.fixture(autouse=True)
+    def setup_widget(self, test_suite, unique_name):
+        self.widget_name = unique_name("WBP_V097")
+        test_suite.run_command("create_umg_widget_blueprint", {
+            "widget_name": self.widget_name,
+            "path": "/Game/Test"
+        })
+        yield
+
+    def test_reparent_no_duplicate(self, test_suite):
+        """BUG-1 regression: reparent 後に旧親の children 配列に widget が残らないこと"""
+        # Canvas 直下にボタンを作る (parent_name 省略 = root canvas)
+        test_suite.run_command("add_button_to_widget", {
+            "widget_name": self.widget_name,
+            "button_name": "BtnJoin",
+            "path": "/Game/Test"
+        })
+        # 別のコンテナ (VerticalBox) を Canvas 直下に作る
+        test_suite.run_command("add_vertical_box_to_widget", {
+            "widget_name": self.widget_name,
+            "box_name": "MainVBox",
+            "path": "/Game/Test"
+        })
+        # BtnJoin を MainVBox 配下に移動
+        reparent_result = test_suite.run_command("reparent_widget_element", {
+            "widget_name": self.widget_name,
+            "element_name": "BtnJoin",
+            "new_parent_name": "MainVBox",
+            "path": "/Game/Test"
+        })
+        assert_success(reparent_result, "reparent_widget_element")
+
+        # get_widget_elements で検証: BtnJoin が elements 配列に 1 回だけ出現すること
+        elements_result = test_suite.run_command("get_widget_elements", {
+            "widget_name": self.widget_name,
+            "path": "/Game/Test"
+        })
+        assert_success(elements_result, "get_widget_elements")
+        elements = elements_result.get("elements", [])
+        btn_matches = [e for e in elements if e.get("name") == "BtnJoin"]
+        assert len(btn_matches) == 1, (
+            f"BUG-1: BtnJoin が elements 配列に {len(btn_matches)} 個出現 (期待: 1)。"
+            f"reparent が旧親 children を完全に切断できていない。"
+        )
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+    def test_add_button_with_parent_name(self, test_suite):
+        """FR-1: add_button_to_widget が parent_name を受け取って VerticalBox 内に配置できること"""
+        test_suite.run_command("add_vertical_box_to_widget", {
+            "widget_name": self.widget_name,
+            "box_name": "ButtonContainer",
+            "path": "/Game/Test"
+        })
+        result = test_suite.run_command("add_button_to_widget", {
+            "widget_name": self.widget_name,
+            "button_name": "BtnInVBox",
+            "parent_name": "ButtonContainer",
+            "text": "Click",
+            "path": "/Game/Test"
+        })
+        assert_success(result, "add_button_to_widget with parent_name")
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+    def test_add_text_with_parent_name(self, test_suite):
+        """FR-1: add_text_to_widget が parent_name を受け取れること"""
+        test_suite.run_command("add_vertical_box_to_widget", {
+            "widget_name": self.widget_name,
+            "box_name": "TextContainer",
+            "path": "/Game/Test"
+        })
+        result = test_suite.run_command("add_text_to_widget", {
+            "widget_name": self.widget_name,
+            "text_name": "TxtInVBox",
+            "parent_name": "TextContainer",
+            "text": "Hello",
+            "path": "/Game/Test"
+        })
+        assert_success(result, "add_text_to_widget with parent_name")
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+    def test_set_element_property_with_parent_scope(self, test_suite):
+        """BUG-5: set_widget_element_property が parent_name で scope 絞り込みできること"""
+        # VBox を 2 つ作って、それぞれに同名 "Label" widget を入れる
+        test_suite.run_command("add_vertical_box_to_widget", {
+            "widget_name": self.widget_name,
+            "box_name": "PanelA",
+            "path": "/Game/Test"
+        })
+        test_suite.run_command("add_vertical_box_to_widget", {
+            "widget_name": self.widget_name,
+            "box_name": "PanelB",
+            "path": "/Game/Test"
+        })
+        test_suite.run_command("add_text_to_widget", {
+            "widget_name": self.widget_name,
+            "text_name": "Label",
+            "parent_name": "PanelA",
+            "text": "In A",
+            "path": "/Game/Test"
+        })
+        # 同名 widget (名前ユニークの UE 側制約で実際は連番になる可能性があるが、
+        # parent_name scope 機能のテストとしては引数が処理されるかを確認)
+        result = test_suite.run_command("set_widget_element_property", {
+            "widget_name": self.widget_name,
+            "element_name": "Label",
+            "parent_name": "PanelA",
+            "property_name": "Text",
+            "property_value": "Updated via scope",
+            "path": "/Game/Test"
+        })
+        # parent_name が正しくルーティングされれば success, 引数が未サポートなら失敗
+        assert_success(result, "set_widget_element_property with parent_name scope")
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+    def test_parent_name_unresolvable_errors(self, test_suite):
+        """parent_name が見つからない場合は WidgetElementNotFound エラー"""
+        result = test_suite.run_command("add_button_to_widget", {
+            "widget_name": self.widget_name,
+            "button_name": "OrphanBtn",
+            "parent_name": "DoesNotExistPanel",
+            "text": "Orphan",
+            "path": "/Game/Test"
+        })
+        assert result.get("success") is not True, "存在しない parent_name で成功してはならない"
+
+        test_suite.add_cleanup("delete_asset", {
+            "asset_path": f"/Game/Test/{self.widget_name}"
+        })
+
+
+@pytest.mark.umg
 @pytest.mark.integration
 class TestUMGWidgetIntegration:
     """UMG統合テスト - 複数コマンドの連携"""

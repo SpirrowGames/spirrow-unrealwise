@@ -433,7 +433,6 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
             // UMG Widget Commands
             else if (CommandType == TEXT("create_umg_widget_blueprint") ||
                      CommandType == TEXT("add_text_to_widget") ||
-                     CommandType == TEXT("add_text_block_to_widget") ||
                      CommandType == TEXT("add_image_to_widget") ||
                      CommandType == TEXT("add_progressbar_to_widget") ||
                      CommandType == TEXT("add_border_to_widget") ||

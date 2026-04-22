@@ -12,7 +12,6 @@ logger = logging.getLogger("SpirrowBridge")
 # ── umg_widget commands ──
 WIDGET_COMMANDS = {
     "create_umg_widget_blueprint": "create_umg_widget_blueprint",
-    "add_text_block_to_widget": "add_text_block_to_widget",
     "bind_widget_event": "bind_widget_event",
     "add_widget_to_viewport": "add_widget_to_viewport",
     "set_text_block_binding": "set_text_block_binding",
@@ -30,7 +29,6 @@ WIDGET_COMMANDS = {
     "add_editabletext_to_widget": "add_editabletext_to_widget",
     "add_spinbox_to_widget": "add_spinbox_to_widget",
     "remove_widget_element": "remove_widget_element",
-    "bind_widget_to_variable": "bind_widget_to_variable",
 }
 
 # ── umg_layout commands ──
@@ -72,13 +70,12 @@ def register_umg_meta_tools(mcp: FastMCP):
     @mcp.tool()
     def umg_widget(ctx: Context, command: str, params: Dict[str, Any] = {}) -> Dict[str, Any]:
         """UMG widgets: create, text, image, button, slider, checkbox, combobox, border, etc.
-        Commands: create_umg_widget_blueprint, add_text_block_to_widget,
-        bind_widget_event, add_widget_to_viewport, set_text_block_binding,
-        add_text_to_widget, add_image_to_widget, add_progressbar_to_widget,
-        add_border_to_widget, get_widget_elements, set_widget_element_property,
-        add_button_to_widget, bind_widget_component_event, add_slider_to_widget,
-        add_checkbox_to_widget, add_combobox_to_widget, add_editabletext_to_widget,
-        add_spinbox_to_widget, remove_widget_element, bind_widget_to_variable
+        Commands: create_umg_widget_blueprint, bind_widget_event, add_widget_to_viewport,
+        set_text_block_binding, add_text_to_widget, add_image_to_widget,
+        add_progressbar_to_widget, add_border_to_widget, get_widget_elements,
+        set_widget_element_property, add_button_to_widget, bind_widget_component_event,
+        add_slider_to_widget, add_checkbox_to_widget, add_combobox_to_widget,
+        add_editabletext_to_widget, add_spinbox_to_widget, remove_widget_element
         Use help("umg_widget", "command_name") for params.
         """
         from tools.meta_utils import execute_command

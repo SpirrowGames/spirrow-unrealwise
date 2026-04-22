@@ -577,7 +577,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetSlotProp
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetElementProperty(const TSharedPtr<FJsonObject>& Params)
 {
 	// Validate required parameters
-	FString WidgetName, ElementName, PropertyName, PropertyValue;
+	FString WidgetName, ElementName, PropertyName;
 	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
 	{
 		return Error;
@@ -590,10 +590,30 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetElementP
 	{
 		return Error;
 	}
-	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("property_value"), PropertyValue))
+
+	// property_value: accept ANY JSON type (string / array / object / number / bool).
+	// v0.9.8 lifts the previous string-only restriction so struct types (FLinearColor,
+	// FMargin, FVector, etc.) can be set from [r,g,b,a]-style arrays or {"field": value}
+	// objects via the shared SetObjectProperty helper.
+	if (!Params->HasField(TEXT("property_value")))
 	{
-		return Error;
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::MissingRequiredParam,
+			TEXT("Missing required parameter: property_value"));
 	}
+	const TSharedPtr<FJsonValue>* PropertyValueJsonRef = Params->Values.Find(TEXT("property_value"));
+	if (!PropertyValueJsonRef || !(*PropertyValueJsonRef).IsValid())
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::InvalidParamValue,
+			TEXT("Parameter 'property_value' is null"));
+	}
+	TSharedPtr<FJsonValue> PropertyValueJson = *PropertyValueJsonRef;
+
+	// For the existing string-based fast paths (Visibility/Text/ColorAndOpacity alias/
+	// Justification/Percent and ImportText_Direct fallback), extract as string when possible.
+	FString PropertyValue;
+	const bool bIsStringValue = PropertyValueJson->TryGetString(PropertyValue);
 
 	// Get optional parameters
 	FString Path;
@@ -628,6 +648,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetElementP
 
 	if (PropertyPath.Num() > 1)
 	{
+		// Nested property paths currently use ImportText_Direct which requires a string.
+		if (!bIsStringValue)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::InvalidParamType,
+				FString::Printf(TEXT("Nested property path '%s' requires a string property_value (got non-string JSON type)"), *PropertyName));
+		}
+
 		// Navigate through nested properties
 		void* CurrentContainer = Widget;
 		UStruct* CurrentStruct = Widget->GetClass();
@@ -675,6 +703,57 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetElementP
 			// Log the failure for debugging
 			UE_LOG(LogTemp, Warning, TEXT("ImportText_Direct failed for nested property '%s' with value '%s'"),
 				*PropertyName, *PropertyValue);
+		}
+	}
+	// Non-string property_value path: delegate to SetObjectProperty which handles
+	// FLinearColor / FMargin / FVector / FVector2D / FRotator / FColor / FTransform
+	// as arrays or objects, plus primitives and nested struct field updates.
+	else if (!bIsStringValue)
+	{
+		// Special case: TextBlock::ColorAndOpacity is FSlateColor (wraps FLinearColor)
+		// and UImage::ColorAndOpacity is FLinearColor directly. SetObjectProperty's
+		// generic struct handling doesn't know about FSlateColor specifically, so
+		// convert [r,g,b,a] arrays explicitly here.
+		if (PropertyName == TEXT("ColorAndOpacity"))
+		{
+			const TArray<TSharedPtr<FJsonValue>>* ColorArr = nullptr;
+			if (PropertyValueJson->TryGetArray(ColorArr) && ColorArr && ColorArr->Num() >= 4)
+			{
+				FLinearColor Color(
+					static_cast<float>((*ColorArr)[0]->AsNumber()),
+					static_cast<float>((*ColorArr)[1]->AsNumber()),
+					static_cast<float>((*ColorArr)[2]->AsNumber()),
+					static_cast<float>((*ColorArr)[3]->AsNumber())
+				);
+				if (UTextBlock* TextBlock = Cast<UTextBlock>(Widget))
+				{
+					TextBlock->SetColorAndOpacity(FSlateColor(Color));
+					bSuccess = true;
+				}
+				else if (UImage* Image = Cast<UImage>(Widget))
+				{
+					Image->SetColorAndOpacity(Color);
+					bSuccess = true;
+				}
+			}
+		}
+
+		// General path: reflect on UPROPERTY and write via SetObjectProperty
+		// (handles FLinearColor, FMargin, FVector, primitives, TSubclassOf, etc.)
+		if (!bSuccess)
+		{
+			FString ErrMsg;
+			if (FSpirrowBridgeCommonUtils::SetObjectProperty(Widget, PropertyName, PropertyValueJson, ErrMsg))
+			{
+				bSuccess = true;
+			}
+			else if (!ErrMsg.IsEmpty())
+			{
+				return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+					ESpirrowErrorCode::PropertySetFailed,
+					FString::Printf(TEXT("Failed to set property '%s' on element '%s': %s"),
+						*PropertyName, *ElementName, *ErrMsg));
+			}
 		}
 	}
 	// Handle special cases first (non-nested properties)

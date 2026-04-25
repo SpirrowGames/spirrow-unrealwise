@@ -3,6 +3,9 @@
 #include "Editor.h"
 #include "EditorViewportClient.h"
 #include "LevelEditorViewport.h"
+#include "ILiveCodingModule.h"  // v0.10.0 - trigger_live_coding
+#include "Modules/ModuleManager.h"
+#include "ShowFlags.h"           // v0.10.0 - set_showflag
 #include "ImageUtils.h"
 #include "HighResScreenshot.h"
 #include "Engine/GameViewportClient.h"
@@ -96,6 +99,23 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleCommand(const FStrin
     else if (CommandType == TEXT("take_screenshot"))
     {
         return HandleTakeScreenshot(Params);
+    }
+    // Editor viewport camera + show flag + live coding (v0.10.0)
+    else if (CommandType == TEXT("get_editor_camera"))
+    {
+        return HandleGetEditorCamera(Params);
+    }
+    else if (CommandType == TEXT("set_editor_camera"))
+    {
+        return HandleSetEditorCamera(Params);
+    }
+    else if (CommandType == TEXT("set_showflag"))
+    {
+        return HandleSetShowFlag(Params);
+    }
+    else if (CommandType == TEXT("trigger_live_coding"))
+    {
+        return HandleTriggerLiveCoding(Params);
     }
     // Asset management commands
     else if (CommandType == TEXT("rename_asset"))
@@ -989,4 +1009,181 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleRenameAsset(const TS
     }
 
     return ResultJson;
-} 
+}
+
+// ============================================================================
+// v0.10.0 - Editor viewport camera + show flag + Live Coding
+// ============================================================================
+
+namespace
+{
+    FLevelEditorViewportClient* GetActivePerspectiveViewport()
+    {
+        if (!GEditor) return nullptr;
+        // Prefer the currently-active viewport client if it's perspective
+        if (FViewport* AV = GEditor->GetActiveViewport())
+        {
+            for (FLevelEditorViewportClient* VC : GEditor->GetLevelViewportClients())
+            {
+                if (VC && VC->Viewport == AV && VC->IsPerspective())
+                {
+                    return VC;
+                }
+            }
+        }
+        // Fall back to the first perspective viewport
+        for (FLevelEditorViewportClient* VC : GEditor->GetLevelViewportClients())
+        {
+            if (VC && VC->IsPerspective())
+            {
+                return VC;
+            }
+        }
+        return nullptr;
+    }
+
+    void AddVectorJsonField_E(TSharedPtr<FJsonObject>& Obj, const TCHAR* Name, const FVector& V)
+    {
+        TArray<TSharedPtr<FJsonValue>> Arr;
+        Arr.Add(MakeShared<FJsonValueNumber>(V.X));
+        Arr.Add(MakeShared<FJsonValueNumber>(V.Y));
+        Arr.Add(MakeShared<FJsonValueNumber>(V.Z));
+        Obj->SetArrayField(Name, Arr);
+    }
+
+    void AddRotatorJsonField_E(TSharedPtr<FJsonObject>& Obj, const TCHAR* Name, const FRotator& R)
+    {
+        TArray<TSharedPtr<FJsonValue>> Arr;
+        Arr.Add(MakeShared<FJsonValueNumber>(R.Pitch));
+        Arr.Add(MakeShared<FJsonValueNumber>(R.Yaw));
+        Arr.Add(MakeShared<FJsonValueNumber>(R.Roll));
+        Obj->SetArrayField(Name, Arr);
+    }
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleGetEditorCamera(const TSharedPtr<FJsonObject>& Params)
+{
+    FLevelEditorViewportClient* VC = GetActivePerspectiveViewport();
+    if (!VC)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(1710, TEXT("No active perspective editor viewport found"));
+    }
+    TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+    AddVectorJsonField_E(Data, TEXT("location"), VC->GetViewLocation());
+    AddRotatorJsonField_E(Data, TEXT("rotation"), VC->GetViewRotation());
+    Data->SetNumberField(TEXT("fov"), VC->ViewFOV);
+    return FSpirrowBridgeCommonUtils::CreateSuccessResponse(Data);
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSetEditorCamera(const TSharedPtr<FJsonObject>& Params)
+{
+    FLevelEditorViewportClient* VC = GetActivePerspectiveViewport();
+    if (!VC)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(1710, TEXT("No active perspective editor viewport found"));
+    }
+
+    bool bChanged = false;
+    if (Params.IsValid())
+    {
+        const TArray<TSharedPtr<FJsonValue>>* LocArr = nullptr;
+        if (Params->TryGetArrayField(TEXT("location"), LocArr) && LocArr && LocArr->Num() == 3)
+        {
+            VC->SetViewLocation(FVector((*LocArr)[0]->AsNumber(), (*LocArr)[1]->AsNumber(), (*LocArr)[2]->AsNumber()));
+            bChanged = true;
+        }
+        const TArray<TSharedPtr<FJsonValue>>* RotArr = nullptr;
+        if (Params->TryGetArrayField(TEXT("rotation"), RotArr) && RotArr && RotArr->Num() == 3)
+        {
+            VC->SetViewRotation(FRotator((*RotArr)[0]->AsNumber(), (*RotArr)[1]->AsNumber(), (*RotArr)[2]->AsNumber()));
+            bChanged = true;
+        }
+        double FOV = 0;
+        if (Params->TryGetNumberField(TEXT("fov"), FOV))
+        {
+            VC->ViewFOV = static_cast<float>(FMath::Clamp(FOV, 5.0, 170.0));
+            bChanged = true;
+        }
+    }
+    if (!bChanged)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("set_editor_camera requires at least 'location', 'rotation' or 'fov'"));
+    }
+
+    VC->Invalidate();
+
+    TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+    AddVectorJsonField_E(Data, TEXT("location"), VC->GetViewLocation());
+    AddRotatorJsonField_E(Data, TEXT("rotation"), VC->GetViewRotation());
+    Data->SetNumberField(TEXT("fov"), VC->ViewFOV);
+    return FSpirrowBridgeCommonUtils::CreateSuccessResponse(Data);
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSetShowFlag(const TSharedPtr<FJsonObject>& Params)
+{
+    FString FlagName;
+    if (!Params.IsValid() || !Params->TryGetStringField(TEXT("flag"), FlagName) || FlagName.IsEmpty())
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'flag' parameter (e.g. 'Collision', 'Navigation', 'Bounds')"));
+    }
+    bool bEnabled = true;
+    Params->TryGetBoolField(TEXT("enabled"), bEnabled);
+
+    // 'target' = 'editor' (default) or 'pie'. Implementation: route via console showflag.
+    FString Target = TEXT("editor");
+    Params->TryGetStringField(TEXT("target"), Target);
+
+    UWorld* TargetWorld = nullptr;
+    if (Target.Equals(TEXT("pie"), ESearchCase::IgnoreCase))
+    {
+        TargetWorld = GEditor ? GEditor->PlayWorld : nullptr;
+    }
+    else
+    {
+        TargetWorld = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
+    }
+    if (!TargetWorld || !GEngine)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(1713,
+            FString::Printf(TEXT("Target world '%s' not available"), *Target));
+    }
+
+    const FString Cmd = FString::Printf(TEXT("showflag.%s %d"), *FlagName, bEnabled ? 1 : 0);
+    const bool bOk = GEngine->Exec(TargetWorld, *Cmd);
+    if (!bOk)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(1713,
+            FString::Printf(TEXT("Show flag '%s' was rejected by engine (unknown name?). Tried: %s"), *FlagName, *Cmd));
+    }
+
+    TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+    Data->SetStringField(TEXT("flag"), FlagName);
+    Data->SetBoolField(TEXT("enabled"), bEnabled);
+    Data->SetStringField(TEXT("target"), Target);
+    Data->SetStringField(TEXT("console_command"), Cmd);
+    return FSpirrowBridgeCommonUtils::CreateSuccessResponse(Data);
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleTriggerLiveCoding(const TSharedPtr<FJsonObject>& Params)
+{
+    ILiveCodingModule* LCModule = FModuleManager::GetModulePtr<ILiveCodingModule>(TEXT("LiveCoding"));
+    if (!LCModule)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(1709, TEXT("LiveCoding module not loaded - Live Coding may be disabled in this build"));
+    }
+    if (!LCModule->IsEnabledForSession())
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(1709, TEXT("Live Coding is not enabled for this session - toggle via Editor Preferences > Live Coding"));
+    }
+    if (LCModule->IsCompiling())
+    {
+        TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+        Data->SetStringField(TEXT("status"), TEXT("already_compiling"));
+        return FSpirrowBridgeCommonUtils::CreateSuccessResponse(Data);
+    }
+    LCModule->Compile();
+    TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+    Data->SetStringField(TEXT("status"), TEXT("requested"));
+    Data->SetStringField(TEXT("note"), TEXT("Live Coding compile is async - completion is signaled in editor. Watch logs for 'PATCH SUCCESS' / 'PATCH FAILURE'"));
+    return FSpirrowBridgeCommonUtils::CreateSuccessResponse(Data);
+}

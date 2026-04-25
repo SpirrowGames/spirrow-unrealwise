@@ -5,6 +5,7 @@ Python/unreal_mcp.log
 .cursorrules
 .cursorignore
 CLAUDE.md
+.claude/settings.local.json
 
 # Code-copy related files
 .codeignore

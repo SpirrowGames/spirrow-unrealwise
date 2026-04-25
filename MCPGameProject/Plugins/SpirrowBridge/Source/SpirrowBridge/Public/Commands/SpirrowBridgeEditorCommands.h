@@ -34,6 +34,14 @@ private:
     TSharedPtr<FJsonObject> HandleFocusViewport(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleTakeScreenshot(const TSharedPtr<FJsonObject>& Params);
 
+    // Editor viewport camera + show flag (v0.10.0)
+    TSharedPtr<FJsonObject> HandleGetEditorCamera(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleSetEditorCamera(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleSetShowFlag(const TSharedPtr<FJsonObject>& Params);
+
+    // Live Coding (v0.10.0)
+    TSharedPtr<FJsonObject> HandleTriggerLiveCoding(const TSharedPtr<FJsonObject>& Params);
+
     // Asset management commands
     TSharedPtr<FJsonObject> HandleRenameAsset(const TSharedPtr<FJsonObject>& Params);
 }; 

@@ -6,7 +6,7 @@ Used by the help() tool to provide on-demand parameter info.
 
 COMMAND_SCHEMAS = {
     # =========================================================================
-    # EDITOR (17 commands)
+    # EDITOR (22 commands — v0.10.0 added get_editor_camera/set_editor_camera/set_showflag/trigger_live_coding)
     # =========================================================================
     "editor": {
         "get_actors_in_level": {
@@ -131,6 +131,36 @@ COMMAND_SCHEMAS = {
             "params": {
                 "properties": {"type": "dict[str, any]", "required": True, "desc": "Key = UPROPERTY name on AWorldSettings (e.g. 'DefaultGameMode', 'KillZ'), value = typed value (class picker properties take a class path string like '/Game/Blueprints/BP_GM.BP_GM_C'). Partial success: per-property failures are reported in 'failed' array; 'applied' lists successes. success=false only if all failed. Level is marked dirty on any success (call save_current_level to persist)"},
             },
+        },
+        "take_screenshot": {
+            "brief": "Capture the active viewport (editor or PIE) to a PNG file",
+            "params": {
+                "filepath": {"type": "str", "required": True, "desc": "Output PNG path (extension auto-appended if missing). Active viewport = whichever viewport currently has focus — usually the editor viewport, or the PIE viewport if Play-In-Editor is running. For a guaranteed PIE capture use pie('take_pie_screenshot')"},
+            },
+        },
+        "get_editor_camera": {
+            "brief": "Get the active perspective editor viewport camera (location, rotation, fov)",
+            "params": {},
+        },
+        "set_editor_camera": {
+            "brief": "Set the active perspective editor viewport camera (Invalidate() forces immediate redraw)",
+            "params": {
+                "location": {"type": "list[float]", "desc": "[x,y,z] world location"},
+                "rotation": {"type": "list[float]", "desc": "[pitch,yaw,roll] degrees"},
+                "fov": {"type": "float", "desc": "Field of view in degrees (5-170)"},
+            },
+        },
+        "set_showflag": {
+            "brief": "Toggle a viewport show flag via showflag.<flag> console command",
+            "params": {
+                "flag": {"type": "str", "required": True, "desc": "Show flag name (e.g. 'Collision', 'Navigation', 'Bounds', 'Lighting'). See FEngineShowFlags for full list"},
+                "enabled": {"type": "bool", "default": True, "desc": "True to enable, False to disable"},
+                "target": {"type": "str", "default": "editor", "desc": "'editor' (default) or 'pie' to target PlayWorld"},
+            },
+        },
+        "trigger_live_coding": {
+            "brief": "Programmatically trigger Live Coding compile (Ctrl+Alt+F11 equivalent)",
+            "params": {},
         },
     },
 
@@ -1664,6 +1694,193 @@ COMMAND_SCHEMAS = {
             "brief": "List config file sections",
             "params": {
                 "config_file": {"type": "str", "default": "DefaultEngine", "desc": "Config file name"},
+            },
+        },
+    },
+
+    # =========================================================================
+    # PIE / RUNTIME / LOGS (25 commands) — v0.10.0
+    # =========================================================================
+    "pie": {
+        # ---------------------------------------------------------------------
+        # PIE lifecycle
+        # ---------------------------------------------------------------------
+        "start_pie": {
+            "brief": "Request PIE (Play-In-Editor) start. Async — call get_pie_state to confirm",
+            "params": {
+                "mode": {"type": "str", "default": "selected_viewport", "desc": "'selected_viewport' (default — embedded in editor) or 'new_window' (separate process)"},
+                "spawn_at_player_start": {"type": "bool", "default": True, "desc": "If True, spawn pawn at PlayerStart actor. If False, use spawn_location/spawn_rotation"},
+                "spawn_location": {"type": "list[float]", "desc": "[x,y,z] world location for pawn spawn (only used when spawn_at_player_start=False)"},
+                "spawn_rotation": {"type": "list[float]", "desc": "[pitch,yaw,roll] for pawn spawn (only used when spawn_at_player_start=False)"},
+            },
+        },
+        "stop_pie": {
+            "brief": "Request PIE end (calls GEditor->RequestEndPlayMap)",
+            "params": {},
+        },
+        "get_pie_state": {
+            "brief": "Get PIE state ('stopped' / 'running' / 'paused') and runtime info",
+            "params": {},
+        },
+        "pause_pie": {
+            "brief": "Pause PIE via APlayerController::SetPause(true)",
+            "params": {
+                "player_index": {"type": "int", "default": 0, "desc": "Player controller index (default 0)"},
+            },
+        },
+        "resume_pie": {
+            "brief": "Resume PIE via APlayerController::SetPause(false)",
+            "params": {
+                "player_index": {"type": "int", "default": 0, "desc": "Player controller index (default 0)"},
+            },
+        },
+        "step_pie_frames": {
+            "brief": "Advance PIE by N frames while remaining paused (Phase 2)",
+            "params": {
+                "frames": {"type": "int", "default": 1, "desc": "Number of frames to advance (1-100)"},
+            },
+        },
+
+        # ---------------------------------------------------------------------
+        # Screenshot + camera
+        # ---------------------------------------------------------------------
+        "take_pie_screenshot": {
+            "brief": "PNG of PIE viewport (resolves PlayWorld viewport explicitly)",
+            "params": {
+                "filepath": {"type": "str", "required": True, "desc": "Output PNG path (.png auto-appended)"},
+            },
+        },
+        "take_high_res_screenshot": {
+            "brief": "HighResShot N — render at any multiplier of viewport resolution",
+            "params": {
+                "multiplier": {"type": "int", "default": 2, "desc": "Resolution multiplier (1-10). Higher = larger PNG, slower render"},
+                "filepath": {"type": "str", "desc": "Optional output path. If omitted, UE writes to Saved/Screenshots/<Platform>/HighresScreenshot00000.png"},
+            },
+        },
+        "get_pie_camera": {
+            "brief": "Read player camera location/rotation/fov from PIE world",
+            "params": {
+                "player_index": {"type": "int", "default": 0, "desc": "Player controller index"},
+            },
+        },
+        "set_pie_camera": {
+            "brief": "Move player camera (teleports possessed pawn unless use_debug_cam=true)",
+            "params": {
+                "location": {"type": "list[float]", "desc": "[x,y,z] world location"},
+                "rotation": {"type": "list[float]", "desc": "[pitch,yaw,roll] degrees"},
+                "player_index": {"type": "int", "default": 0, "desc": "Player controller index"},
+                "use_debug_cam": {"type": "bool", "default": False, "desc": "If True, enable DebugCam mode (free-look) instead of teleporting pawn"},
+            },
+        },
+        "enable_debug_cam": {
+            "brief": "Toggle DebugCam ON (ToggleDebugCamera console command)",
+            "params": {},
+        },
+        "disable_debug_cam": {
+            "brief": "Toggle DebugCam OFF",
+            "params": {},
+        },
+
+        # ---------------------------------------------------------------------
+        # Console + runtime control
+        # ---------------------------------------------------------------------
+        "exec_console_command": {
+            "brief": "Run a UE console command (GEngine->Exec) with output capture",
+            "params": {
+                "command": {"type": "str", "required": True, "desc": "Console command (e.g. 'stat fps', 'showflag.collision 1', 'voxel.show_chunk_borders 1')"},
+                "target": {"type": "str", "default": "auto", "desc": "'pie' (PlayWorld), 'editor' (editor world), or 'auto' (PIE if running, else editor)"},
+            },
+        },
+        "set_global_time_dilation": {
+            "brief": "Scale game time. dilation < 1 = slow-motion, > 1 = fast-forward",
+            "params": {
+                "dilation": {"type": "float", "required": True, "desc": "Time dilation factor (e.g. 0.5 = half speed, 2.0 = double speed). Min 0.0001, max 20"},
+            },
+        },
+        "simulate_pie_input": {
+            "brief": "Programmatic input via APlayerController::InputKey (Jump, WASD, mouse click)",
+            "params": {
+                "key": {"type": "str", "required": True, "desc": "Key name. UE FKey names: 'Jump', 'W', 'A', 'S', 'D', 'Space', 'LeftMouseButton', 'RightMouseButton', 'E', 'F', etc."},
+                "event": {"type": "str", "default": "tap", "desc": "'press' / 'release' / 'tap' (press then release in same frame)"},
+                "player_index": {"type": "int", "default": 0, "desc": "Player controller index"},
+            },
+        },
+
+        # ---------------------------------------------------------------------
+        # PIE world introspection
+        # ---------------------------------------------------------------------
+        "get_pie_actors": {
+            "brief": "List actors in PIE world (GEditor->PlayWorld), unlike editor get_actors_in_level",
+            "params": {
+                "include_components": {"type": "bool", "default": False, "desc": "If True, include component name + class for each actor"},
+            },
+        },
+        "find_pie_actors_by_class": {
+            "brief": "Filter PIE actors by class name",
+            "params": {
+                "class_name": {"type": "str", "required": True, "desc": "Class name (bare 'Pawn' or full '/Script/Engine.Pawn'). Matches subclasses too"},
+                "exact_match": {"type": "bool", "default": False, "desc": "If True, only return exact class matches (no subclasses)"},
+            },
+        },
+        "get_pie_actor_properties": {
+            "brief": "Read live property values from a PIE actor (vs blueprint defaults)",
+            "params": {
+                "name": {"type": "str", "required": True, "desc": "PIE actor name"},
+                "properties": {"type": "list[str]", "desc": "Specific property names. Omit to return all reflected properties"},
+            },
+        },
+
+        # ---------------------------------------------------------------------
+        # Log access
+        # ---------------------------------------------------------------------
+        "tail_ue_log": {
+            "brief": "Tail last N lines of Saved/Logs/<Project>.log (raw)",
+            "params": {
+                "lines": {"type": "int", "default": 50, "desc": "Number of trailing lines to return"},
+            },
+        },
+        "filter_ue_log": {
+            "brief": "Filter log by category prefix",
+            "params": {
+                "category": {"type": "str", "required": True, "desc": "Category prefix (e.g. 'LogTemp', 'LogVoxel')"},
+                "lines": {"type": "int", "default": 50, "desc": "Number of matching lines to return"},
+            },
+        },
+        "set_log_verbosity": {
+            "brief": "Set runtime log verbosity for a category (Log <Cat> <Level>)",
+            "params": {
+                "category": {"type": "str", "required": True, "desc": "Log category (e.g. 'LogVoxel')"},
+                "verbosity": {"type": "str", "required": True, "desc": "'Verbose' / 'VeryVerbose' / 'Log' / 'Display' / 'Warning' / 'Error' / 'Off'"},
+            },
+        },
+        "get_ue_log_path": {
+            "brief": "Return absolute path to the active UE log file",
+            "params": {},
+        },
+        "scan_ue_log_errors": {
+            "brief": "Scan recent log for Error/Warning/Fatal lines, return structured JSON",
+            "params": {
+                "lines": {"type": "int", "default": 5000, "desc": "How many trailing lines to scan (perf bound)"},
+                "severity_filter": {"type": "list[str]", "default": ["Error", "Warning", "Fatal"], "desc": "Severities to include. Add 'Ensure' to catch ensure() failures"},
+                "max_results": {"type": "int", "default": 200, "desc": "Max entries to return"},
+            },
+        },
+        "search_ue_log": {
+            "brief": "Keyword/regex/severity/category filter — returns parsed JSON entries",
+            "params": {
+                "keyword": {"type": "str | list[str]", "desc": "Substring(s) to match in message. List = OR. Omit to match all"},
+                "regex": {"type": "bool", "default": False, "desc": "Treat keyword as regex pattern(s)"},
+                "severity": {"type": "list[str]", "desc": "Filter by severity ('Error', 'Warning', 'Display', 'Verbose', 'VeryVerbose'). Omit = any"},
+                "category": {"type": "str | list[str]", "desc": "Filter by category prefix (e.g. 'LogVoxel'). Omit = any"},
+                "lines": {"type": "int", "default": 5000, "desc": "How many trailing lines to scan (perf bound)"},
+                "max_results": {"type": "int", "default": 200, "desc": "Max entries to return"},
+            },
+        },
+        "tail_editor_output_log": {
+            "brief": "Tail Editor's in-memory Output Log buffer (pre-disk-flush)",
+            "params": {
+                "lines": {"type": "int", "default": 50, "desc": "Number of trailing entries to return"},
+                "severity_filter": {"type": "list[str]", "desc": "Filter by severity ('Display', 'Warning', 'Error', etc.)"},
             },
         },
     },

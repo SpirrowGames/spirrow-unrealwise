@@ -25,6 +25,11 @@ COMMANDS = {
     "open_level": "open_level",
     "get_world_settings": "get_world_settings",
     "set_world_properties": "set_world_properties",
+    "take_screenshot": "take_screenshot",
+    "get_editor_camera": "get_editor_camera",
+    "set_editor_camera": "set_editor_camera",
+    "set_showflag": "set_showflag",
+    "trigger_live_coding": "trigger_live_coding",
 }
 
 RATIONALE_COMMANDS = {
@@ -39,12 +44,13 @@ def register_editor_meta_tool(mcp: FastMCP):
 
     @mcp.tool()
     def editor(ctx: Context, command: str, params: Dict[str, Any] = {}) -> Dict[str, Any]:
-        """Editor: actors, transforms, properties, components, assets, levels, world settings.
+        """Editor: actors, transforms, properties, components, assets, levels, world settings, viewport, build.
         Commands: get_actors_in_level, find_actors_by_name, spawn_actor, delete_actor,
         set_actor_transform, get_actor_properties, set_actor_property,
         set_actor_component_property, get_actor_components, rename_actor,
         spawn_blueprint_actor, rename_asset, create_level, save_current_level, open_level,
-        get_world_settings, set_world_properties
+        get_world_settings, set_world_properties, take_screenshot,
+        get_editor_camera, set_editor_camera, set_showflag, trigger_live_coding
 
         Level lifecycle:
         - create_level: create a new .umap and switch the editor to it
@@ -54,6 +60,14 @@ def register_editor_meta_tool(mcp: FastMCP):
         World Settings (per-level AWorldSettings, current editor world only):
         - get_world_settings: read properties (curated preset or filter via 'properties' list)
         - set_world_properties: batch-set properties via dict; marks level dirty (call save_current_level to persist)
+
+        Viewport / capture (v0.10.0):
+        - take_screenshot: capture the active viewport (editor or PIE) to a PNG. params: {"filepath": "C:/path/to/file.png"}
+        - get_editor_camera / set_editor_camera: read/write the active perspective viewport camera (location, rotation, fov)
+        - set_showflag: toggle a viewport show flag (collision / navigation / bounds / etc.) on editor or PIE world
+        - trigger_live_coding: programmatically invoke Live Coding compile (Ctrl+Alt+F11 equivalent)
+
+        For PIE control / runtime / logs, use the `pie` meta-tool.
         Use help("editor", "command_name") for params.
         """
         from tools.meta_utils import execute_command

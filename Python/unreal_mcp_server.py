@@ -25,7 +25,7 @@ logging.basicConfig(
     level=logging.DEBUG,  # Change to DEBUG level for more details
     format='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
     handlers=[
-        logging.FileHandler('unreal_mcp.log'),
+        logging.FileHandler('unreal_mcp.log', encoding='utf-8'),
         # logging.StreamHandler(sys.stdout) # Remove this handler to unexpected non-whitespace characters in JSON
     ]
 )
@@ -289,7 +289,7 @@ mcp = FastMCP(
     lifespan=server_lifespan
 )
 
-# Import and register meta-tools (14 categories + 1 help)
+# Import and register meta-tools (15 categories + 1 help)
 from tools.help_tool import register_help_tool
 from tools.editor_meta import register_editor_meta_tool
 from tools.blueprint_meta import register_blueprint_meta_tool
@@ -302,6 +302,7 @@ from tools.eqs_meta import register_eqs_meta_tool
 from tools.gas_meta import register_gas_meta_tool
 from tools.material_meta import register_material_meta_tool
 from tools.config_meta import register_config_meta_tool
+from tools.pie_meta import register_pie_meta_tool
 
 # Standalone tools (no C++ bridge, kept as-is)
 from tools.rag_tools import register_rag_tools
@@ -321,6 +322,7 @@ register_eqs_meta_tool(mcp)
 register_gas_meta_tool(mcp)
 register_material_meta_tool(mcp)
 register_config_meta_tool(mcp)
+register_pie_meta_tool(mcp)
 
 # Register standalone tools
 register_rag_tools(mcp)

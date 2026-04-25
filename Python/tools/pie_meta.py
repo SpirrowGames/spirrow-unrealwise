@@ -73,13 +73,18 @@ def register_pie_meta_tool(mcp: FastMCP):
         - pause_pie / resume_pie: pause via APlayerController::SetPause
         - step_pie_frames: advance N frames while paused (Phase 2)
 
-        Capture:
+        Capture (BUG fix 2026-04-26: render-thread sync via Viewport->Draw + FlushRenderingCommands
+        ensures the latest frame is captured, not the stale back buffer / clear color):
         - take_pie_screenshot: PNG of PIE viewport. params: {"filepath": "...png"}
-        - take_high_res_screenshot: HighResShot N — params: {"multiplier": 1-10, "filepath": optional}
+        - take_high_res_screenshot: HighResShot N - params: {"multiplier": 1-10, "filepath": optional}.
+          filepath override is honored (passed inline as `filename=<path>` in the console cmd
+          so HighResShot's ParseConsoleCommand picks it up - direct field assignment is wiped).
 
         Camera:
         - get_pie_camera / set_pie_camera: read/write player camera (location, rotation, fov).
-          set teleports the possessed pawn — pass "use_debug_cam": true for free-look.
+          set teleports the possessed pawn - pass "use_debug_cam": true for free-look.
+          Response (BUG fix 2026-04-26) returns the requested target loc/rot directly
+          (not the stale pre-teleport view), plus previous_location / previous_rotation.
 
         Console / runtime:
         - exec_console_command: GEngine->Exec. params: {"command": "stat fps", "target": "pie"|"editor"}

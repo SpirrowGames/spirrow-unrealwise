@@ -37,7 +37,8 @@ public class SpirrowBridge : ModuleRules
 				"JsonUtilities",
 				"DeveloperSettings",
 				"AIModule",
-				"NavigationSystem"
+				"NavigationSystem",
+				"RenderCore"  // v0.10.0 bug fix - FlushRenderingCommands for take_pie_screenshot render-thread sync
 			}
 		);
 		

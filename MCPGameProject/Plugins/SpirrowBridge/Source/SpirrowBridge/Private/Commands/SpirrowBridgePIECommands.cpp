@@ -162,6 +162,15 @@ namespace
             OutError = TEXT("Viewport is null");
             return false;
         }
+        // Render-thread sync (BUG fix 2026-04-26):
+        // Without this, ReadPixels reads the back buffer BEFORE the latest game-thread
+        // state (camera teleport / actor changes) has been rendered, returning the
+        // previous frame or even just clear color (sky atmosphere green / black).
+        // Step 1: enqueue a draw command for the current state.
+        // Step 2: drain the render thread until it completes (~1 frame block).
+        Viewport->Draw();
+        FlushRenderingCommands();
+
         TArray<FColor> Bitmap;
         const FIntPoint Size = Viewport->GetSizeXY();
         FIntRect Rect(0, 0, Size.X, Size.Y);
@@ -561,7 +570,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgePIECommands::HandleTakeHighResScreenshot(c
             ErrHighResScreenshotFailed, TEXT("No editor or PIE world available for HighResShot"));
     }
 
-    // Optional: filename override via CVar before exec
+    // Optional filepath override (BUG fix 2026-04-26):
+    // HighResShot's ParseConsoleCommand resets FilenameOverride at the start
+    // (UnrealClient.cpp:2420-2426) UNLESS the command contains `filename=...`.
+    // So setting Config.FilenameOverride in advance is wiped before the screenshot
+    // is captured. The canonical solution is to pass `filename=<path>` AS PART OF
+    // THE CONSOLE COMMAND itself, which ParseConsoleCommand reads via FParse::Value
+    // and uses directly.
     FString OptionalPath;
     if (Params.IsValid())
     {
@@ -569,13 +584,16 @@ TSharedPtr<FJsonObject> FSpirrowBridgePIECommands::HandleTakeHighResScreenshot(c
     }
     if (!OptionalPath.IsEmpty())
     {
-        if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.HighResScreenshotConfig.FilenameOverride")))
+        if (!OptionalPath.EndsWith(TEXT(".png")))
         {
-            CVar->Set(*OptionalPath);
+            OptionalPath += TEXT(".png");
         }
+        IFileManager::Get().MakeDirectory(*FPaths::GetPath(OptionalPath), /*Tree=*/true);
     }
 
-    const FString Cmd = FString::Printf(TEXT("HighResShot %d"), Multiplier);
+    const FString Cmd = OptionalPath.IsEmpty()
+        ? FString::Printf(TEXT("HighResShot %d"), Multiplier)
+        : FString::Printf(TEXT("HighResShot %d filename=%s"), Multiplier, *OptionalPath);
     const bool bOk = GEngine->Exec(TargetWorld, *Cmd);
     if (!bOk)
     {
@@ -586,10 +604,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgePIECommands::HandleTakeHighResScreenshot(c
     TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
     Data->SetNumberField(TEXT("multiplier"), Multiplier);
     Data->SetStringField(TEXT("status"), TEXT("requested"));
-    Data->SetStringField(TEXT("note"), TEXT("HighResShot is async - file is written to Saved/Screenshots/<Platform>/HighresScreenshotNNNNN.png on the next frame"));
     if (!OptionalPath.IsEmpty())
     {
         Data->SetStringField(TEXT("filepath_override"), OptionalPath);
+        Data->SetStringField(TEXT("note"), TEXT("HighResShot is async - file is written to the specified filepath on the next frame"));
+    }
+    else
+    {
+        Data->SetStringField(TEXT("note"), TEXT("HighResShot is async - file is written to Saved/Screenshots/<Platform>/HighresScreenshotNNNNN.png on the next frame"));
     }
     return FSpirrowBridgeCommonUtils::CreateSuccessResponse(Data);
 }
@@ -700,17 +722,27 @@ TSharedPtr<FJsonObject> FSpirrowBridgePIECommands::HandleSetPIECamera(const TSha
         GEngine->Exec(PIEWorld, TEXT("ToggleDebugCamera"));
     }
 
+    // Capture the pre-teleport view for the response (so callers can see what changed)
+    FVector PrevLoc;
+    FRotator PrevRot;
+    PC->GetPlayerViewPoint(PrevLoc, PrevRot);
+
     APawn* Pawn = PC->GetPawn();
+    bool bPawnTeleported = false;
+    FVector AppliedLoc = bHasLoc ? NewLoc : PrevLoc;
+    FRotator AppliedRot = bHasRot ? NewRot : PrevRot;
     if (Pawn)
     {
         const FVector ApplyLoc = bHasLoc ? NewLoc : Pawn->GetActorLocation();
         const FRotator ApplyRot = bHasRot ? NewRot : Pawn->GetActorRotation();
         FHitResult Hit;
-        Pawn->SetActorLocationAndRotation(ApplyLoc, ApplyRot, false, &Hit, ETeleportType::TeleportPhysics);
+        bPawnTeleported = Pawn->SetActorLocationAndRotation(ApplyLoc, ApplyRot, false, &Hit, ETeleportType::TeleportPhysics);
         if (bHasRot)
         {
             PC->SetControlRotation(NewRot);
         }
+        AppliedLoc = ApplyLoc;
+        AppliedRot = ApplyRot;
     }
     else
     {
@@ -721,16 +753,18 @@ TSharedPtr<FJsonObject> FSpirrowBridgePIECommands::HandleSetPIECamera(const TSha
         }
     }
 
-    // Read back actual final view
-    FVector FinalLoc;
-    FRotator FinalRot;
-    PC->GetPlayerViewPoint(FinalLoc, FinalRot);
-
+    // BUG fix 2026-04-26: Return the requested target loc/rot directly.
+    // GetPlayerViewPoint() / Pawn->GetActorLocation() right after SetActorLocationAndRotation
+    // can return the PRE-teleport position because pose updates lag a tick (movement
+    // component / physics interp). Returning AppliedLoc/Rot matches caller intent and
+    // is consistent with the pawn's state at the next frame.
     TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
-    AddVectorJsonField(Data, TEXT("location"), FinalLoc);
-    AddRotatorJsonField(Data, TEXT("rotation"), FinalRot);
+    AddVectorJsonField(Data, TEXT("location"), AppliedLoc);
+    AddRotatorJsonField(Data, TEXT("rotation"), AppliedRot);
+    AddVectorJsonField(Data, TEXT("previous_location"), PrevLoc);
+    AddRotatorJsonField(Data, TEXT("previous_rotation"), PrevRot);
     Data->SetBoolField(TEXT("debug_cam_toggled"), bUseDebugCam);
-    Data->SetBoolField(TEXT("pawn_teleported"), Pawn != nullptr);
+    Data->SetBoolField(TEXT("pawn_teleported"), bPawnTeleported);
     return FSpirrowBridgeCommonUtils::CreateSuccessResponse(Data);
 }
 TSharedPtr<FJsonObject> FSpirrowBridgePIECommands::HandleEnableDebugCam(const TSharedPtr<FJsonObject>&)

@@ -1,8 +1,8 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: v0.10.0 (PIE Control + Screenshot + Camera + Logs + visual diff)
+> **バージョン**: v0.10.0 (PIE Control + Screenshot + Camera + Logs + visual diff) + 2026-04-26 PIE screenshot/camera bug fixes
 > **ステータス**: Beta
-> **最終更新**: 2026-04-25
+> **最終更新**: 2026-04-26
 
 ---
 
@@ -298,7 +298,21 @@ generate_and_import_texture(
 
 ## 最新の更新
 
-### 2026-04-25: PIE Control + Screenshot + Camera + Logs + Visual Diff (v0.10.0) 🆕
+### 2026-04-26: v0.10.0 PIE bug fixes (3 件) 🐛
+
+spirrow-voxelworld の SeamOctree C5 修正の PIE 視覚検証中に発覚した 3 件のバグを修正。verification: `Python/tests/verify_bugfix_2026-04-26.py` で 3/3 PASS。
+
+| Bug | 原因 | Fix |
+|---|---|---|
+| **A** `take_pie_screenshot` が緑/黒 placeholder PNG を返す | `Viewport->ReadPixels` を render-thread 完了前に呼んでおり、フレーム描画前の clear color (sky atmosphere) を読んでいた | `Viewport->Draw()` + `FlushRenderingCommands()` を ReadPixels 直前に挟む。Build.cs に `RenderCore` モジュール依存追加 |
+| **B** `take_high_res_screenshot` の `filepath` 引数が無視され Saved/Screenshots/... に出力 | `Config.FilenameOverride =` を事前 set しても `HighResShot` の `ParseConsoleCommand` が起動時に `OutFilenameOverride.Reset()` で wipe (UE 5.7 `UnrealClient.cpp:2420-2426`) | コンソールコマンド自体に `filename=<path>` を埋め込む形に変更 (`HighResShot 2 filename=C:/path.png`)。`FParse::Value` で正しく拾われる |
+| **C** `set_pie_camera` の response location が teleport 前の値を返す | `SetActorLocationAndRotation` 直後の `GetPlayerViewPoint` / `Pawn->GetActorLocation` は前 tick の位置を返す (movement component 補間遅延) | response に caller の target loc/rot をそのまま返す。透明性確保のため `previous_location` / `previous_rotation` も付与。`pawn_teleported` も実際の戻り値ベースに修正 |
+
+**起源指示書**: `Docs/Prompts/BugFix/PIE_Screenshot_Render_Sync_Fix_Prompt.md`
+
+---
+
+### 2026-04-25: PIE Control + Screenshot + Camera + Logs + Visual Diff (v0.10.0)
 
 **起源**: 2026-04-25、spirrow-voxelworld の SeamOctree LOD 修正 (commit c21b9e7) を PIE で目視確認したかったが、UnrealWise には PIE 起動・カメラ操作・スクショ・ログ取得が無く、ユーザが手で Play を押す必要があった。これを完全自動化することで AI が「コード変更 → editor で PIE 起動 → カメラ位置決め → スクショ → ログ確認 → 視覚 regression check」までクローズドループで回せるようにする。
 

@@ -361,6 +361,7 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("resume_pie") ||
                      CommandType == TEXT("step_pie_frames") ||
                      CommandType == TEXT("take_pie_screenshot") ||
+                     CommandType == TEXT("take_pie_pov_screenshot") ||
                      CommandType == TEXT("take_high_res_screenshot") ||
                      CommandType == TEXT("get_pie_camera") ||
                      CommandType == TEXT("set_pie_camera") ||

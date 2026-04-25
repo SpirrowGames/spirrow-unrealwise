@@ -20,8 +20,9 @@ COMMANDS = {
     "resume_pie": "resume_pie",
     "step_pie_frames": "step_pie_frames",
 
-    # Camera + screenshot (4)
+    # Camera + screenshot (5)
     "take_pie_screenshot": "take_pie_screenshot",
+    "take_pie_pov_screenshot": "take_pie_pov_screenshot",
     "take_high_res_screenshot": "take_high_res_screenshot",
     "get_pie_camera": "get_pie_camera",
     "set_pie_camera": "set_pie_camera",
@@ -59,7 +60,8 @@ def register_pie_meta_tool(mcp: FastMCP):
         """PIE / runtime / log: Play-In-Editor lifecycle, camera, screenshot, console, logs.
 
         Commands: start_pie, stop_pie, get_pie_state, pause_pie, resume_pie, step_pie_frames,
-        take_pie_screenshot, take_high_res_screenshot, get_pie_camera, set_pie_camera,
+        take_pie_screenshot, take_pie_pov_screenshot, take_high_res_screenshot,
+        get_pie_camera, set_pie_camera,
         enable_debug_cam, disable_debug_cam, set_global_time_dilation,
         exec_console_command, simulate_pie_input,
         get_pie_actors, find_pie_actors_by_class, get_pie_actor_properties,
@@ -75,10 +77,18 @@ def register_pie_meta_tool(mcp: FastMCP):
 
         Capture (BUG fix 2026-04-26: render-thread sync via Viewport->Draw + FlushRenderingCommands
         ensures the latest frame is captured, not the stale back buffer / clear color):
-        - take_pie_screenshot: PNG of PIE viewport. params: {"filepath": "...png"}
+        - take_pie_screenshot: PNG of PIE GameViewport. params: {"filepath": "...png"}.
+          NOTE: in selected_viewport PIE mode the GameViewport is a non-displayed back
+          buffer and may return a clear-color placeholder. Use take_pie_pov_screenshot for
+          a guaranteed PIE-pawn-POV capture.
+        - take_pie_pov_screenshot: PNG from the PIE pawn's actual viewpoint, rendered via
+          an in-world ASceneCapture2D. Independent of viewport routing - works in any PIE
+          mode and reflects pawn teleports immediately.
+          params: {"filepath": "...png", "width": 1920, "height": 1080, "player_index": 0}
         - take_high_res_screenshot: HighResShot N - params: {"multiplier": 1-10, "filepath": optional}.
           filepath override is honored (passed inline as `filename=<path>` in the console cmd
           so HighResShot's ParseConsoleCommand picks it up - direct field assignment is wiped).
+          NOTE: HighResShot captures the active *editor* viewport, not the PIE pawn POV.
 
         Camera:
         - get_pie_camera / set_pie_camera: read/write player camera (location, rotation, fov).

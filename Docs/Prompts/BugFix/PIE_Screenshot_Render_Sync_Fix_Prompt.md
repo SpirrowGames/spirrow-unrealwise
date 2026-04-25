@@ -6,6 +6,123 @@
 > **対照**: `editor.take_screenshot` も editor viewport (level editor preview) を正常撮影
 > **影響**: PIE 中に多角度から visual regression 比較ができない (今は HighResShot でしか取れず file path 制御も効かない)
 
+---
+
+## 2026-04-26 02:00 1 回目修正後の追加検証で判明したより深い問題
+
+1 回目の修正 (Fix B/C) 完了後の 2 回目検証で、当初想定していなかった **より根本的な問題** を発見。
+
+### 1 回目修正の動作確認結果
+
+| Fix | 状態 | 確認 |
+|---|---|---|
+| **A) take_pie_screenshot の render sync** | ❌ **未効** | 修正後も `pie.take_pie_screenshot` は PIE viewport を映さず緑のまま。`FlushRenderingCommands` 1 行追加では足りない可能性 |
+| **B) take_high_res_screenshot filepath override** | ✅ 効いた | `C:/temp/foo.png` 指定通りに出力される |
+| **C) set_pie_camera response の location** | ✅ 効いた | target/previous 両方が response に含まれるようになった |
+
+### より深い問題: PIE pawn camera が screenshot に反映しない
+
+**現象** (2026-04-26 04:11 検証):
+- PIE 起動 + DefaultPawn を spawn
+- `set_pie_camera` で 3 つの異なる極端な位置に teleport: (3200,3200,5000) → (10000,10000,4000) → (-50000,-50000,10000)
+- 各位置で `pie.take_high_res_screenshot multiplier=1 filepath="C:/temp/v[1-3].png"` 実行
+- 結果: **3 枚とも視覚的に同一画像** (compare_screenshots で diff_pixel_pct=0.06%)
+- get_pie_camera で確認すると pawn は確かにその位置に居る
+
+**つまり**: HighResShot は PIE pawn の POV ではなく **editor viewport (level editor の固定カメラ)** を撮っている。`take_pie_screenshot` も同じく editor viewport 経由 (緑の placeholder は active viewport の clear color を読んでるだけ)。
+
+PIE 中に PIE pawn の POV を捕まえる経路が **MCP 経由では現状存在しない**。
+
+### 検証エビデンス
+| ファイル | 撮影位置 | 結果 |
+|---|---|---|
+| `C:/temp/c5_baseline/after_v1.png` | PIE pawn=(3200, 3200, 5000) rot=[-45,0,0] | terrain 見える |
+| `C:/temp/c5_baseline/after_v2.png` | PIE pawn=(10000, 10000, 4000) rot=[-30,-135,0] | **after_v1 と完全同一** |
+| `C:/temp/c5_baseline/after_v3.png` | PIE pawn=(6400, 0, 3500) rot=[-15,90,0] | **after_v1 と完全同一** |
+| `C:/temp/c5_baseline/test_far.png` | PIE pawn=(-50000,-50000,10000) rot=[-45,45,0] | **after_v1 と完全同一** (50km 離れても!) |
+
+→ 全部 editor viewport の固定 camera からの screenshot。PIE pawn 位置は無視されてる。
+
+### 真の root cause
+
+`HighResShot N` console コマンドは **active viewport** (`GEditor->GetActiveViewport()`) を render する。
+- PIE が `selected_viewport` モードで起動 → active viewport は editor の level viewport
+- だが UE 5.7 の最近の挙動として、PIE 中も level viewport の **editor camera** はそのまま (PIE pawn POV にはならない)
+- HighResShot はその editor camera の view を撮るので、PIE pawn 移動とは無関係
+
+`pie.take_pie_screenshot` の C++ 側はおそらく `GEditor->PlayWorld->GetGameViewport()->Viewport->ReadPixels` を呼んでるが、こちらの GameViewport は PIE 中も「画面に描画されない仮想 viewport」になってて、ReadPixels すると初期 clear color (緑) を返す。
+
+つまり **PIE の rendering 出力先が editor viewport ではなく非表示の back buffer** になっており、それを読むには別の経路が必要。
+
+### 修正方針 (推奨アプローチ)
+
+#### 案 1: `selected_viewport` モードで editor camera を PIE pawn に追従させる
+
+`start_pie` 後に `GLevelEditorModeTools().SetCamera(PawnLoc, PawnRot)` を毎フレーム呼ぶ、もしくは `FLevelEditorViewportClient::SetCameraToActor(PawnActor)` で actor 追従設定。
+
+これで level viewport の editor camera が PIE pawn を follow → HighResShot/editor.take_screenshot で PIE pawn POV を撮れる。
+
+#### 案 2: PIE を `new_window` モードで起動 + その window の captured texture を読む
+
+`FRequestPlaySessionParams::SessionDestination = NewProcess` で別 window 起動 → window handle から OS-level capture (Windows API `BitBlt` など) → かなり重い、推奨しない。
+
+#### 案 3: `SceneCapture2D` actor を PIE world に spawn して毎フレーム capture
+
+PIE world に SceneCapture2D actor を spawn (位置 = PIE pawn と同じ)、SceneCaptureComponent2D の output texture を `RenderTarget->ReadPixels` で読む。
+
+PIE pawn 移動に追従して capture actor も move、texture を PNG エンコードして file 出力。
+
+```cpp
+// 新コマンド: pie.take_pie_pov_screenshot
+// 内部実装:
+// 1. PIE world に ASceneCapture2D を spawn (1回のみ、static keep)
+// 2. capture component の TextureTarget を 1920x1080 程度の UTextureRenderTarget2D で create
+// 3. PIE pawn の location/rotation を read
+// 4. capture actor をその位置に teleport
+// 5. capture->CaptureScene() を呼んで render trigger
+// 6. FlushRenderingCommands()
+// 7. RenderTarget->GameThread_GetRenderTargetResource()->ReadPixels()
+// 8. PNG encode + save to filepath
+APlayerController* PC = UGameplayStatics::GetPlayerController(PIEWorld, 0);
+FVector ViewLoc; FRotator ViewRot;
+PC->GetPlayerViewPoint(ViewLoc, ViewRot);
+
+ASceneCapture2D* Capture = GetOrSpawnPIECaptureActor(PIEWorld);  // cached
+Capture->SetActorLocationAndRotation(ViewLoc, ViewRot);
+USceneCaptureComponent2D* Comp = Capture->GetCaptureComponent2D();
+Comp->FOVAngle = PC->PlayerCameraManager ? PC->PlayerCameraManager->GetFOVAngle() : 90.0f;
+Comp->TextureTarget = GetOrCreatePIECaptureRT(1920, 1080);  // cached UTextureRenderTarget2D
+Comp->CaptureScene();
+FlushRenderingCommands();
+
+// readback
+TArray<FColor> Bitmap;
+Comp->TextureTarget->GameThread_GetRenderTargetResource()->ReadPixels(Bitmap);
+// PNG 圧縮 + save
+```
+
+**利点**: PIE pawn POV を確実に取れる、headless 動作可能、HUD 等 game viewport 固有の overlay も入る (CaptureSource 設定で調整可)
+**欠点**: SceneCapture2D は post-process が異なる (TemporalAA 切れる等)、game viewport の HUD は写らない、初回 spawn コスト
+
+#### 案 4: PIE GameViewport の back buffer を直接 readback (要 RHI 知識)
+
+GameViewport が rendering している back buffer が `FViewport::GetSlateTextureRHIRef` 経由で取れるなら、そこから RHI readback。これは複雑なので case-by-case。
+
+### 推奨実装
+
+**案 3 (SceneCapture2D)** を `pie.take_pie_pov_screenshot` という新コマンドで追加。既存の `take_pie_screenshot` は editor viewport 撮影 (実質 `editor.take_screenshot` と同じ動作) として残し、新しい POV 専用コマンドで PIE pawn 視点を撮る。
+
+ユーザの操作的には:
+- `take_pie_pov_screenshot` → PIE pawn の POV
+- `take_pie_screenshot` → PIE 中の editor viewport (= editor.take_screenshot と etc.)
+- `take_high_res_screenshot` → HighResShot (editor viewport の高解像度版)
+
+### Phase B 視覚 regression 検証への影響
+
+spirrow-voxelworld の C5 修正視覚 diff は **`take_pie_pov_screenshot` 実装後にやり直す** 必要あり。現状の MCP では editor camera が固定なので、PIE 中の正しい POV diff が取れない。
+
+代替: editor 側で **`UVoxelEditorPreviewComponent`** が seam mesh を生成しているなら、editor viewport (PIE 不要) で diff 可能。要確認 (voxel 側コードで `BuildSeamMeshForChunk` が editor preview path から呼ばれてるか)。
+
 ## コンテキスト
 
 - **プロジェクト**: spirrow-unrealwise

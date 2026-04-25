@@ -19,7 +19,7 @@ def register_help_tool(mcp: FastMCP):
         """Get parameter docs for SpirrowBridge commands.
 
         Categories: editor, blueprint, blueprint_node, umg_widget, umg_layout,
-        umg_variable, umg_animation, project, ai, perception, eqs, gas, material, config
+        umg_variable, umg_animation, project, ai, perception, eqs, gas, material, config, pie
 
         Args:
             category: Tool category name

@@ -68,6 +68,7 @@
 #include "Commands/SpirrowBridgeAIPerceptionCommands.h"
 #include "Commands/SpirrowBridgeEQSCommands.h"
 #include "Commands/SpirrowBridgeLevelCommands.h"
+#include "Commands/SpirrowBridgePIECommands.h"
 
 // Default settings
 #define MCP_SERVER_HOST "127.0.0.1"
@@ -90,6 +91,7 @@ USpirrowBridge::USpirrowBridge()
     AIPerceptionCommands = MakeShared<FSpirrowBridgeAIPerceptionCommands>();
     EQSCommands = MakeShared<FSpirrowBridgeEQSCommands>();
     LevelCommands = MakeShared<FSpirrowBridgeLevelCommands>();
+    PIECommands = MakeShared<FSpirrowBridgePIECommands>();
 }
 
 USpirrowBridge::~USpirrowBridge()
@@ -109,6 +111,7 @@ USpirrowBridge::~USpirrowBridge()
     AIPerceptionCommands.Reset();
     EQSCommands.Reset();
     LevelCommands.Reset();
+    PIECommands.Reset();
 }
 
 // Initialize subsystem
@@ -333,7 +336,11 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("rename_asset") ||
                      CommandType == TEXT("spawn_blueprint_actor") ||
                      CommandType == TEXT("focus_viewport") ||
-                     CommandType == TEXT("take_screenshot"))
+                     CommandType == TEXT("take_screenshot") ||
+                     CommandType == TEXT("get_editor_camera") ||
+                     CommandType == TEXT("set_editor_camera") ||
+                     CommandType == TEXT("set_showflag") ||
+                     CommandType == TEXT("trigger_live_coding"))
             {
                 ResultJson = EditorCommands->HandleCommand(CommandType, Params);
             }
@@ -345,6 +352,35 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("set_world_properties"))
             {
                 ResultJson = LevelCommands->HandleCommand(CommandType, Params);
+            }
+            // PIE / runtime control / log access commands (v0.10.0)
+            else if (CommandType == TEXT("start_pie") ||
+                     CommandType == TEXT("stop_pie") ||
+                     CommandType == TEXT("get_pie_state") ||
+                     CommandType == TEXT("pause_pie") ||
+                     CommandType == TEXT("resume_pie") ||
+                     CommandType == TEXT("step_pie_frames") ||
+                     CommandType == TEXT("take_pie_screenshot") ||
+                     CommandType == TEXT("take_high_res_screenshot") ||
+                     CommandType == TEXT("get_pie_camera") ||
+                     CommandType == TEXT("set_pie_camera") ||
+                     CommandType == TEXT("enable_debug_cam") ||
+                     CommandType == TEXT("disable_debug_cam") ||
+                     CommandType == TEXT("exec_console_command") ||
+                     CommandType == TEXT("set_global_time_dilation") ||
+                     CommandType == TEXT("simulate_pie_input") ||
+                     CommandType == TEXT("get_pie_actors") ||
+                     CommandType == TEXT("find_pie_actors_by_class") ||
+                     CommandType == TEXT("get_pie_actor_properties") ||
+                     CommandType == TEXT("tail_ue_log") ||
+                     CommandType == TEXT("filter_ue_log") ||
+                     CommandType == TEXT("set_log_verbosity") ||
+                     CommandType == TEXT("get_ue_log_path") ||
+                     CommandType == TEXT("scan_ue_log_errors") ||
+                     CommandType == TEXT("search_ue_log") ||
+                     CommandType == TEXT("tail_editor_output_log"))
+            {
+                ResultJson = PIECommands->HandleCommand(CommandType, Params);
             }
             // Blueprint Commands
             else if (CommandType == TEXT("create_blueprint") ||

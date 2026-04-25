@@ -6,6 +6,7 @@ and importing them as textures into Unreal Engine.
 """
 
 import logging
+import math
 import os
 import json
 from typing import Dict, Any, Optional
@@ -566,5 +567,126 @@ def register_image_gen_tools(mcp: FastMCP):
                     "seed": gen_result.get("seed")
                 }
             }
+
+    @mcp.tool()
+    def compare_screenshots(
+        ctx: Context,
+        path_a: str,
+        path_b: str,
+        output_diff_path: Optional[str] = None,
+        threshold: int = 5,
+    ) -> Dict[str, Any]:
+        """
+        Compare two PNG screenshots pixel-by-pixel for visual regression testing.
+
+        Pure-Python (Pillow) image diff — does NOT round-trip through Unreal.
+        Useful for verifying screenshots taken via editor('take_screenshot') or
+        pie('take_pie_screenshot') match a saved baseline.
+
+        Args:
+            path_a: Path to first PNG
+            path_b: Path to second PNG
+            output_diff_path: Optional path to write a 4x-amplified diff visualization PNG.
+                If None, no diff image is written.
+            threshold: Per-pixel max-channel difference threshold (0-255) used to count
+                "differing" pixels. Pixels whose max(|R_a-R_b|, |G_a-G_b|, |B_a-B_b|)
+                is > threshold are counted as differing. Default 5 (catches anti-alias /
+                subtle changes; raise for noisier comparisons).
+
+        Returns:
+            Dict containing:
+            - success: bool
+            - dimensions_match: bool
+            - size: [width, height] (only when dimensions match)
+            - size_a / size_b: dimensions of each image (when they don't match)
+            - rms_error: root-mean-square error normalized to [0.0, 1.0]
+                (0.0 = identical, 1.0 = max possible)
+            - max_pixel_diff: largest single-channel difference observed (0-255)
+            - diff_pixel_pct: % of pixels exceeding threshold
+            - differing_pixels / total_pixels
+            - threshold_used
+            - diff_image_path: written if output_diff_path was supplied
+
+        Example:
+            # Compare PIE screenshot against baseline
+            compare_screenshots(
+                path_a="C:/temp/baseline_lod.png",
+                path_b="C:/temp/after_lod_fix.png",
+                output_diff_path="C:/temp/diff.png"
+            )
+            # → {"rms_error": 0.02, "diff_pixel_pct": 0.5, ...}
+        """
+        try:
+            from PIL import Image, ImageChops, ImageStat
+        except ImportError:
+            return {
+                "success": False,
+                "message": "Pillow not installed",
+                "hint": "Run: uv pip install Pillow  (or add Pillow to your environment)",
+            }
+
+        if not os.path.exists(path_a):
+            return {"success": False, "message": f"path_a not found: {path_a}"}
+        if not os.path.exists(path_b):
+            return {"success": False, "message": f"path_b not found: {path_b}"}
+
+        try:
+            img_a = Image.open(path_a).convert("RGB")
+            img_b = Image.open(path_b).convert("RGB")
+        except Exception as e:
+            return {"success": False, "message": f"Failed to open image: {e}"}
+
+        if img_a.size != img_b.size:
+            return {
+                "success": False,
+                "dimensions_match": False,
+                "size_a": list(img_a.size),
+                "size_b": list(img_b.size),
+                "message": "Images have different dimensions — cannot compare pixel-by-pixel",
+            }
+
+        # Per-pixel absolute channel difference
+        diff = ImageChops.difference(img_a, img_b)
+
+        # RMS over all channels (normalized to 0-1)
+        stat = ImageStat.Stat(diff)
+        total_pixels = img_a.size[0] * img_a.size[1]
+        sum_squared = sum(stat.sum2)  # sum of squared per-channel diffs across image
+        rms_normalized = math.sqrt(sum_squared / (total_pixels * 3)) / 255.0
+
+        # Per-pixel max channel diff -> grayscale image
+        r, g, b = diff.split()
+        max_chan = ImageChops.lighter(ImageChops.lighter(r, g), b)
+        hist = max_chan.histogram()  # 256-element list
+
+        differing = sum(hist[threshold + 1:])
+        max_pixel_diff = 0
+        for v in range(255, -1, -1):
+            if hist[v] > 0:
+                max_pixel_diff = v
+                break
+
+        result: Dict[str, Any] = {
+            "success": True,
+            "dimensions_match": True,
+            "size": list(img_a.size),
+            "rms_error": round(rms_normalized, 6),
+            "max_pixel_diff": max_pixel_diff,
+            "diff_pixel_pct": round((differing / total_pixels) * 100.0, 4),
+            "differing_pixels": differing,
+            "total_pixels": total_pixels,
+            "threshold_used": threshold,
+        }
+
+        if output_diff_path:
+            # 4x amplified visualization for easier inspection (clamp at 255)
+            amp = ImageChops.multiply(diff, Image.new("RGB", diff.size, (4, 4, 4)))
+            try:
+                amp.save(output_diff_path)
+                result["diff_image_path"] = output_diff_path
+            except Exception as e:
+                result["diff_image_save_error"] = str(e)
+
+        return result
 
     logger.info(f"AI Image Generation tools registered (AI_IMAGE_SERVER_URL: {AI_IMAGE_SERVER_URL})")

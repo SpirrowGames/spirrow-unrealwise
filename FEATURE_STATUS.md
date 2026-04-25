@@ -1,8 +1,8 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: v0.9.9 (Layout Polish — VBox/HBox slot property 対応 + get_widget_elements dedupe + IPC UTF-8 バグ修正)
+> **バージョン**: v0.10.0 (PIE Control + Screenshot + Camera + Logs + visual diff)
 > **ステータス**: Beta
-> **最終更新**: 2026-04-22
+> **最終更新**: 2026-04-25
 
 ---
 
@@ -27,15 +27,15 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 
 ## 機能サマリー
 
-### メタツール (14カテゴリ = 148コマンド)
+### メタツール (15カテゴリ = 178コマンド)
 
 | メタツール | 説明 | コマンド数 | 状態 |
 |-----------|------|-----------|------|
-| `editor` | Actor操作、トランスフォーム、プロパティ、レベル作成/保存/オープン、WorldSettings 🆕 | 17 | ✅ |
-| `blueprint` | BP作成、コンパイル、プロパティ、DataAsset (LSB対応) 🆕 | 21 | ✅ |
-| `blueprint_node` | イベント、関数、変数、フロー制御、数学 (LSB + 外部UPROPERTY + typed Subsystem) 🆕 | 24 | ✅ |
-| `umg_widget` | テキスト、画像、ボタン、スライダー、Border 等 (全て parent_name 対応 🆕 v0.9.7) | 18 | ✅ |
-| `umg_layout` | VBox/HBox、WidgetSwitcher、ScrollBox、リペアレント (reparent 整合性強化 🆕 v0.9.7) | 6 | ✅ |
+| `editor` | Actor操作、トランスフォーム、プロパティ、レベル、WorldSettings、Screenshot/Camera/Showflag/LiveCoding 🆕 v0.10.0 | 22 | ✅ |
+| `blueprint` | BP作成、コンパイル、プロパティ、DataAsset (LSB対応) | 21 | ✅ |
+| `blueprint_node` | イベント、関数、変数、フロー制御、数学 (LSB + 外部UPROPERTY + typed Subsystem) | 24 | ✅ |
+| `umg_widget` | テキスト、画像、ボタン、スライダー、Border 等 (全て parent_name 対応 v0.9.7) | 18 | ✅ |
+| `umg_layout` | VBox/HBox、WidgetSwitcher、ScrollBox、リペアレント (reparent 整合性強化 v0.9.7) | 6 | ✅ |
 | `umg_variable` | Widget変数、関数、イベント | 5 | ✅ |
 | `umg_animation` | アニメーション、トラック、キーフレーム | 4 | ✅ |
 | `project` | Input Mapping、アセット、フォルダ、テクスチャ | 13 | ✅ |
@@ -45,8 +45,9 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 | `gas` | Gameplay Tags、Effect、Ability | 8 | ✅ |
 | `material` | マテリアルテンプレート、作成 | 6 | ✅ |
 | `config` | Unreal Config読み書き | 3 | ✅ |
+| `pie` 🆕 v0.10.0 | PIE 起動/停止/状態、camera、screenshot、console exec、入力 simulation、PIE actor 列挙、ログ tail/filter/search/scan、Live Coding | 25 | ✅ |
 
-### スタンドアロンツール (10個 + 1 help)
+### スタンドアロンツール (11個 + 1 help)
 
 | ツール | 説明 | 状態 |
 |--------|------|------|
@@ -61,11 +62,12 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 | `get_ai_image_server_status` | AI画像サーバー状態 | ✅ |
 | `generate_image` | AI画像生成 | ✅ |
 | `generate_and_import_texture` | AI画像生成+UEインポート | ✅ |
+| `compare_screenshots` 🆕 v0.10.0 | 2 PNG の pixel diff (Pillow ベース、UE round-trip 不要) | ✅ |
 
 | | 数 |
 |---|---|
-| **MCP登録ツール合計** | **25** |
-| **内包コマンド合計** | **158** |
+| **MCP登録ツール合計** | **27** |
+| **内包コマンド合計** | **188** |
 
 ---
 
@@ -296,7 +298,74 @@ generate_and_import_texture(
 
 ## 最新の更新
 
-### 2026-04-22: Layout Polish — VBox/HBox Slot + get_widget_elements dedupe + IPC UTF-8 修正 (v0.9.9) 🆕
+### 2026-04-25: PIE Control + Screenshot + Camera + Logs + Visual Diff (v0.10.0) 🆕
+
+**起源**: 2026-04-25、spirrow-voxelworld の SeamOctree LOD 修正 (commit c21b9e7) を PIE で目視確認したかったが、UnrealWise には PIE 起動・カメラ操作・スクショ・ログ取得が無く、ユーザが手で Play を押す必要があった。これを完全自動化することで AI が「コード変更 → editor で PIE 起動 → カメラ位置決め → スクショ → ログ確認 → 視覚 regression check」までクローズドループで回せるようにする。
+
+**新規 `pie` メタツール (25 commands)**:
+| サブカテゴリ | コマンド | 説明 |
+|---|---|---|
+| Lifecycle | `start_pie` / `stop_pie` / `get_pie_state` / `pause_pie` / `resume_pie` / `step_pie_frames` | PIE 起動・停止・状態 (`GEditor->RequestPlaySession` / `RequestEndPlayMap` / `APlayerController::SetPause`)。`step_pie_frames` は `FCoreDelegates::OnEndFrame` listener で N フレーム後に自動再 pause |
+| Capture | `take_pie_screenshot` / `take_high_res_screenshot` | PIE viewport 明示的取得 (`GameViewportClient::Viewport`) / HighResShot N コマンド |
+| Camera | `get_pie_camera` / `set_pie_camera` | `APlayerController::GetPlayerViewPoint` / Pawn を `SetActorLocationAndRotation` で teleport (use_debug_cam=true で free-look) |
+| Debug Cam | `enable_debug_cam` / `disable_debug_cam` | `ToggleDebugCamera` console command |
+| Console | `exec_console_command` | `GEngine->Exec` + FOutputDevice subclass で出力 capture (Phase 2 完成形) |
+| Runtime | `set_global_time_dilation` / `simulate_pie_input` | `SetGlobalTimeDilation` / `APlayerController::InputKey(FInputKeyEventArgs)` で keyboard/mouse 発火 (press/release/tap) |
+| Introspection | `get_pie_actors` / `find_pie_actors_by_class` / `get_pie_actor_properties` | PIE world (`GEditor->PlayWorld`) の actor 列挙・class フィルタ・live property 読み取り |
+| Logs (disk) | `tail_ue_log` / `filter_ue_log` / `set_log_verbosity` / `get_ue_log_path` / `scan_ue_log_errors` / `search_ue_log` | `Saved/Logs/<Project>.log` の tail / category filter / runtime verbosity / 構造化 errors / keyword+severity+category 検索 |
+| Logs (in-memory) | `tail_editor_output_log` | カスタム `FOutputDevice` subscriber 経由で in-memory ring buffer (5000 行) を読む。disk flush 前のログが取れる |
+
+**`editor` メタツール拡張 (+5 commands)**:
+| コマンド | 内容 |
+|---|---|
+| `take_screenshot` | C++ 既存 (v0.8.7 から実装あり) を Python に expose 漏れ修正 |
+| `get_editor_camera` / `set_editor_camera` | active perspective viewport の camera 制御 (`FLevelEditorViewportClient::SetViewLocation/Rotation/ViewFOV` + `Invalidate()`) |
+| `set_showflag` | `showflag.<name> 0/1` console command の構造化 wrapper (target=editor/pie) |
+| `trigger_live_coding` | `ILiveCodingModule::Compile()` で AI 自身が C++ 編集後に hot reload (`IsEnabledForSession` / `IsCompiling` 事前チェック) |
+
+**新規スタンドアロン**:
+- `compare_screenshots` (Python `image_gen_tools.py`): 2 PNG の pixel diff。Pillow ベースで RMS / 差異 % / max diff / オプションで 4× 増幅 diff 画像出力。pure Python、UE round-trip 不要 — 視覚 regression test の核
+
+**新規ファイル**:
+- `Commands/SpirrowBridgePIECommands.h/.cpp` (約 900 行)
+- `Python/tools/pie_meta.py`
+
+**Build.cs 拡張**: editor build 限定 module を 3 つ追加 — `LevelEditor` (FLevelEditorViewportClient), `LiveCoding` (ILiveCodingModule), `OutputLog` (将来の OutputLogModule 統合用)
+
+**新規エラーコード**: 1700-1799 に 14 件 (PIENotRunning / PIEAlreadyRunning / PlayerControllerNotFound / PawnNotFound / ConsoleCommandFailed / HighResScreenshotFailed / LogFileNotAccessible / LogParseError / LiveCodingUnavailable / EditorViewportNotFound / InputKeyInvalid / FrameSteppingNotSupported / ShowFlagInvalid / PIEStartFailed)
+
+**コマンド数**: 158 → **188** (+30) / **MCP ツール数**: 25 → **27** (+2: pie meta + compare_screenshots)
+
+```python
+# End-to-end 統合シナリオ (起源の voxel SeamOctree 検証を題材に)
+editor("open_level", {"level_path": "/Game/Maps/Test_LOD"})
+editor("set_editor_camera", {"location": [3200, 3200, 8000], "rotation": [-45, 0, 0]})
+editor("take_screenshot", {"filepath": "C:/temp/before_pie.png"})
+
+pie("start_pie", {"spawn_at_player_start": True})
+# 1-2 秒待機後
+pie("get_pie_state")  # → {"state": "running"}
+
+pie("set_pie_camera", {"location": [0, 0, 5000], "rotation": [-30, 0, 0]})
+pie("exec_console_command", {"command": "voxel.show_chunk_borders 1"})
+pie("take_pie_screenshot", {"filepath": "C:/temp/after_lod_fix.png"})
+
+pie("search_ue_log", {"keyword": "SeamOctree", "lines": 200})
+# → {"lines": ["[2026.04.25-...]LogVoxel: ...", ...], ...}
+
+# 視覚 diff
+compare_screenshots(
+    path_a="C:/temp/baseline_lod.png",
+    path_b="C:/temp/after_lod_fix.png",
+    output_diff_path="C:/temp/diff.png"
+)  # → {"rms_error": 0.02, "diff_pixel_pct": 0.5, ...}
+
+pie("stop_pie")
+```
+
+---
+
+### 2026-04-22: Layout Polish — VBox/HBox Slot + get_widget_elements dedupe + IPC UTF-8 修正 (v0.9.9)
 
 **FR-2**: `set_widget_slot_property` が slot 型を動的ディスパッチ。CanvasPanelSlot だけでなく VerticalBoxSlot / HorizontalBoxSlot / OverlaySlot / BorderSlot / WidgetSwitcherSlot に対応。
 

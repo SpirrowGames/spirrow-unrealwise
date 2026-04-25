@@ -86,6 +86,25 @@ SpirrowBridge で使用されるエラーコード体系。
 | `FileWriteFailed` | 1601 | ファイル書き込み失敗 |
 | `FileReadFailed` | 1602 | ファイル読み取り失敗 |
 
+## PIE / Runtime / Logs (1700-1799) — v0.10.0
+
+| コード | 値 | 説明 |
+|--------|-----|------|
+| `PIENotRunning` | 1700 | PIE が起動していない (PlayWorld == nullptr) |
+| `PIEAlreadyRunning` | 1701 | PIE が既に起動中 (start_pie 二重呼び出し) |
+| `PIEStartFailed` | 1702 | PIE 起動失敗 |
+| `PlayerControllerNotFound` | 1703 | 指定 player_index に PlayerController が無い |
+| `PawnNotFound` | 1704 | PlayerController に Pawn が possessed されていない |
+| `ConsoleCommandFailed` | 1705 | exec_console_command の対象 World が無い等 |
+| `HighResScreenshotFailed` | 1706 | HighResShot 失敗 / World 不在 |
+| `LogFileNotAccessible` | 1707 | ログファイルが存在しない / 読めない |
+| `LogParseError` | 1708 | ログパース失敗 (search_ue_log の regex 不正等) |
+| `LiveCodingUnavailable` | 1709 | Live Coding モジュール未読み込み / 無効 / コンパイル中 |
+| `EditorViewportNotFound` | 1710 | active な perspective editor viewport が見つからない |
+| `InputKeyInvalid` | 1711 | simulate_pie_input の key 名が FKey として invalid |
+| `FrameSteppingNotSupported` | 1712 | step_pie_frames セッションが既に進行中 |
+| `ShowFlagInvalid` | 1713 | set_showflag の flag 名が engine に拒否された |
+
 ---
 
 ## 使用例

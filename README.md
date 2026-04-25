@@ -9,17 +9,17 @@
 
 An MCP (Model Context Protocol) server that bridges AI assistants (Claude) with Unreal Engine 5. Control Blueprints, design levels, create UI, and build AI systems using natural language.
 
-## Features (25 MCP Tools / 157 Commands)
+## Features (27 MCP Tools / 188 Commands)
 
 Since **v0.9.1**, all tools are consolidated into **meta-tools** for dramatically reduced context usage (~170K → ~22K tokens).
 
 | Meta-Tool | Commands | Description |
 |-----------|----------|-------------|
-| `editor` | 17 | Spawn, transform, properties, components, level (.umap) create/save/open, WorldSettings 🆕 |
-| `blueprint` | 21 | Create, compile, properties, DataAsset (Level BP support) 🆕 |
-| `blueprint_node` | 24 | Event nodes, functions, variables, flow control (Level BP + external UPROPERTY + typed Subsystem) 🆕 |
-| `umg_widget` | 18 | Text, image, button, slider, etc. |
-| `umg_layout` | 5 | VBox/HBox, ScrollBox, reparent |
+| `editor` | 22 | Spawn, transform, properties, level (.umap) lifecycle, WorldSettings, screenshot, viewport camera, show flag, Live Coding 🆕 v0.10.0 |
+| `blueprint` | 21 | Create, compile, properties, DataAsset (Level BP support) |
+| `blueprint_node` | 24 | Event nodes, functions, variables, flow control (Level BP + external UPROPERTY + typed Subsystem) |
+| `umg_widget` | 18 | Text, image, button, slider, Border, etc. (all support `parent_name`) |
+| `umg_layout` | 6 | VBox/HBox, WidgetSwitcher, ScrollBox, reparent (slot-type-aware property dispatch) |
 | `umg_variable` | 5 | Widget variables, functions, events |
 | `umg_animation` | 4 | Animations, tracks, keyframes |
 | `project` | 13 | Input Mapping, assets, folders, textures |
@@ -29,8 +29,9 @@ Since **v0.9.1**, all tools are consolidated into **meta-tools** for dramaticall
 | `gas` | 8 | GameplayTags, Effects, Abilities |
 | `material` | 6 | Template-based material creation |
 | `config` | 3 | INI file read/write |
+| `pie` 🆕 v0.10.0 | 25 | PIE start/stop/state, camera, screenshot, console exec, input simulation, PIE actor introspection, log tail/filter/search/scan, frame stepping |
 
-**+ 10 standalone tools**: RAG (4), AI Image (3), Project Context (2), Related Nodes (1)
+**+ 11 standalone tools**: RAG (4), AI Image (3) + `compare_screenshots` 🆕 v0.10.0, Project Context (2), Related Nodes (1)
 
 > See [FEATURE_STATUS.md](FEATURE_STATUS.md) for detailed feature documentation.
 
@@ -112,7 +113,7 @@ Add to your `claude_desktop_config.json`:
 spirrow-unrealwise/
 ├── Python/                    # MCP Server
 │   ├── unreal_mcp_server.py   # Main server entry
-│   ├── tools/                 # Tool definitions (14 meta + standalone)
+│   ├── tools/                 # Tool definitions (15 meta + standalone)
 │   └── tests/                 # Test suite
 ├── MCPGameProject/Plugins/    # UE Plugin
 │   └── SpirrowBridge/         # Editor module
@@ -145,6 +146,24 @@ See [Docs/PATTERNS.md](Docs/PATTERNS.md) for implementation patterns and guideli
 ---
 
 ## Version History
+
+**v0.10.0 (Beta)** - 2026-04-25
+- New `pie` meta-tool: 25 commands for PIE lifecycle, camera, screenshot, console exec, input simulation, runtime actor introspection, and log access (tail / filter / search / scan / in-memory ring buffer)
+- `editor` extended +5: `take_screenshot` (Python expose fix), `get_editor_camera` / `set_editor_camera`, `set_showflag`, `trigger_live_coding`
+- New standalone `compare_screenshots` (Pillow-based pixel diff for visual regression testing)
+- Error codes 1700-1799 reserved for PIE/Runtime
+- Total: 158 → **188 commands**, 25 → **27 MCP tools**
+
+**v0.9.6 - v0.9.9 (Beta)** - 2026-04-21 to 2026-04-22
+- v0.9.6 UMG Extensions: `add_widget_switcher_to_widget`, `add_border_to_widget`, explicit anchors (`anchor_min` / `anchor_max` / `offset_*`), `parent_class` generalization
+- v0.9.7 Reparent Safety: BUG-1 (double-parent) + BUG-5 (`FindWidget` last-match) fixes; all 9 leaf widget commands now accept optional `parent_name`
+- v0.9.8 Property Value: `set_widget_element_property.property_value` accepts non-string types (LinearColor / FMargin / FVector / Class / Object) directly
+- v0.9.9 Layout Polish: VBox/HBox/Overlay/Border/WidgetSwitcher slot dispatch, `get_widget_elements` dedupe + `duplicate_names` detection, IPC UTF-8 boundary 3-point fix
+
+**v0.9.3 - v0.9.5 (Beta)** - 2026-04-12 to 2026-04-17
+- v0.9.3 Level Blueprint + external UPROPERTY + typed Subsystem nodes (`add_external_property_set/get_node`, `add_get_subsystem_node`, Class/Object pin support in `set_node_pin_value`)
+- v0.9.4 Level lifecycle: `create_level`, `save_current_level`, `open_level`
+- v0.9.5 WorldSettings: `get_world_settings`, `set_world_properties` with curated 9-property preset
 
 **v0.9.2 (Beta)** - 2026-03-13
 - BT node robustness: null pointer guards on all BT node creation

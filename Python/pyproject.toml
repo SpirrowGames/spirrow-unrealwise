@@ -13,7 +13,8 @@ dependencies = [
   "pydantic>=2.10.0",
   "requests",
   "httpx>=0.25.0",
-  "python-dotenv>=1.0.0"
+  "python-dotenv>=1.0.0",
+  "Pillow>=10.0.0"
 ]
 
 [project.optional-dependencies]

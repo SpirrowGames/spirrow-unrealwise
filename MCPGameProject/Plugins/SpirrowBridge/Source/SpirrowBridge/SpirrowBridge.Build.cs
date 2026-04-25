@@ -72,10 +72,13 @@ public class SpirrowBridge : ModuleRules
 			PrivateDependencyModuleNames.AddRange(
 				new string[]
 				{
-					"PropertyEditor",      // For widget property editing
-					"ToolMenus",           // For editor UI
+					"PropertyEditor",         // For widget property editing
+					"ToolMenus",              // For editor UI
 					"BlueprintEditorLibrary", // For Blueprint utilities
-					"UMGEditor"           // For WidgetBlueprint.h and other UMG editor functionality
+					"UMGEditor",              // For WidgetBlueprint.h and other UMG editor functionality
+					"LevelEditor",            // For FLevelEditorViewportClient (editor camera control, v0.10.0)
+					"LiveCoding",             // For ILiveCodingModule (trigger_live_coding, v0.10.0)
+					"OutputLog"               // For FOutputLogModule (tail_editor_output_log, v0.10.0)
 				}
 			);
 		}

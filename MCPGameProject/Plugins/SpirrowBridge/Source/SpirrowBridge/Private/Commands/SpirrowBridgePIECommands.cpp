@@ -637,6 +637,20 @@ TSharedPtr<FJsonObject> FSpirrowBridgePIECommands::HandleTakePIEPOVScreenshot(co
     Comp->bAlwaysPersistRenderingState = true;
     Comp->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
 
+    // Explicit ShowFlags — observed in VoxelWorldHost (UProceduralMeshComponent)
+    // that defaults render the mesh as wireframe + green tint. Per ue-investigator
+    // (Q1_SceneCapture_Investigation_Result.md), the most likely cause is that the
+    // defaults get overridden somewhere in the project / view path. Setting these
+    // explicitly per-call insulates us from upstream toggles.
+    FEngineShowFlags& Flags = Comp->ShowFlags;
+    Flags.SetMaterials(true);
+    Flags.SetLighting(true);
+    Flags.SetWireframe(false);            // critical — guards against the wireframe symptom
+    Flags.SetFog(true);
+    Flags.SetAtmosphere(true);
+    Flags.SetMotionBlur(false);           // recommended OFF for SceneCapture
+    Flags.SetSeparateTranslucency(false);
+
     // Re-create RT only if size changed (saves GPU realloc).
     UTextureRenderTarget2D* RT = Cast<UTextureRenderTarget2D>(Comp->TextureTarget);
     if (!RT || RT->SizeX != Width || RT->SizeY != Height)

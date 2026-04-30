@@ -1834,6 +1834,20 @@ bool FSpirrowBridgeCommonUtils::SetStructPropertyValue(void* StructAddr, FStruct
     UE_LOG(LogTemp, Display, TEXT("SetStructPropertyValue: Processing struct type '%s'"), *StructName);
 
     // ============================================
+    // String input — try ImportText_Direct first (UE text format e.g. "(X=1,Y=0,Z=0)")
+    // Skipped for FBlackboardKeySelector which has custom string semantics handled below.
+    // ============================================
+    if (Value->Type == EJson::String && StructName != TEXT("BlackboardKeySelector"))
+    {
+        if (StructProp->ImportText_Direct(*Value->AsString(), StructAddr, nullptr, PPF_None))
+        {
+            UE_LOG(LogTemp, Display, TEXT("Set struct '%s' via ImportText_Direct from string"), *StructName);
+            return true;
+        }
+        // Fall through — let named handlers / generic try if ImportText_Direct didn't claim it
+    }
+
+    // ============================================
     // Handle FBlackboardKeySelector (BehaviorTree)
     // ============================================
     if (StructName == TEXT("BlackboardKeySelector"))
@@ -1901,6 +1915,60 @@ bool FSpirrowBridgeCommonUtils::SetStructPropertyValue(void* StructAddr, FStruct
             return true;
         }
         OutErrorMessage = TEXT("FVector requires an array [X, Y, Z] or object {X, Y, Z}");
+        return false;
+    }
+    // ============================================
+    // Handle FIntVector
+    // ============================================
+    else if (StructName == TEXT("IntVector"))
+    {
+        FIntVector* IntVecPtr = static_cast<FIntVector*>(StructAddr);
+        if (Value->Type == EJson::Array)
+        {
+            const TArray<TSharedPtr<FJsonValue>>& Arr = Value->AsArray();
+            if (Arr.Num() >= 3)
+            {
+                IntVecPtr->X = static_cast<int32>(Arr[0]->AsNumber());
+                IntVecPtr->Y = static_cast<int32>(Arr[1]->AsNumber());
+                IntVecPtr->Z = static_cast<int32>(Arr[2]->AsNumber());
+                return true;
+            }
+        }
+        else if (Value->Type == EJson::Object)
+        {
+            const TSharedPtr<FJsonObject>& Obj = Value->AsObject();
+            if (Obj->HasField(TEXT("X"))) IntVecPtr->X = static_cast<int32>(Obj->GetNumberField(TEXT("X")));
+            if (Obj->HasField(TEXT("Y"))) IntVecPtr->Y = static_cast<int32>(Obj->GetNumberField(TEXT("Y")));
+            if (Obj->HasField(TEXT("Z"))) IntVecPtr->Z = static_cast<int32>(Obj->GetNumberField(TEXT("Z")));
+            return true;
+        }
+        OutErrorMessage = TEXT("FIntVector requires array [X,Y,Z] or object {X,Y,Z}");
+        return false;
+    }
+    // ============================================
+    // Handle FIntPoint
+    // ============================================
+    else if (StructName == TEXT("IntPoint"))
+    {
+        FIntPoint* IntPtPtr = static_cast<FIntPoint*>(StructAddr);
+        if (Value->Type == EJson::Array)
+        {
+            const TArray<TSharedPtr<FJsonValue>>& Arr = Value->AsArray();
+            if (Arr.Num() >= 2)
+            {
+                IntPtPtr->X = static_cast<int32>(Arr[0]->AsNumber());
+                IntPtPtr->Y = static_cast<int32>(Arr[1]->AsNumber());
+                return true;
+            }
+        }
+        else if (Value->Type == EJson::Object)
+        {
+            const TSharedPtr<FJsonObject>& Obj = Value->AsObject();
+            if (Obj->HasField(TEXT("X"))) IntPtPtr->X = static_cast<int32>(Obj->GetNumberField(TEXT("X")));
+            if (Obj->HasField(TEXT("Y"))) IntPtPtr->Y = static_cast<int32>(Obj->GetNumberField(TEXT("Y")));
+            return true;
+        }
+        OutErrorMessage = TEXT("FIntPoint requires array [X,Y] or object {X,Y}");
         return false;
     }
     // ============================================
@@ -2221,6 +2289,18 @@ bool FSpirrowBridgeCommonUtils::SetStructPropertyValue(void* StructAddr, FStruct
         return bSuccess;
     }
 
+    // ============================================
+    // Final fallback — try ImportText_Direct on any remaining input
+    // (handles non-named structs with array/object input that don't match named cases)
+    // ============================================
+    if (Value->Type == EJson::String)
+    {
+        if (StructProp->ImportText_Direct(*Value->AsString(), StructAddr, nullptr, PPF_None))
+        {
+            return true;
+        }
+    }
+
     OutErrorMessage = FString::Printf(TEXT("Struct type '%s' requires a JSON object for field mapping"), *StructName);
     return false;
 }
@@ -2244,44 +2324,365 @@ bool FSpirrowBridgeCommonUtils::SetStructFieldValue(void* StructAddr, UScriptStr
     }
 
     void* PropertyAddr = Property->ContainerPtrToValuePtr<void>(StructAddr);
+    return SetPropertyValueAtAddress(Property, PropertyAddr, Value, OutErrorMessage);
+}
 
-    // Handle basic types
+bool FSpirrowBridgeCommonUtils::SetPropertyValueAtAddress(FProperty* Property, void* PropertyAddr,
+                                                          const TSharedPtr<FJsonValue>& Value,
+                                                          FString& OutErrorMessage)
+{
+    if (!Property || !PropertyAddr || !Value.IsValid())
+    {
+        OutErrorMessage = TEXT("Invalid property, address, or JSON value");
+        return false;
+    }
+
+    // ============================================
+    // FBoolProperty
+    // ============================================
     if (FBoolProperty* BoolProp = CastField<FBoolProperty>(Property))
     {
-        BoolProp->SetPropertyValue(PropertyAddr, Value->AsBool());
+        BoolProp->SetPropertyValue(PropertyAddr,
+            Value->Type == EJson::Boolean ? Value->AsBool() :
+            Value->Type == EJson::Number ? (Value->AsNumber() != 0.0) :
+            Value->AsString().ToBool());
         return true;
     }
-    else if (FIntProperty* IntProp = CastField<FIntProperty>(Property))
+    // ============================================
+    // Numeric properties (Int/UInt/Float/Double, including Int64/UInt64)
+    // ============================================
+    if (FByteProperty* ByteProp = CastField<FByteProperty>(Property))
     {
-        IntProp->SetPropertyValue(PropertyAddr, static_cast<int32>(Value->AsNumber()));
+        UEnum* EnumDef = ByteProp->GetIntPropertyEnum();
+        if (EnumDef && Value->Type == EJson::String)
+        {
+            FString EnumStr = Value->AsString();
+            if (EnumStr.Contains(TEXT("::"))) EnumStr.Split(TEXT("::"), nullptr, &EnumStr);
+            int64 EnumVal = EnumDef->GetValueByNameString(EnumStr);
+            if (EnumVal == INDEX_NONE) EnumVal = EnumDef->GetValueByNameString(Value->AsString());
+            if (EnumVal == INDEX_NONE)
+            {
+                OutErrorMessage = FString::Printf(TEXT("Unknown enum value '%s' for %s"),
+                    *Value->AsString(), *EnumDef->GetName());
+                return false;
+            }
+            ByteProp->SetPropertyValue(PropertyAddr, static_cast<uint8>(EnumVal));
+            return true;
+        }
+        ByteProp->SetPropertyValue(PropertyAddr, static_cast<uint8>(Value->AsNumber()));
         return true;
     }
-    else if (FFloatProperty* FloatProp = CastField<FFloatProperty>(Property))
+    if (FEnumProperty* EnumProp = CastField<FEnumProperty>(Property))
     {
-        FloatProp->SetPropertyValue(PropertyAddr, static_cast<float>(Value->AsNumber()));
+        UEnum* EnumDef = EnumProp->GetEnum();
+        FNumericProperty* Underlying = EnumProp->GetUnderlyingProperty();
+        if (!EnumDef || !Underlying)
+        {
+            OutErrorMessage = FString::Printf(TEXT("Invalid enum metadata for %s"), *Property->GetName());
+            return false;
+        }
+        if (Value->Type == EJson::String)
+        {
+            FString EnumStr = Value->AsString();
+            if (EnumStr.IsNumeric())
+            {
+                Underlying->SetIntPropertyValue(PropertyAddr, FCString::Atoi64(*EnumStr));
+                return true;
+            }
+            if (EnumStr.Contains(TEXT("::"))) EnumStr.Split(TEXT("::"), nullptr, &EnumStr);
+            int64 EnumVal = EnumDef->GetValueByNameString(EnumStr);
+            if (EnumVal == INDEX_NONE) EnumVal = EnumDef->GetValueByNameString(Value->AsString());
+            if (EnumVal == INDEX_NONE)
+            {
+                OutErrorMessage = FString::Printf(TEXT("Unknown enum value '%s' for %s"),
+                    *Value->AsString(), *EnumDef->GetName());
+                return false;
+            }
+            Underlying->SetIntPropertyValue(PropertyAddr, EnumVal);
+            return true;
+        }
+        Underlying->SetIntPropertyValue(PropertyAddr, static_cast<int64>(Value->AsNumber()));
         return true;
     }
-    else if (FDoubleProperty* DoubleProp = CastField<FDoubleProperty>(Property))
+    if (FNumericProperty* NumericProp = CastField<FNumericProperty>(Property))
     {
-        DoubleProp->SetPropertyValue(PropertyAddr, Value->AsNumber());
+        // Covers Int8/16/32/64, UInt8/16/32/64, Float, Double (those not handled above)
+        if (NumericProp->IsFloatingPoint())
+        {
+            NumericProp->SetFloatingPointPropertyValue(PropertyAddr, Value->AsNumber());
+        }
+        else
+        {
+            NumericProp->SetIntPropertyValue(PropertyAddr, static_cast<int64>(Value->AsNumber()));
+        }
         return true;
     }
-    else if (FStrProperty* StrProp = CastField<FStrProperty>(Property))
+    // ============================================
+    // String / Name / Text
+    // ============================================
+    if (FStrProperty* StrProp = CastField<FStrProperty>(Property))
     {
         StrProp->SetPropertyValue(PropertyAddr, Value->AsString());
         return true;
     }
-    else if (FNameProperty* NameProp = CastField<FNameProperty>(Property))
+    if (FNameProperty* NameProp = CastField<FNameProperty>(Property))
     {
         NameProp->SetPropertyValue(PropertyAddr, FName(*Value->AsString()));
         return true;
     }
-    else if (FStructProperty* NestedStructProp = CastField<FStructProperty>(Property))
+    if (FTextProperty* TextProp = CastField<FTextProperty>(Property))
     {
-        // Recursive struct handling
-        return SetStructPropertyValue(PropertyAddr, NestedStructProp, Value, OutErrorMessage);
+        TextProp->SetPropertyValue(PropertyAddr, FText::FromString(Value->AsString()));
+        return true;
+    }
+    // ============================================
+    // Object refs — check derived (Class/SoftObject) BEFORE base (Object)
+    // ============================================
+    if (FClassProperty* ClassProp = CastField<FClassProperty>(Property))
+    {
+        if (Value->Type == EJson::Null)
+        {
+            ClassProp->SetObjectPropertyValue(PropertyAddr, nullptr);
+            return true;
+        }
+        if (Value->Type != EJson::String)
+        {
+            OutErrorMessage = FString::Printf(TEXT("Class property %s requires string class path or null"), *Property->GetName());
+            return false;
+        }
+        FString ClassPath = Value->AsString();
+        if (ClassPath.IsEmpty() || ClassPath.Equals(TEXT("None"), ESearchCase::IgnoreCase) ||
+            ClassPath.Equals(TEXT("null"), ESearchCase::IgnoreCase) ||
+            ClassPath.Equals(TEXT("nullptr"), ESearchCase::IgnoreCase))
+        {
+            ClassProp->SetObjectPropertyValue(PropertyAddr, nullptr);
+            return true;
+        }
+        UClass* LoadedClass = LoadClass<UObject>(nullptr, *ClassPath);
+        if (!LoadedClass)
+        {
+            UObject* AssetObj = UEditorAssetLibrary::LoadAsset(ClassPath);
+            if (UBlueprint* BP = Cast<UBlueprint>(AssetObj))
+            {
+                LoadedClass = BP->GeneratedClass;
+            }
+            else if (UClass* DirectClass = Cast<UClass>(AssetObj))
+            {
+                LoadedClass = DirectClass;
+            }
+        }
+        if (!LoadedClass && !ClassPath.Contains(TEXT(".")))
+        {
+            FString AssetName = FPaths::GetCleanFilename(ClassPath);
+            FString AltPath = ClassPath + TEXT(".") + AssetName;
+            UObject* AssetObj = UEditorAssetLibrary::LoadAsset(AltPath);
+            if (UBlueprint* BP = Cast<UBlueprint>(AssetObj))
+            {
+                LoadedClass = BP->GeneratedClass;
+            }
+        }
+        if (!LoadedClass)
+        {
+            OutErrorMessage = FString::Printf(TEXT("Failed to load class for %s: %s"), *Property->GetName(), *ClassPath);
+            return false;
+        }
+        if (!LoadedClass->IsChildOf(ClassProp->MetaClass))
+        {
+            OutErrorMessage = FString::Printf(TEXT("Class %s is not a child of expected MetaClass %s"),
+                *LoadedClass->GetName(), *ClassProp->MetaClass->GetName());
+            return false;
+        }
+        ClassProp->SetObjectPropertyValue(PropertyAddr, LoadedClass);
+        return true;
+    }
+    if (FSoftObjectProperty* SoftObjProp = CastField<FSoftObjectProperty>(Property))
+    {
+        if (Value->Type == EJson::Null)
+        {
+            SoftObjProp->SetPropertyValue(PropertyAddr, FSoftObjectPtr());
+            return true;
+        }
+        if (Value->Type != EJson::String)
+        {
+            OutErrorMessage = FString::Printf(TEXT("Soft object property %s requires string asset path or null"), *Property->GetName());
+            return false;
+        }
+        FString AssetPath = Value->AsString();
+        if (AssetPath.IsEmpty() || AssetPath.Equals(TEXT("None"), ESearchCase::IgnoreCase) ||
+            AssetPath.Equals(TEXT("null"), ESearchCase::IgnoreCase) ||
+            AssetPath.Equals(TEXT("nullptr"), ESearchCase::IgnoreCase))
+        {
+            SoftObjProp->SetPropertyValue(PropertyAddr, FSoftObjectPtr());
+            return true;
+        }
+        SoftObjProp->SetPropertyValue(PropertyAddr, FSoftObjectPtr(FSoftObjectPath(AssetPath)));
+        return true;
+    }
+    if (FObjectProperty* ObjectProp = CastField<FObjectProperty>(Property))
+    {
+        if (Value->Type == EJson::Null)
+        {
+            ObjectProp->SetObjectPropertyValue(PropertyAddr, nullptr);
+            return true;
+        }
+        if (Value->Type != EJson::String)
+        {
+            OutErrorMessage = FString::Printf(TEXT("Object property %s requires string asset path or null"), *Property->GetName());
+            return false;
+        }
+        FString AssetPath = Value->AsString();
+        if (AssetPath.IsEmpty() || AssetPath.Equals(TEXT("None"), ESearchCase::IgnoreCase) ||
+            AssetPath.Equals(TEXT("null"), ESearchCase::IgnoreCase) ||
+            AssetPath.Equals(TEXT("nullptr"), ESearchCase::IgnoreCase))
+        {
+            ObjectProp->SetObjectPropertyValue(PropertyAddr, nullptr);
+            return true;
+        }
+        UObject* LoadedAsset = UEditorAssetLibrary::LoadAsset(AssetPath);
+        if (!LoadedAsset && !AssetPath.Contains(TEXT(".")))
+        {
+            FString AssetName = FPaths::GetCleanFilename(AssetPath);
+            LoadedAsset = UEditorAssetLibrary::LoadAsset(AssetPath + TEXT(".") + AssetName);
+        }
+        if (!LoadedAsset)
+        {
+            // Last resort: try StaticLoadObject with property's expected class
+            LoadedAsset = StaticLoadObject(ObjectProp->PropertyClass, nullptr, *AssetPath);
+        }
+        if (!LoadedAsset)
+        {
+            OutErrorMessage = FString::Printf(TEXT("Failed to load asset for %s: %s"), *Property->GetName(), *AssetPath);
+            return false;
+        }
+        if (!LoadedAsset->IsA(ObjectProp->PropertyClass))
+        {
+            OutErrorMessage = FString::Printf(TEXT("Asset %s is not a %s"),
+                *LoadedAsset->GetName(), *ObjectProp->PropertyClass->GetName());
+            return false;
+        }
+        ObjectProp->SetObjectPropertyValue(PropertyAddr, LoadedAsset);
+        return true;
+    }
+    // ============================================
+    // FStructProperty — recurse via SetStructPropertyValue
+    // ============================================
+    if (FStructProperty* StructProp = CastField<FStructProperty>(Property))
+    {
+        return SetStructPropertyValue(PropertyAddr, StructProp, Value, OutErrorMessage);
+    }
+    // ============================================
+    // FArrayProperty — recurse on each element
+    // ============================================
+    if (FArrayProperty* ArrayProp = CastField<FArrayProperty>(Property))
+    {
+        if (Value->Type != EJson::Array)
+        {
+            // Allow string fallback via ImportText_Direct (e.g. "(1,2,3)")
+            if (Value->Type == EJson::String)
+            {
+                if (ArrayProp->ImportText_Direct(*Value->AsString(), PropertyAddr, nullptr, PPF_None))
+                {
+                    return true;
+                }
+            }
+            OutErrorMessage = FString::Printf(TEXT("Array property %s requires a JSON array"), *Property->GetName());
+            return false;
+        }
+        const TArray<TSharedPtr<FJsonValue>>& JsonArray = Value->AsArray();
+        FScriptArrayHelper ArrayHelper(ArrayProp, PropertyAddr);
+        ArrayHelper.EmptyAndAddValues(JsonArray.Num());
+        for (int32 i = 0; i < JsonArray.Num(); ++i)
+        {
+            void* ElemAddr = ArrayHelper.GetRawPtr(i);
+            FString ElemError;
+            if (!SetPropertyValueAtAddress(ArrayProp->Inner, ElemAddr, JsonArray[i], ElemError))
+            {
+                OutErrorMessage = FString::Printf(TEXT("Array %s[%d]: %s"),
+                    *Property->GetName(), i, *ElemError);
+                return false;
+            }
+        }
+        return true;
+    }
+    // ============================================
+    // FMapProperty — recurse on each key/value
+    // ============================================
+    if (FMapProperty* MapProp = CastField<FMapProperty>(Property))
+    {
+        if (Value->Type != EJson::Object)
+        {
+            OutErrorMessage = FString::Printf(TEXT("Map property %s requires a JSON object"), *Property->GetName());
+            return false;
+        }
+        const TSharedPtr<FJsonObject>& MapObj = Value->AsObject();
+        FScriptMapHelper MapHelper(MapProp, PropertyAddr);
+        MapHelper.EmptyValues();
+        for (const auto& Pair : MapObj->Values)
+        {
+            int32 NewIdx = MapHelper.AddDefaultValue_Invalid_NeedsRehash();
+            uint8* KeyAddr = MapHelper.GetKeyPtr(NewIdx);
+            uint8* ValAddr = MapHelper.GetValuePtr(NewIdx);
+            // Set key (must be a string-coercible type — wrap key as JSON string)
+            TSharedPtr<FJsonValue> KeyJson = MakeShared<FJsonValueString>(Pair.Key);
+            FString KeyError;
+            if (!SetPropertyValueAtAddress(MapProp->KeyProp, KeyAddr, KeyJson, KeyError))
+            {
+                OutErrorMessage = FString::Printf(TEXT("Map %s key '%s': %s"),
+                    *Property->GetName(), *Pair.Key, *KeyError);
+                return false;
+            }
+            // Set value (recursive)
+            FString ValError;
+            if (!SetPropertyValueAtAddress(MapProp->ValueProp, ValAddr, Pair.Value, ValError))
+            {
+                OutErrorMessage = FString::Printf(TEXT("Map %s['%s']: %s"),
+                    *Property->GetName(), *Pair.Key, *ValError);
+                return false;
+            }
+        }
+        MapHelper.Rehash();
+        return true;
+    }
+    // ============================================
+    // FSetProperty — recurse on each element
+    // ============================================
+    if (FSetProperty* SetProp = CastField<FSetProperty>(Property))
+    {
+        if (Value->Type != EJson::Array)
+        {
+            OutErrorMessage = FString::Printf(TEXT("Set property %s requires a JSON array"), *Property->GetName());
+            return false;
+        }
+        const TArray<TSharedPtr<FJsonValue>>& JsonArray = Value->AsArray();
+        FScriptSetHelper SetHelper(SetProp, PropertyAddr);
+        SetHelper.EmptyElements();
+        for (int32 i = 0; i < JsonArray.Num(); ++i)
+        {
+            int32 NewIdx = SetHelper.AddDefaultValue_Invalid_NeedsRehash();
+            uint8* ElemAddr = SetHelper.GetElementPtr(NewIdx);
+            FString ElemError;
+            if (!SetPropertyValueAtAddress(SetProp->ElementProp, ElemAddr, JsonArray[i], ElemError))
+            {
+                OutErrorMessage = FString::Printf(TEXT("Set %s[%d]: %s"),
+                    *Property->GetName(), i, *ElemError);
+                return false;
+            }
+        }
+        SetHelper.Rehash();
+        return true;
+    }
+    // ============================================
+    // Last-resort fallback: ImportText_Direct for string input on any unhandled type
+    // ============================================
+    if (Value->Type == EJson::String)
+    {
+        if (Property->ImportText_Direct(*Value->AsString(), PropertyAddr, nullptr, PPF_None))
+        {
+            return true;
+        }
     }
 
-    OutErrorMessage = FString::Printf(TEXT("Unsupported field type for '%s'"), *FieldName);
+    OutErrorMessage = FString::Printf(TEXT("Unsupported property type '%s' for %s"),
+        *Property->GetClass()->GetName(), *Property->GetName());
     return false;
 }

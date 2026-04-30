@@ -491,67 +491,16 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetStruct
         const TSharedPtr<FJsonObject>& ElementObj = ElementValue->AsObject();
         void* ElementPtr = ArrayHelper.GetRawPtr(i);
 
-        for (TFieldIterator<FProperty> PropIt(StructType); PropIt; ++PropIt)
+        // Delegate per-field writes to SetStructFieldValue, which recurses into
+        // nested FStructProperty / FArrayProperty / FMapProperty etc. (Issue #11)
+        for (const auto& Pair : ElementObj->Values)
         {
-            FProperty* FieldProp = *PropIt;
-            FString FieldName = FieldProp->GetName();
-
-            if (!ElementObj->HasField(FieldName)) continue;
-
-            TSharedPtr<FJsonValue> FieldValue = ElementObj->TryGetField(FieldName);
-            if (!FieldValue.IsValid()) continue;
-
-            void* FieldPtr = FieldProp->ContainerPtrToValuePtr<void>(ElementPtr);
-
-            if (FClassProperty* ClassFieldProp = CastField<FClassProperty>(FieldProp))
+            FString FieldError;
+            if (!FSpirrowBridgeCommonUtils::SetStructFieldValue(
+                    ElementPtr, StructType, Pair.Key, Pair.Value, FieldError))
             {
-                FString ClassPath = FieldValue->AsString();
-                UClass* LoadedClass = LoadObject<UClass>(nullptr, *ClassPath);
-                if (LoadedClass)
-                {
-                    ClassFieldProp->SetObjectPropertyValue(FieldPtr, LoadedClass);
-                }
-                else
-                {
-                    Errors.Add(FString::Printf(TEXT("Element %d: Failed to load class for %s: %s"), i, *FieldName, *ClassPath));
-                }
-            }
-            else if (FObjectProperty* ObjFieldProp = CastField<FObjectProperty>(FieldProp))
-            {
-                FString ObjPath = FieldValue->AsString();
-                UObject* LoadedObj = StaticLoadObject(ObjFieldProp->PropertyClass, nullptr, *ObjPath);
-                if (LoadedObj)
-                {
-                    ObjFieldProp->SetObjectPropertyValue(FieldPtr, LoadedObj);
-                }
-                else
-                {
-                    Errors.Add(FString::Printf(TEXT("Element %d: Failed to load object for %s: %s"), i, *FieldName, *ObjPath));
-                }
-            }
-            else if (FIntProperty* IntFieldProp = CastField<FIntProperty>(FieldProp))
-            {
-                IntFieldProp->SetPropertyValue(FieldPtr, static_cast<int32>(FieldValue->AsNumber()));
-            }
-            else if (FFloatProperty* FloatFieldProp = CastField<FFloatProperty>(FieldProp))
-            {
-                FloatFieldProp->SetPropertyValue(FieldPtr, static_cast<float>(FieldValue->AsNumber()));
-            }
-            else if (FDoubleProperty* DoubleFieldProp = CastField<FDoubleProperty>(FieldProp))
-            {
-                DoubleFieldProp->SetPropertyValue(FieldPtr, FieldValue->AsNumber());
-            }
-            else if (FBoolProperty* BoolFieldProp = CastField<FBoolProperty>(FieldProp))
-            {
-                BoolFieldProp->SetPropertyValue(FieldPtr, FieldValue->AsBool());
-            }
-            else if (FStrProperty* StrFieldProp = CastField<FStrProperty>(FieldProp))
-            {
-                StrFieldProp->SetPropertyValue(FieldPtr, FieldValue->AsString());
-            }
-            else if (FNameProperty* NameFieldProp = CastField<FNameProperty>(FieldProp))
-            {
-                NameFieldProp->SetPropertyValue(FieldPtr, FName(*FieldValue->AsString()));
+                Errors.Add(FString::Printf(TEXT("Element %d field '%s': %s"),
+                    i, *Pair.Key, *FieldError));
             }
         }
 
@@ -1087,96 +1036,22 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetStruct
     void* ElementPtr = ArrayHelper.GetRawPtr(Index);
     UScriptStruct* StructType = StructProp->Struct;
 
-    // Update only specified fields
+    // Update only specified fields. Delegate per-field writes to SetStructFieldValue
+    // for full recursive support of nested structs / arrays / maps (Issue #11).
     TArray<FString> UpdatedFields;
     TArray<FString> Errors;
 
     for (const auto& Pair : (*ValuesObj)->Values)
     {
-        FString FieldName = Pair.Key;
-        TSharedPtr<FJsonValue> FieldValue = Pair.Value;
-
-        // Find field in struct
-        FProperty* FieldProp = nullptr;
-        for (TFieldIterator<FProperty> PropIt(StructType); PropIt; ++PropIt)
+        FString FieldError;
+        if (FSpirrowBridgeCommonUtils::SetStructFieldValue(
+                ElementPtr, StructType, Pair.Key, Pair.Value, FieldError))
         {
-            if ((*PropIt)->GetName() == FieldName)
-            {
-                FieldProp = *PropIt;
-                break;
-            }
-        }
-
-        if (!FieldProp)
-        {
-            Errors.Add(FString::Printf(TEXT("Field not found: %s"), *FieldName));
-            continue;
-        }
-
-        void* FieldPtr = FieldProp->ContainerPtrToValuePtr<void>(ElementPtr);
-
-        // Handle different field types
-        if (FClassProperty* ClassFieldProp = CastField<FClassProperty>(FieldProp))
-        {
-            FString ClassPath = FieldValue->AsString();
-            UClass* LoadedClass = LoadObject<UClass>(nullptr, *ClassPath);
-            if (LoadedClass)
-            {
-                ClassFieldProp->SetObjectPropertyValue(FieldPtr, LoadedClass);
-                UpdatedFields.Add(FieldName);
-            }
-            else
-            {
-                Errors.Add(FString::Printf(TEXT("Failed to load class for %s: %s"), *FieldName, *ClassPath));
-            }
-        }
-        else if (FObjectProperty* ObjectFieldProp = CastField<FObjectProperty>(FieldProp))
-        {
-            FString AssetPath = FieldValue->AsString();
-            UObject* LoadedAsset = UEditorAssetLibrary::LoadAsset(AssetPath);
-            if (LoadedAsset)
-            {
-                ObjectFieldProp->SetObjectPropertyValue(FieldPtr, LoadedAsset);
-                UpdatedFields.Add(FieldName);
-            }
-            else
-            {
-                Errors.Add(FString::Printf(TEXT("Failed to load asset for %s: %s"), *FieldName, *AssetPath));
-            }
-        }
-        else if (FIntProperty* IntFieldProp = CastField<FIntProperty>(FieldProp))
-        {
-            IntFieldProp->SetPropertyValue(FieldPtr, static_cast<int32>(FieldValue->AsNumber()));
-            UpdatedFields.Add(FieldName);
-        }
-        else if (FFloatProperty* FloatFieldProp = CastField<FFloatProperty>(FieldProp))
-        {
-            FloatFieldProp->SetPropertyValue(FieldPtr, static_cast<float>(FieldValue->AsNumber()));
-            UpdatedFields.Add(FieldName);
-        }
-        else if (FDoubleProperty* DoubleFieldProp = CastField<FDoubleProperty>(FieldProp))
-        {
-            DoubleFieldProp->SetPropertyValue(FieldPtr, FieldValue->AsNumber());
-            UpdatedFields.Add(FieldName);
-        }
-        else if (FBoolProperty* BoolFieldProp = CastField<FBoolProperty>(FieldProp))
-        {
-            BoolFieldProp->SetPropertyValue(FieldPtr, FieldValue->AsBool());
-            UpdatedFields.Add(FieldName);
-        }
-        else if (FStrProperty* StrFieldProp = CastField<FStrProperty>(FieldProp))
-        {
-            StrFieldProp->SetPropertyValue(FieldPtr, FieldValue->AsString());
-            UpdatedFields.Add(FieldName);
-        }
-        else if (FNameProperty* NameFieldProp = CastField<FNameProperty>(FieldProp))
-        {
-            NameFieldProp->SetPropertyValue(FieldPtr, FName(*FieldValue->AsString()));
-            UpdatedFields.Add(FieldName);
+            UpdatedFields.Add(Pair.Key);
         }
         else
         {
-            Errors.Add(FString::Printf(TEXT("Unsupported field type for %s"), *FieldName));
+            Errors.Add(FString::Printf(TEXT("Field '%s': %s"), *Pair.Key, *FieldError));
         }
     }
 

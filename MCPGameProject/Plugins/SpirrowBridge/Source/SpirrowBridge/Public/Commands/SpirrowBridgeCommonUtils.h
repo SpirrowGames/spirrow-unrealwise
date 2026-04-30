@@ -275,11 +275,22 @@ public:
     /** Set a struct property value from JSON (internal helper) */
     static bool SetStructPropertyValue(void* StructAddr, FStructProperty* StructProp,
                                        const TSharedPtr<FJsonValue>& Value, FString& OutErrorMessage);
-    
+
     /** Set individual struct field value (recursive helper) */
     static bool SetStructFieldValue(void* StructAddr, UScriptStruct* ScriptStruct,
                                     const FString& FieldName, const TSharedPtr<FJsonValue>& Value,
                                     FString& OutErrorMessage);
+
+    /**
+     * Recursively write a JSON value to any FProperty at the given address.
+     * Handles all property types including nested FStructProperty, FArrayProperty,
+     * FMapProperty, FSetProperty, enums, and object/class refs. Falls back to
+     * FProperty::ImportText_Direct for string inputs that no specific handler claims.
+     * This is the unified worker for nested-struct field writes (Issue #11 v0.10.2).
+     */
+    static bool SetPropertyValueAtAddress(FProperty* Property, void* PropertyAddr,
+                                          const TSharedPtr<FJsonValue>& Value,
+                                          FString& OutErrorMessage);
     
     // ============================================
     // Logging utilities

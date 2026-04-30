@@ -4,6 +4,71 @@
 
 ---
 
+## 2026-04-30: set_struct_array_property / set_struct_property nested struct fix (v0.10.2)
+
+**Issue**: [#11](https://github.com/SpirrowGames/spirrow-unrealwise/issues/11)
+
+`blueprint.set_struct_array_property` と `blueprint.set_struct_property` で USTRUCT のネスト構造体フィールド (`FIntVector` / `FVector` / `FLinearColor` / 任意ネスト USTRUCT) が黙殺される問題を再帰実装で修正。
+
+### 原因
+
+両ハンドラが `SpirrowBridgeBlueprintPropertyCommands.cpp` 内で独自の leaf-only な `if (FIntProperty) … else if (FFloatProperty) …` チェーンを持ち、`FStructProperty` のケースが抜けていた。同一ファイル内の `SetStructFieldValue` ヘルパーは既に再帰的 (line 2279 で `SetStructPropertyValue` を呼ぶ) だが、両ハンドラは利用していなかった。
+
+### 修正内容
+
+**`SpirrowBridgeCommonUtils.{h,cpp}`** に統一再帰 helper `SetPropertyValueAtAddress(FProperty*, void*, JsonValue, &OutErr)` を追加。すべての property type を一箇所で:
+
+- Bool / Numeric (Int8/16/32/64 + UInt + Float + Double) / Str / Name / Text
+- Byte / Enum (`TEnumAsByte<E>` と `enum class : uintN_t` 両対応)
+- Object / Class / SoftObject (asset path 文字列 + `None`/`null` 許容)
+- **Struct → `SetStructPropertyValue` へ再帰**
+- **Array (TArray) → 各要素に対し `SetPropertyValueAtAddress` 再帰**
+- **Map (TMap) → key/value 両方を再帰**
+- **Set (TSet) → 各要素を再帰**
+- 最終フォールバック: 文字列入力に対し `FProperty::ImportText_Direct` (UE 内部テキスト形式)
+
+`SetStructFieldValue` は薄いラッパに reduce (Property 解決 → `SetPropertyValueAtAddress` 委譲)。
+
+**`SetStructPropertyValue`** に追加:
+- `FIntVector` 名前付きハンドラ (`{X,Y,Z}` object 形式 + `[X,Y,Z]` array 形式)
+- `FIntPoint` 名前付きハンドラ
+- 入力先頭での文字列受付 (`StructProp->ImportText_Direct` を `(X=1,Y=0,Z=0)` 等で起動)
+- 末尾フォールバックの ImportText_Direct (named handler/generic Object のいずれにもマッチしないケース)
+
+**`HandleSetStructArrayProperty` / `HandleSetStructProperty`** を `SetStructFieldValue` 呼び出しに refactor。重複していた leaf-only チェーン約 80 行を削減。
+
+### 受け付けられる入力形式 (Issue で挙げられた全 3 形式)
+
+```python
+# (1) dict — 推奨
+{"Coord": {"X": 1, "Y": 0, "Z": 0}}
+
+# (2) array — FIntVector / FVector / FLinearColor 等
+{"Coord": [1, 0, 0]}
+
+# (3) UE text — ImportText_Direct fallback
+{"Coord": "(X=1,Y=0,Z=0)"}
+```
+
+### テスト fixture (MCPGameProject)
+
+`AStructArrayTestActor` (Source/MCPGameProject/StructArrayTestActor.h) を追加。`TArray<FStructArrayTestRow>` を持ち各 row が `FIntVector Coord` + `FVector Position` + `int32 Count` + `TObjectPtr<UMaterialInterface> Material` を持つ。Issue #11 の repro と同型。
+
+### 検証
+
+`Python/tests/verify_struct_array_nested_fix.py` で 4/4 PASS:
+- A) Coord dict `{X,Y,Z}` 経由
+- B) Coord array `[X,Y,Z]` 経由 (新規対応形式)
+- C) Coord UE text `"(X=,Y=,Z=)"` 経由 (新規対応形式)
+- D) `set_struct_property` での部分更新 (ネスト構造体フィールド単独パッチ)
+
+### 影響範囲
+
+- 副次的に struct array 要素内の `TArray` / `TMap` / `TSet` / 任意ネスト USTRUCT も対応 (再帰)
+- 既存 leaf-only ケース (Material 等の `FObjectProperty`) は backwards-compatible
+
+---
+
 ## 2026-04-22: Layout Polish — VBox/HBox Slot + get_widget_elements dedupe + IPC UTF-8 修正 (v0.9.9)
 
 **概要**: バックログ残タスク (FR-2 / FR-3 / BUG-3 / BUG-4) をまとめて解消。

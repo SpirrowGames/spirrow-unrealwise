@@ -1,8 +1,8 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: v0.10.0 (PIE Control + Screenshot + Camera + Logs + visual diff) + 2026-04-26 PIE screenshot/camera bug fixes
+> **バージョン**: v0.10.2 (set_struct_array_property nested struct fix) — v0.10.0 PIE Control + Screenshot + Camera + Logs + 2026-04-26 PIE bug fixes ベース
 > **ステータス**: Beta
-> **最終更新**: 2026-04-26
+> **最終更新**: 2026-04-30
 
 ---
 

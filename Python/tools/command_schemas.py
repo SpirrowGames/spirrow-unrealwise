@@ -1745,9 +1745,18 @@ COMMAND_SCHEMAS = {
         # Screenshot + camera
         # ---------------------------------------------------------------------
         "take_pie_screenshot": {
-            "brief": "PNG of PIE viewport (resolves PlayWorld viewport explicitly)",
+            "brief": "PNG of PIE GameViewport (may return clear-color placeholder in selected_viewport mode — prefer take_pie_pov_screenshot)",
             "params": {
                 "filepath": {"type": "str", "required": True, "desc": "Output PNG path (.png auto-appended)"},
+            },
+        },
+        "take_pie_pov_screenshot": {
+            "brief": "PNG from PIE pawn's actual viewpoint via ASceneCapture2D (independent of viewport routing — works in any PIE mode)",
+            "params": {
+                "filepath": {"type": "str", "required": True, "desc": "Output PNG path (.png auto-appended)"},
+                "width": {"type": "int", "default": 1920, "desc": "Render width (64-4096)"},
+                "height": {"type": "int", "default": 1080, "desc": "Render height (64-4096)"},
+                "player_index": {"type": "int", "default": 0, "desc": "Player controller index (whose viewpoint to capture)"},
             },
         },
         "take_high_res_screenshot": {

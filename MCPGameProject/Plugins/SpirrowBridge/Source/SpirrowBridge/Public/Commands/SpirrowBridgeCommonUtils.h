@@ -295,13 +295,70 @@ public:
     // ============================================
     // Logging utilities
     // ============================================
-    
+
     /** Log an error with command context */
     static void LogCommandError(const FString& CommandName, const FString& Message);
-    
+
     /** Log a warning with command context */
     static void LogCommandWarning(const FString& CommandName, const FString& Message);
-    
+
     /** Log info with command context */
     static void LogCommandInfo(const FString& CommandName, const FString& Message);
 };
+
+// Forward declarations for SafeCreateBTGraphAndRuntimeNode template
+class UBehaviorTreeGraph;
+
+/**
+ * SpirrowBridgePrimitives — primitive I/O layer below the command-handler layer.
+ *
+ * Handlers must go through this namespace for the patterns that have proven
+ * bug-prone when called directly (Issue #11 nested struct, SafeCompileBlueprint
+ * AV, BT 2-layer invariant). See Docs/Architecture/PrimitiveLayerMigration.md
+ * for rules and the boy-scout migration policy.
+ *
+ * Lint: .github/workflows/lint-primitive-bypass.yml forbids direct calls to:
+ *   - FBlueprintEditorUtils::CompileBlueprint  (use SafeCompileBlueprint)
+ *   - FGraphNodeCreator<...>                   (use SafeCreateBTGraphAndRuntimeNode)
+ *
+ * Bypass requires a `SPIRROW_PRIMITIVE_BYPASS: <reason>` comment on the same line.
+ */
+namespace SpirrowBridgePrimitives
+{
+    /** GeneratedClass / SkeletonGeneratedClass の不整合を解消して安全に compile。 */
+    SPIRROWBRIDGE_API void SafeCompileBlueprint(UBlueprint* Blueprint);
+
+    /**
+     * Recursively write a JSON value to any FProperty at the given address.
+     * Handles FStructProperty, FArrayProperty, FMapProperty, FSetProperty, enums,
+     * object/class refs, etc. Falls back to FProperty::ImportText_Direct for
+     * unclaimed string inputs. Unified worker for nested-struct field writes
+     * (Issue #11, v0.10.2).
+     */
+    SPIRROWBRIDGE_API bool SetPropertyValueAtAddress(
+        FProperty* Property,
+        void* PropertyAddr,
+        const TSharedPtr<FJsonValue>& Value,
+        FString& OutErrorMessage);
+
+    /**
+     * BT 2-layer invariant primitive: creates a BehaviorTree graph node and its
+     * paired runtime NodeInstance under the graph node's outer in the correct
+     * order (FGraphNodeCreator → CreateNode → NewObject(outer=GraphNode) →
+     * NodeInstance/ClassData wiring → Finalize). Returns the GraphNode (caller
+     * accesses GraphNode->NodeInstance for the runtime reference).
+     *
+     * Template params:
+     *   TGraphNode    — concrete UBehaviorTreeGraphNode subclass to spawn.
+     *   TRuntimeBase  — runtime base class (UBTCompositeNode / UBTTaskNode etc.).
+     *
+     * Returns nullptr and populates OutError on failure.
+     */
+    template <typename TGraphNode, typename TRuntimeBase>
+    TGraphNode* SafeCreateBTGraphAndRuntimeNode(
+        UBehaviorTreeGraph* BTGraph,
+        UClass* RuntimeNodeClass,
+        const FName& RuntimeNodeName,
+        const FString& OptionalDisplayName,
+        FString& OutError);
+}

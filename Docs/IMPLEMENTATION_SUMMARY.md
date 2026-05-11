@@ -2,7 +2,7 @@
 
 C++ 実装の全体像。新しいセッション開始時の参照用。
 
-> **最終更新**: 2026-05-11 | **バージョン**: v0.10.3 (`take_pie_pov_screenshot` via SceneCapture2D) — v0.10.2 set_struct_array_property nested struct fix merged · v0.10.0 PIE Control + Screenshot + Camera + Logs base
+> **最終更新**: 2026-05-11 | **バージョン**: v0.11.0 WIP (Primitive I/O Layer — Issue #14) — v0.10.3 take_pie_pov_screenshot via SceneCapture2D + v0.10.2 set_struct_array_property nested struct fix base
 
 ---
 

@@ -1,0 +1,53 @@
+name: lint-primitive-bypass
+
+# Enforces Issue #14: command handlers must not call the UE APIs covered by
+# SpirrowBridgePrimitives directly. See Docs/Architecture/PrimitiveLayerMigration.md
+# for rationale, authoring rules, and the SPIRROW_PRIMITIVE_BYPASS escape hatch.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'MCPGameProject/Plugins/SpirrowBridge/Source/SpirrowBridge/**/*.cpp'
+      - 'MCPGameProject/Plugins/SpirrowBridge/Source/SpirrowBridge/**/*.h'
+      - '.github/workflows/lint-primitive-bypass.yml'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Check for direct UE API calls forbidden by primitive layer
+        run: |
+          set -e
+          # Patterns forbidden in handlers. The primitive impl itself lives in
+          # SpirrowBridgeCommonUtils.cpp and is excluded; a SPIRROW_PRIMITIVE_BYPASS
+          # comment on the same line is the documented escape hatch.
+          #
+          # Pattern shape requires the trailing token (`(`, `\w`) so doc strings
+          # like "FGraphNodeCreator<...>" or "FBlueprintEditorUtils::CompileBlueprint"
+          # in comments do not produce false positives.
+          rg --type cpp \
+             --glob '!**/SpirrowBridgeCommonUtils.cpp' \
+             -n \
+             -e 'FBlueprintEditorUtils::CompileBlueprint\(' \
+             -e 'FGraphNodeCreator<\w' \
+             MCPGameProject/Plugins/SpirrowBridge/Source/SpirrowBridge/ \
+             | grep -v 'SPIRROW_PRIMITIVE_BYPASS' \
+             > lint-violations.txt || true
+
+          if [ -s lint-violations.txt ]; then
+            echo "::error::Direct UE API call detected. Use SpirrowBridgePrimitives or add SPIRROW_PRIMITIVE_BYPASS comment."
+            echo "See Docs/Architecture/PrimitiveLayerMigration.md for rules."
+            echo ""
+            echo "Violations:"
+            cat lint-violations.txt
+            exit 1
+          fi
+
+          echo "lint-primitive-bypass: OK (no direct API calls outside primitive impl)"

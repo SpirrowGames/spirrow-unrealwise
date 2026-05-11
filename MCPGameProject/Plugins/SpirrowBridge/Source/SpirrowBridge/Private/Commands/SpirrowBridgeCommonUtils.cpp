@@ -39,6 +39,17 @@
 #include "BehaviorTree/BehaviorTreeTypes.h"      // FBlackboardKeySelector
 #include "DataProviders/AIDataProvider.h"        // FAIDataProviderFloatValue, FAIDataProviderIntValue, FAIDataProviderBoolValue
 
+// BT primitive (SafeCreateBTGraphAndRuntimeNode) includes
+#include "AIGraphTypes.h"                        // FGraphNodeClassData
+#include "BehaviorTree/BTCompositeNode.h"
+#include "BehaviorTree/BTTaskNode.h"
+#include "BehaviorTreeGraph.h"
+#include "BehaviorTreeGraphNode.h"
+#include "BehaviorTreeGraphNode_Composite.h"
+#include "BehaviorTreeGraphNode_SimpleParallel.h"
+#include "BehaviorTreeGraphNode_Task.h"
+#include "BehaviorTreeGraphNode_SubtreeTask.h"
+
 // ============================================
 // JSON Response Utilities  
 // ============================================
@@ -228,6 +239,11 @@ UEdGraph* FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(UBlueprint* Blueprin
 
 void FSpirrowBridgeCommonUtils::SafeCompileBlueprint(UBlueprint* Blueprint)
 {
+    SpirrowBridgePrimitives::SafeCompileBlueprint(Blueprint);
+}
+
+void SpirrowBridgePrimitives::SafeCompileBlueprint(UBlueprint* Blueprint)
+{
     if (!Blueprint) return;
 
     bool bNeedsFullCompile = (Blueprint->GeneratedClass == nullptr)
@@ -246,6 +262,78 @@ void FSpirrowBridgeCommonUtils::SafeCompileBlueprint(UBlueprint* Blueprint)
         Blueprint->MarkPackageDirty();
     }
 }
+
+// BT 2-layer invariant primitive — template body. Explicit instantiations follow.
+template <typename TGraphNode, typename TRuntimeBase>
+TGraphNode* SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode(
+    UBehaviorTreeGraph* BTGraph,
+    UClass* RuntimeNodeClass,
+    const FName& RuntimeNodeName,
+    const FString& OptionalDisplayName,
+    FString& OutError)
+{
+    if (!BTGraph)
+    {
+        OutError = TEXT("BTGraph is null");
+        return nullptr;
+    }
+    if (!RuntimeNodeClass)
+    {
+        OutError = TEXT("RuntimeNodeClass is null");
+        return nullptr;
+    }
+    if (!RuntimeNodeClass->IsChildOf(TRuntimeBase::StaticClass()))
+    {
+        OutError = FString::Printf(
+            TEXT("RuntimeNodeClass '%s' is not a child of expected base '%s'"),
+            *RuntimeNodeClass->GetName(),
+            *TRuntimeBase::StaticClass()->GetName());
+        return nullptr;
+    }
+
+    FGraphNodeCreator<TGraphNode> NodeCreator(*BTGraph); // SPIRROW_PRIMITIVE_BYPASS: primitive impl
+    TGraphNode* GraphNode = NodeCreator.CreateNode();
+    if (!GraphNode)
+    {
+        OutError = TEXT("FGraphNodeCreator::CreateNode returned null");
+        return nullptr;
+    }
+
+    TRuntimeBase* RuntimeNode = NewObject<TRuntimeBase>(
+        GraphNode,
+        RuntimeNodeClass,
+        RuntimeNodeName,
+        RF_Transactional);
+
+    if (!RuntimeNode)
+    {
+        OutError = FString::Printf(
+            TEXT("NewObject failed for runtime class '%s'"),
+            *RuntimeNodeClass->GetName());
+        return nullptr;
+    }
+
+    GraphNode->NodeInstance = RuntimeNode;
+    GraphNode->ClassData = FGraphNodeClassData(RuntimeNodeClass, TEXT(""));
+
+    if (!OptionalDisplayName.IsEmpty())
+    {
+        RuntimeNode->NodeName = OptionalDisplayName;
+    }
+
+    NodeCreator.Finalize();
+    return GraphNode;
+}
+
+// Explicit instantiations — every (TGraphNode, TRuntimeBase) pair the handlers use.
+template UBehaviorTreeGraphNode_Composite* SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<UBehaviorTreeGraphNode_Composite, UBTCompositeNode>(
+    UBehaviorTreeGraph*, UClass*, const FName&, const FString&, FString&);
+template UBehaviorTreeGraphNode_SimpleParallel* SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<UBehaviorTreeGraphNode_SimpleParallel, UBTCompositeNode>(
+    UBehaviorTreeGraph*, UClass*, const FName&, const FString&, FString&);
+template UBehaviorTreeGraphNode_Task* SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<UBehaviorTreeGraphNode_Task, UBTTaskNode>(
+    UBehaviorTreeGraph*, UClass*, const FName&, const FString&, FString&);
+template UBehaviorTreeGraphNode_SubtreeTask* SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<UBehaviorTreeGraphNode_SubtreeTask, UBTTaskNode>(
+    UBehaviorTreeGraph*, UClass*, const FName&, const FString&, FString&);
 
 // Blueprint node utilities
 UK2Node_Event* FSpirrowBridgeCommonUtils::CreateEventNode(UEdGraph* Graph, const FString& EventName, const FVector2D& Position)
@@ -2331,6 +2419,13 @@ bool FSpirrowBridgeCommonUtils::SetPropertyValueAtAddress(FProperty* Property, v
                                                           const TSharedPtr<FJsonValue>& Value,
                                                           FString& OutErrorMessage)
 {
+    return SpirrowBridgePrimitives::SetPropertyValueAtAddress(Property, PropertyAddr, Value, OutErrorMessage);
+}
+
+bool SpirrowBridgePrimitives::SetPropertyValueAtAddress(FProperty* Property, void* PropertyAddr,
+                                                       const TSharedPtr<FJsonValue>& Value,
+                                                       FString& OutErrorMessage)
+{
     if (!Property || !PropertyAddr || !Value.IsValid())
     {
         OutErrorMessage = TEXT("Invalid property, address, or JSON value");
@@ -2568,7 +2663,10 @@ bool FSpirrowBridgeCommonUtils::SetPropertyValueAtAddress(FProperty* Property, v
     // ============================================
     if (FStructProperty* StructProp = CastField<FStructProperty>(Property))
     {
-        return SetStructPropertyValue(PropertyAddr, StructProp, Value, OutErrorMessage);
+        // Cross-layer call: SetStructPropertyValue is a class member of
+        // FSpirrowBridgeCommonUtils (not a primitive). Qualify explicitly so name
+        // lookup works from namespace SpirrowBridgePrimitives.
+        return FSpirrowBridgeCommonUtils::SetStructPropertyValue(PropertyAddr, StructProp, Value, OutErrorMessage);
     }
     // ============================================
     // FArrayProperty — recurse on each element

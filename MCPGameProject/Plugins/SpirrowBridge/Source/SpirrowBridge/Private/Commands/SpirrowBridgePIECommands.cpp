@@ -16,6 +16,9 @@
 #include "InputCoreTypes.h"
 #include "InputKeyEventArgs.h"
 #include "EngineUtils.h"
+#include "Engine/SceneCapture2D.h"
+#include "Components/SceneCaptureComponent2D.h"
+#include "Engine/TextureRenderTarget2D.h"
 
 // In-memory ring buffer of recent log lines, fed by GLog (used by tail_editor_output_log).
 namespace
@@ -208,6 +211,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgePIECommands::HandleCommand(const FString& 
 
     // Camera + screenshot
     if (CommandType == TEXT("take_pie_screenshot"))        return HandleTakePIEScreenshot(Params);
+    if (CommandType == TEXT("take_pie_pov_screenshot"))    return HandleTakePIEPOVScreenshot(Params);
     if (CommandType == TEXT("take_high_res_screenshot"))   return HandleTakeHighResScreenshot(Params);
     if (CommandType == TEXT("get_pie_camera"))             return HandleGetPIECamera(Params);
     if (CommandType == TEXT("set_pie_camera"))             return HandleSetPIECamera(Params);
@@ -544,6 +548,162 @@ TSharedPtr<FJsonObject> FSpirrowBridgePIECommands::HandleTakePIEScreenshot(const
     Data->SetStringField(TEXT("source"), TEXT("pie_viewport"));
     Data->SetNumberField(TEXT("width"), Viewport->GetSizeXY().X);
     Data->SetNumberField(TEXT("height"), Viewport->GetSizeXY().Y);
+    return FSpirrowBridgeCommonUtils::CreateSuccessResponse(Data);
+}
+
+// PIE pawn POV capture via SceneCapture2D (BUG fix 2026-04-26 follow-up):
+// take_pie_screenshot reads PIEWorld->GameViewport->Viewport which is a non-displayed
+// back buffer in some PIE configurations (selected_viewport mode in particular). HighResShot
+// reads the editor viewport (level editor camera), ignoring PIE pawn position entirely.
+// To get a screenshot from the PIE pawn's actual viewpoint, we spawn an ASceneCapture2D
+// in the PIE world, sync it to the player's view loc/rot/FOV, render once into our own
+// UTextureRenderTarget2D, then read that. Independent of viewport routing.
+TSharedPtr<FJsonObject> FSpirrowBridgePIECommands::HandleTakePIEPOVScreenshot(const TSharedPtr<FJsonObject>& Params)
+{
+    UWorld* PIEWorld = GetPIEWorldOrNull();
+    if (!PIEWorld)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(ErrPIENotRunning, TEXT("PIE is not running"));
+    }
+
+    if (!Params.IsValid())
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing parameters"));
+    }
+    FString FilePath;
+    if (!Params->TryGetStringField(TEXT("filepath"), FilePath) || FilePath.IsEmpty())
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'filepath' parameter"));
+    }
+    if (!FilePath.EndsWith(TEXT(".png")))
+    {
+        FilePath += TEXT(".png");
+    }
+
+    int32 PlayerIndex = 0;
+    int32 Width = 1920;
+    int32 Height = 1080;
+    double Tmp = 0;
+    if (Params->TryGetNumberField(TEXT("player_index"), Tmp)) PlayerIndex = static_cast<int32>(Tmp);
+    if (Params->TryGetNumberField(TEXT("width"), Tmp))  Width  = FMath::Clamp(static_cast<int32>(Tmp), 64, 4096);
+    if (Params->TryGetNumberField(TEXT("height"), Tmp)) Height = FMath::Clamp(static_cast<int32>(Tmp), 64, 4096);
+
+    APlayerController* PC = UGameplayStatics::GetPlayerController(PIEWorld, PlayerIndex);
+    if (!PC)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ErrPlayerControllerNotFound,
+            FString::Printf(TEXT("PlayerController not found at index %d"), PlayerIndex));
+    }
+
+    FVector ViewLoc;
+    FRotator ViewRot;
+    PC->GetPlayerViewPoint(ViewLoc, ViewRot);
+    const float FOV = (PC->PlayerCameraManager) ? PC->PlayerCameraManager->GetFOVAngle() : 90.0f;
+
+    // Cache: keep a single ASceneCapture2D + UTextureRenderTarget2D per PIE world so
+    // repeated calls don't allocate a fresh GPU buffer each time. The actor lives in
+    // the PIE world and is auto-destroyed on stop_pie; we detect that via TWeakObjectPtr.
+    static TWeakObjectPtr<ASceneCapture2D>      CachedActor;
+    static TWeakObjectPtr<UWorld>               CachedWorld;
+    ASceneCapture2D* Capture = nullptr;
+    if (CachedActor.IsValid() && CachedWorld.Get() == PIEWorld)
+    {
+        Capture = CachedActor.Get();
+    }
+    if (!Capture)
+    {
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        SpawnParams.ObjectFlags |= RF_Transient;
+        Capture = PIEWorld->SpawnActor<ASceneCapture2D>(ViewLoc, ViewRot, SpawnParams);
+        if (!Capture)
+        {
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to spawn ASceneCapture2D in PIE world"));
+        }
+        CachedActor = Capture;
+        CachedWorld = PIEWorld;
+    }
+
+    Capture->SetActorLocationAndRotation(ViewLoc, ViewRot);
+    USceneCaptureComponent2D* Comp = Capture->GetCaptureComponent2D();
+    if (!Comp)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("ASceneCapture2D missing capture component"));
+    }
+    Comp->FOVAngle = FOV;
+    Comp->bCaptureEveryFrame = false;
+    Comp->bCaptureOnMovement = false;
+    Comp->bAlwaysPersistRenderingState = true;
+    Comp->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
+
+    // Explicit ShowFlags — observed in VoxelWorldHost (UProceduralMeshComponent)
+    // that defaults render the mesh as wireframe + green tint. Per ue-investigator
+    // (Q1_SceneCapture_Investigation_Result.md), the most likely cause is that the
+    // defaults get overridden somewhere in the project / view path. Setting these
+    // explicitly per-call insulates us from upstream toggles.
+    FEngineShowFlags& Flags = Comp->ShowFlags;
+    Flags.SetMaterials(true);
+    Flags.SetLighting(true);
+    Flags.SetWireframe(false);            // critical — guards against the wireframe symptom
+    Flags.SetFog(true);
+    Flags.SetAtmosphere(true);
+    Flags.SetMotionBlur(false);           // recommended OFF for SceneCapture
+    Flags.SetSeparateTranslucency(false);
+
+    // Re-create RT only if size changed (saves GPU realloc).
+    UTextureRenderTarget2D* RT = Cast<UTextureRenderTarget2D>(Comp->TextureTarget);
+    if (!RT || RT->SizeX != Width || RT->SizeY != Height)
+    {
+        RT = NewObject<UTextureRenderTarget2D>(Capture);
+        RT->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;
+        RT->ClearColor = FLinearColor::Black;
+        RT->bGPUSharedFlag = false;
+        RT->InitAutoFormat(Width, Height);
+        RT->UpdateResourceImmediate(true);
+        Comp->TextureTarget = RT;
+    }
+
+    // Render now (single explicit capture) and drain the render thread before readback.
+    Comp->CaptureScene();
+    FlushRenderingCommands();
+
+    FTextureRenderTargetResource* RTRes = RT->GameThread_GetRenderTargetResource();
+    if (!RTRes)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("RenderTarget resource missing"));
+    }
+    TArray<FColor> Bitmap;
+    FReadSurfaceDataFlags ReadFlags(RCM_UNorm, CubeFace_MAX);
+    ReadFlags.SetLinearToGamma(false);
+    if (!RTRes->ReadPixels(Bitmap, ReadFlags))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("RenderTarget ReadPixels failed"));
+    }
+    // SCS_FinalColorLDR can leave alpha undefined; force opaque for PNG.
+    for (FColor& C : Bitmap)
+    {
+        C.A = 255;
+    }
+
+    IFileManager::Get().MakeDirectory(*FPaths::GetPath(FilePath), /*Tree=*/true);
+    TArray64<uint8> Compressed;
+    FImageUtils::PNGCompressImageArray(Width, Height, Bitmap, Compressed);
+    if (!FFileHelper::SaveArrayToFile(Compressed, *FilePath))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("FFileHelper::SaveArrayToFile failed for '%s'"), *FilePath));
+    }
+
+    TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+    Data->SetStringField(TEXT("filepath"), FilePath);
+    Data->SetStringField(TEXT("source"), TEXT("pie_pov_scene_capture"));
+    Data->SetNumberField(TEXT("width"), Width);
+    Data->SetNumberField(TEXT("height"), Height);
+    Data->SetNumberField(TEXT("fov"), FOV);
+    Data->SetNumberField(TEXT("player_index"), PlayerIndex);
+    AddVectorJsonField(Data, TEXT("camera_location"), ViewLoc);
+    AddRotatorJsonField(Data, TEXT("camera_rotation"), ViewRot);
     return FSpirrowBridgeCommonUtils::CreateSuccessResponse(Data);
 }
 

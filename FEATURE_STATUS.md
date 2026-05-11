@@ -1,8 +1,8 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: v0.10.2 (set_struct_array_property nested struct fix) — v0.10.0 PIE Control + Screenshot + Camera + Logs + 2026-04-26 PIE bug fixes ベース
+> **バージョン**: v0.10.3 (`take_pie_pov_screenshot` via SceneCapture2D) — v0.10.2 set_struct_array_property nested struct fix + v0.10.0 PIE Control + 2026-04-26 PIE bug fixes ベース
 > **ステータス**: Beta
-> **最終更新**: 2026-04-30
+> **最終更新**: 2026-05-11
 
 ---
 
@@ -27,7 +27,7 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 
 ## 機能サマリー
 
-### メタツール (15カテゴリ = 178コマンド)
+### メタツール (15カテゴリ = 189コマンド)
 
 | メタツール | 説明 | コマンド数 | 状態 |
 |-----------|------|-----------|------|
@@ -45,7 +45,7 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 | `gas` | Gameplay Tags、Effect、Ability | 8 | ✅ |
 | `material` | マテリアルテンプレート、作成 | 6 | ✅ |
 | `config` | Unreal Config読み書き | 3 | ✅ |
-| `pie` 🆕 v0.10.0 | PIE 起動/停止/状態、camera、screenshot、console exec、入力 simulation、PIE actor 列挙、ログ tail/filter/search/scan、Live Coding | 25 | ✅ |
+| `pie` 🆕 v0.10.0 | PIE 起動/停止/状態、camera、screenshot (take_pie_pov_screenshot v0.10.3)、console exec、入力 simulation、PIE actor 列挙、ログ tail/filter/search/scan、Live Coding | 26 | ✅ |
 
 ### スタンドアロンツール (11個 + 1 help)
 
@@ -67,7 +67,7 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 | | 数 |
 |---|---|
 | **MCP登録ツール合計** | **27** |
-| **内包コマンド合計** | **188** |
+| **内包コマンド合計** | **189** |
 
 ---
 
@@ -298,13 +298,40 @@ generate_and_import_texture(
 
 ## 最新の更新
 
+### 2026-04-26 (follow-up): `take_pie_pov_screenshot` 追加 🆕
+
+PR #10 の Fix A (`Viewport->Draw()` + `FlushRenderingCommands()`) は MCPGameProject 上の test_A は緩い heuristic で PASS したが、追加検証で **2 つの隠れた問題** が判明:
+
+1. `take_pie_screenshot` は `selected_viewport` PIE モードでは `GameViewportClient::Viewport` が非表示の back buffer を指しており、render-thread sync を加えても clear color (white/green) が返る
+2. `take_high_res_screenshot` (HighResShot console) は **active editor viewport** を撮るので、PIE pawn を 50km 離した位置に teleport しても **同じ画像が返る** (PIE pawn POV ≠ 撮影位置)
+
+**Fix**: 新コマンド `pie("take_pie_pov_screenshot", ...)` を追加。viewport routing と完全に独立した実装:
+
+- PIE world に `ASceneCapture2D` を spawn (cached)、`PC->GetPlayerViewPoint` 結果に同期
+- `USceneCaptureComponent2D::CaptureSource = SCS_FinalColorLDR` でポストプロセス込みのフレームを `UTextureRenderTarget2D` (cached, デフォルト 1920x1080) に render
+- `FlushRenderingCommands()` → `RTRes->ReadPixels()` → `FImageUtils::PNGCompressImageArray` で書き出し
+- 既存 `take_pie_screenshot` / `take_high_res_screenshot` はそのまま残し、用途別に使い分け
+
+**Verification**: `Python/tests/verify_pie_pov_2026-04-26.py` で 3 つの極端な pose (near_low / far_high 50km / orbit) で撮影 → 全 pairwise mean diff > 5/255 (実測 34-43/255 = 13-17%、目視で完全に異なる terrain/floor/sky)。`test_pie.py` 6/6 baseline regression なし。
+
+| Capture | 用途 | カバー範囲 |
+|---|---|---|
+| `take_pie_pov_screenshot` 🆕 | PIE pawn POV 確実取得 (visual regression / AI loop) | SceneCapture2D 経由、viewport routing 不要 |
+| `take_pie_screenshot` | PIE GameViewport raw (互換性のため残置) | selected_viewport モードでは placeholder の可能性 |
+| `take_high_res_screenshot` | editor viewport の高解像度 (LOD step 確認等) | HighResShot console、PIE pawn 位置と無関係 |
+| `editor.take_screenshot` | active editor viewport (PIE 不要) | level editor preview |
+
+**ファイル変更**: `SpirrowBridgePIECommands.h/.cpp` (+~140 行)、`SpirrowBridge.cpp` router 1 行、`Python/tools/pie_meta.py`、`Python/tools/command_schemas.py`
+
+---
+
 ### 2026-04-26: v0.10.0 PIE bug fixes (3 件) 🐛
 
 spirrow-voxelworld の SeamOctree C5 修正の PIE 視覚検証中に発覚した 3 件のバグを修正。verification: `Python/tests/verify_bugfix_2026-04-26.py` で 3/3 PASS。
 
 | Bug | 原因 | Fix |
 |---|---|---|
-| **A** `take_pie_screenshot` が緑/黒 placeholder PNG を返す | `Viewport->ReadPixels` を render-thread 完了前に呼んでおり、フレーム描画前の clear color (sky atmosphere) を読んでいた | `Viewport->Draw()` + `FlushRenderingCommands()` を ReadPixels 直前に挟む。Build.cs に `RenderCore` モジュール依存追加 |
+| **A** `take_pie_screenshot` が緑/黒 placeholder PNG を返す | `Viewport->ReadPixels` を render-thread 完了前に呼んでおり、フレーム描画前の clear color (sky atmosphere) を読んでいた | `Viewport->Draw()` + `FlushRenderingCommands()` を ReadPixels 直前に挟む。Build.cs に `RenderCore` モジュール依存追加 (注: 後日 `selected_viewport` モードでは render sync では不十分と判明 — 上記 follow-up 参照) |
 | **B** `take_high_res_screenshot` の `filepath` 引数が無視され Saved/Screenshots/... に出力 | `Config.FilenameOverride =` を事前 set しても `HighResShot` の `ParseConsoleCommand` が起動時に `OutFilenameOverride.Reset()` で wipe (UE 5.7 `UnrealClient.cpp:2420-2426`) | コンソールコマンド自体に `filename=<path>` を埋め込む形に変更 (`HighResShot 2 filename=C:/path.png`)。`FParse::Value` で正しく拾われる |
 | **C** `set_pie_camera` の response location が teleport 前の値を返す | `SetActorLocationAndRotation` 直後の `GetPlayerViewPoint` / `Pawn->GetActorLocation` は前 tick の位置を返す (movement component 補間遅延) | response に caller の target loc/rot をそのまま返す。透明性確保のため `previous_location` / `previous_rotation` も付与。`pawn_teleported` も実際の戻り値ベースに修正 |
 
@@ -320,7 +347,7 @@ spirrow-voxelworld の SeamOctree C5 修正の PIE 視覚検証中に発覚し�
 | サブカテゴリ | コマンド | 説明 |
 |---|---|---|
 | Lifecycle | `start_pie` / `stop_pie` / `get_pie_state` / `pause_pie` / `resume_pie` / `step_pie_frames` | PIE 起動・停止・状態 (`GEditor->RequestPlaySession` / `RequestEndPlayMap` / `APlayerController::SetPause`)。`step_pie_frames` は `FCoreDelegates::OnEndFrame` listener で N フレーム後に自動再 pause |
-| Capture | `take_pie_screenshot` / `take_high_res_screenshot` | PIE viewport 明示的取得 (`GameViewportClient::Viewport`) / HighResShot N コマンド |
+| Capture | `take_pie_screenshot` / `take_pie_pov_screenshot` / `take_high_res_screenshot` | PIE viewport 明示的取得 (`GameViewportClient::Viewport`) / **PIE pawn POV を SceneCapture2D 経由で取得 (確実)** / HighResShot N コマンド |
 | Camera | `get_pie_camera` / `set_pie_camera` | `APlayerController::GetPlayerViewPoint` / Pawn を `SetActorLocationAndRotation` で teleport (use_debug_cam=true で free-look) |
 | Debug Cam | `enable_debug_cam` / `disable_debug_cam` | `ToggleDebugCamera` console command |
 | Console | `exec_console_command` | `GEngine->Exec` + FOutputDevice subclass で出力 capture (Phase 2 完成形) |

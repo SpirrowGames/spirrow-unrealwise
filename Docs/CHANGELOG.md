@@ -4,6 +4,31 @@
 
 ---
 
+## 2026-05-11: `take_pie_pov_screenshot` via SceneCapture2D (v0.10.3)
+
+> ブランチ作業開始時点では v0.10.1 として番号付けされていたが、main の merge 順序 (v0.10.0 → v0.10.2 → 本 PR) と semver bump 順序を一致させるため、PR #13 review F の指摘を受けて v0.10.3 に bump (commit message の `v0.10.1` 表記は歴史的事実として残置)。
+
+**Commits**: `fa277cd feat(SpirrowBridge): v0.10.1 - take_pie_pov_screenshot via SceneCapture2D` / `273a0ed fix(SpirrowBridge): explicit ShowFlags in HandleTakePIEPOVScreenshot`
+
+### 概要
+
+PIE 中の任意 POV (camera location / rotation / FOV) からスクリーンショットを取得する `pie.take_pie_pov_screenshot` を追加。実装は `ASceneCapture2D` + `USceneCaptureComponent2D` で off-screen render を行い、PIE 本体の viewport は触らない。
+
+### 修正内容
+
+- `SpirrowBridgePIECommands.cpp` に `HandleTakePIEPOVScreenshot` 追加
+- `pie_meta.py` / `command_schemas.py` にスキーマ登録 (`pie` カテゴリの 26 番目のコマンド)
+- `273a0ed` で ShowFlags を明示設定 (デフォルト依存で render が空になる事象の対策)
+
+### 副次的な docs drift 是正
+
+本 PR で 2026-05-11 に確認された documentation drift を併せて修正:
+- `FEATURE_STATUS.md`: version 表記更新 (最終 v0.10.3、PR #13 review F の指摘で semver bump 順整合)、内部不整合 "178コマンド" → "189"、`pie` 25 → 26、合計 188 → 189
+- `Docs/DEV_CHEATSHEET.md`: v0.9.9 base のスタイル情報を全面更新 (27 tools / 189 commands / editor 17→22 / umg_widget 19→18 / pie meta-tool 行を新規追加)
+- `Docs/IMPLEMENTATION_SUMMARY.md`: v0.10.0 base → v0.10.3 + v0.10.2 merged に更新
+
+---
+
 ## 2026-04-30: set_struct_array_property / set_struct_property nested struct fix (v0.10.2)
 
 **Issue**: [#11](https://github.com/SpirrowGames/spirrow-unrealwise/issues/11)

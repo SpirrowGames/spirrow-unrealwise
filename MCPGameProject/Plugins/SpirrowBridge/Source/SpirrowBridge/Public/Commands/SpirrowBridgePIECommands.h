@@ -28,6 +28,7 @@ private:
 
     // Camera + screenshot (PIE viewport)
     TSharedPtr<FJsonObject> HandleTakePIEScreenshot(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleTakePIEPOVScreenshot(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleTakeHighResScreenshot(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleGetPIECamera(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleSetPIECamera(const TSharedPtr<FJsonObject>& Params);

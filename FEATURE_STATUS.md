@@ -1,6 +1,6 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: v0.10.1 (`take_pie_pov_screenshot` via SceneCapture2D) — v0.10.2 set_struct_array_property nested struct fix + v0.10.0 PIE Control + 2026-04-26 PIE bug fixes ベース
+> **バージョン**: v0.10.3 (`take_pie_pov_screenshot` via SceneCapture2D) — v0.10.2 set_struct_array_property nested struct fix + v0.10.0 PIE Control + 2026-04-26 PIE bug fixes ベース
 > **ステータス**: Beta
 > **最終更新**: 2026-05-11
 
@@ -45,7 +45,7 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 | `gas` | Gameplay Tags、Effect、Ability | 8 | ✅ |
 | `material` | マテリアルテンプレート、作成 | 6 | ✅ |
 | `config` | Unreal Config読み書き | 3 | ✅ |
-| `pie` 🆕 v0.10.0 | PIE 起動/停止/状態、camera、screenshot (take_pie_pov_screenshot v0.10.1)、console exec、入力 simulation、PIE actor 列挙、ログ tail/filter/search/scan、Live Coding | 26 | ✅ |
+| `pie` 🆕 v0.10.0 | PIE 起動/停止/状態、camera、screenshot (take_pie_pov_screenshot v0.10.3)、console exec、入力 simulation、PIE actor 列挙、ログ tail/filter/search/scan、Live Coding | 26 | ✅ |
 
 ### スタンドアロンツール (11個 + 1 help)
 

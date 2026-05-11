@@ -4,7 +4,7 @@
 >
 > **Companion docs**: [`AGENTS.md`](../AGENTS.md) (workflow rules) · [`Docs/IMPLEMENTATION_SUMMARY.md`](IMPLEMENTATION_SUMMARY.md) (file-level prose) · [`FEATURE_STATUS.md`](../FEATURE_STATUS.md) (user-visible command list)
 >
-> **Generated against**: v0.10.1 (v0.10.2 merged) · 27 MCP tools (15 meta + 1 help + 11 standalone) · 189 commands · UE 5.7
+> **Generated against**: v0.10.3 (v0.10.2 merged) · 27 MCP tools (15 meta + 1 help + 11 standalone) · 189 commands · UE 5.7
 
 ---
 
@@ -68,7 +68,7 @@ Adding a new command means touching exactly:
 
 | Meta-tool | Commands | Python | C++ implementation files |
 |---|---|---|---|
-| `pie` | 26 | `pie_meta.py` | `SpirrowBridgePIECommands.cpp` (start/stop/state, console exec, input simulation, PIE actor enumeration, **screenshot + take_pie_pov_screenshot via SceneCapture2D 🆕 v0.10.1**, log tail/filter/search/scan, frame stepping) |
+| `pie` | 26 | `pie_meta.py` | `SpirrowBridgePIECommands.cpp` (start/stop/state, console exec, input simulation, PIE actor enumeration, **screenshot + take_pie_pov_screenshot via SceneCapture2D 🆕 v0.10.3**, log tail/filter/search/scan, frame stepping) |
 
 ---
 

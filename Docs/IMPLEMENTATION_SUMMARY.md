@@ -2,7 +2,7 @@
 
 C++ 実装の全体像。新しいセッション開始時の参照用。
 
-> **最終更新**: 2026-05-11 | **バージョン**: v0.11.0 WIP (Primitive I/O Layer — Issue #14) — v0.10.3 take_pie_pov_screenshot via SceneCapture2D + v0.10.2 set_struct_array_property nested struct fix base
+> **最終更新**: 2026-05-12 | **バージョン**: v0.11.0 WIP (Primitive I/O Layer — Issue #14, PR #15) — v0.10.3 take_pie_pov_screenshot via SceneCapture2D + v0.10.2 set_struct_array_property nested struct fix base
 
 ---
 
@@ -63,7 +63,7 @@ C++ 実装の全体像。新しいセッション開始時の参照用。
 | ファイル | サイズ | 担当 |
 |----------|--------|------|
 | `GASCommands` | 55 KB | Gameplay Ability System |
-| `CommonUtils` | 35 KB | 共通ユーティリティ |
+| `CommonUtils` | 38 KB | 共通ユーティリティ + `SpirrowBridgePrimitives` 名前空間 (primitive I/O layer、v0.11.0~) |
 | `EditorCommands` | 29 KB | アクター・エディタ |
 | `LevelCommands` | 12 KB | レベル (.umap) ライフサイクル + WorldSettings (`create_level`, `save_current_level`, `open_level`, `get_world_settings`, `set_world_properties`) |
 | `PIECommands` 🆕 v0.10.0 | ~30 KB | PIE 起動/停止/状態 + camera + screenshot + console exec + 入力 simulation + actor introspection + ログ tail/filter/search/scan + frame stepping (25 commands)。in-memory log ring buffer (FOutputDevice subscriber, 5000 行) |
@@ -167,7 +167,13 @@ Blueprint/BlueprintNode/UMGWidget/AICommands は内部で更に分割ファイ�
 - `CreateEventNode/FunctionCallNode` - ノード作成
 - `ConnectGraphNodes` - ノード接続
 - `FindPin` - ピン検索
-- `SafeCompileBlueprint` - GeneratedClass/SkeletonGeneratedClass 不整合を修正して安全にコンパイル
+- `SafeCompileBlueprint` - GeneratedClass/SkeletonGeneratedClass 不整合を修正して安全にコンパイル (v0.11.0 で `SpirrowBridgePrimitives::SafeCompileBlueprint` に移管、class member は thin wrapper)
+
+### Primitive I/O Layer (v0.11.0~) — `SpirrowBridgePrimitives` 名前空間
+ハンドラより下の必須レイヤー。bug 実績のあるパターンを CI lint で禁止し、primitive 経由を強制する。詳細: [`Architecture/PrimitiveLayerMigration.md`](Architecture/PrimitiveLayerMigration.md)
+- `SpirrowBridgePrimitives::SafeCompileBlueprint(UBlueprint*)` — 上記 wrapper の実体
+- `SpirrowBridgePrimitives::SetPropertyValueAtAddress(FProperty*, void*, JsonValue, FString&)` — 再帰 property writer (Issue #11 由来)
+- `SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<TGraphNode, TRuntimeBase>(BTGraph, RuntimeClass, Name, DisplayName, OutErr)` — BT 2 層不変条件 (FGraphNodeCreator → CreateNode → NewObject(outer=GraphNode) → wiring → Finalize) をテンプレートで集約。4 ペアの explicit instantiation あり
 
 ### v0.9.3 追加ヘルパー
 - `ResolveTargetBlueprint(Params, OutBlueprint)` - 通常BPとLevel Script Blueprintを統一解決。`target_type="level_blueprint"` + オプション `level_path` に対応。省略時は `GEditor->GetEditorWorldContext().World()->PersistentLevel->GetLevelScriptBlueprint(true)` から解決
@@ -176,6 +182,59 @@ Blueprint/BlueprintNode/UMGWidget/AICommands は内部で更に分割ファイ�
 - `SpawnExternalPropertyGetNode(Graph, OwnerClass, PropName, Pos, OutError)` - 同じく `UK2Node_VariableGet` 生成 (BlueprintVisible 必須)
 
 > エラーコード一覧: [ERROR_CODES.md](ERROR_CODES.md)
+
+---
+
+## v0.11.0 新機能 (2026-05-12) — Primitive I/O Layer (Issue #14, PR #15)
+
+### 目的
+
+Issue #11 nested struct / SafeCompileBlueprint AV / BT 2 層問題 で繰り返された「ハンドラが UE 内部 API を直接叩き、各ハンドラが個別に不変条件を再実装」構造を断ち切る。`SpirrowBridgePrimitives` 名前空間をハンドラ層より下の必須レイヤーとして制度化し、bug 実績のあるパターン (`FBlueprintEditorUtils::CompileBlueprint(` / `FGraphNodeCreator<\w`) の直呼びを CI lint で禁止。
+
+### 変更内容
+
+| 種別 | 場所 | 内容 |
+|---|---|---|
+| 新規 | `Docs/Architecture/PrimitiveLayerMigration.md` | primitive 層の役割 / boy scout rule / sub-function 分解ガイドライン / `SPIRROW_PRIMITIVE_BYPASS` escape hatch / Future primitive 候補 (`SafeCaptureSceneAndReadback` / Live Coding `TWeakObjectPtr` 静的キャッシュ) |
+| 新規 | `.github/workflows/lint-primitive-bypass.yml` | ripgrep ベースの CI lint。pattern は実コードのみマッチ (doc コメント false positive 回避) |
+| 新規 | `Python/tests/verify_safe_create_bt_graph_runtime_node.py` | BT primitive の E2E verify (3/3 PASS 確認済 on live MCPGameProject editor) |
+| 変更 | `SpirrowBridgeCommonUtils.{h,cpp}` | `namespace SpirrowBridgePrimitives` 整備。`SafeCompileBlueprint` / `SetPropertyValueAtAddress` を移管 (class member は thin wrapper として残置、22 call site の source 互換維持)。`SafeCreateBTGraphAndRuntimeNode<TGraphNode, TRuntimeBase>` template + 4 ペア explicit instantiation 追加 |
+| 変更 | `SpirrowBridgeAICommands_BTNodeCreation.cpp` | お手本書き換え: regular Composite (Sequence/Selector/Parallel) 分岐を primitive 経由に。残り 3 分岐 (SimpleParallel / Task / SubtreeTask) は boy scout 待ちで `SPIRROW_PRIMITIVE_BYPASS: boy-scout migration deferred (Issue #14)` tag |
+
+### `SafeCreateBTGraphAndRuntimeNode<TGraphNode, TRuntimeBase>` 不変条件
+
+```cpp
+namespace SpirrowBridgePrimitives {
+    template <typename TGraphNode, typename TRuntimeBase>
+    TGraphNode* SafeCreateBTGraphAndRuntimeNode(
+        UBehaviorTreeGraph* BTGraph,
+        UClass* RuntimeNodeClass,
+        const FName& RuntimeNodeName,
+        const FString& OptionalDisplayName,
+        FString& OutError);
+}
+```
+
+1. `FGraphNodeCreator<TGraphNode>` → `CreateNode()`
+2. `NewObject<TRuntimeBase>(GraphNode, RuntimeClass, Name, RF_Transactional)` — 必ず GraphNode を Outer に
+3. `GraphNode->NodeInstance` / `GraphNode->ClassData` を wire
+4. `NodeCreator.Finalize()` (AllocateDefaultPins が NodeInstance attached の状態で走る)
+
+Explicit instantiation 4 ペア: `<Composite, UBTCompositeNode>` / `<SimpleParallel, UBTCompositeNode>` / `<Task, UBTTaskNode>` / `<SubtreeTask, UBTTaskNode>`
+
+### Lint 設定 (`.github/workflows/lint-primitive-bypass.yml`)
+
+- Glob: `MCPGameProject/Plugins/SpirrowBridge/**/*.{cpp,h}`、ただし `SpirrowBridgeCommonUtils.cpp` (primitive 実装本体) は除外
+- Pattern: `FBlueprintEditorUtils::CompileBlueprint\(` / `FGraphNodeCreator<\w` (`(` / `\w` で実コードのみマッチ、doc コメントは false positive にならない)
+- Escape: 同じ行に `SPIRROW_PRIMITIVE_BYPASS` token を含むコメントがあれば skip
+
+### スコープ
+
+Naysayer-review (`T-primitive-io-layer-mandate` msg-002 → msg-003 decide) で削減済。**OUT**: `SafeFindWidget` / `SafeSaveAsset` / 全 148 ハンドラ移行 / clang-tidy / Editor-Runtime-PIE 名前空間分離 / Engine plugin DoD。バグ実績ベース、boy scout で漸進的に migration。
+
+### コマンド数
+
+189 (変更なし、refactor のみ)
 
 ---
 

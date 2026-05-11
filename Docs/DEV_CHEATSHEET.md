@@ -4,7 +4,7 @@
 >
 > **Companion docs**: [`AGENTS.md`](../AGENTS.md) (workflow rules) · [`Docs/IMPLEMENTATION_SUMMARY.md`](IMPLEMENTATION_SUMMARY.md) (file-level prose) · [`FEATURE_STATUS.md`](../FEATURE_STATUS.md) (user-visible command list)
 >
-> **Generated against**: v0.9.9 · 25 MCP tools · 158 commands · UE 5.7
+> **Generated against**: v0.10.1 (v0.10.2 merged) · 27 MCP tools (15 meta + 1 help + 11 standalone) · 189 commands · UE 5.7
 
 ---
 
@@ -27,7 +27,7 @@ Adding a new command means touching exactly:
 
 | Meta-tool | Commands | Python | C++ class | C++ files |
 |---|---|---|---|---|
-| `editor` | 17 | `editor_meta.py` | `FSpirrowBridgeEditorCommands` + `FSpirrowBridgeLevelCommands` | `SpirrowBridgeEditorCommands.cpp` (actor / spawn / properties / asset rename / viewport), `SpirrowBridgeLevelCommands.cpp` (create_level / save_current_level / open_level / get_world_settings / set_world_properties) |
+| `editor` | 22 | `editor_meta.py` | `FSpirrowBridgeEditorCommands` + `FSpirrowBridgeLevelCommands` | `SpirrowBridgeEditorCommands.cpp` (actor / spawn / properties / asset rename / viewport / **screenshot + camera + showflag + live_coding** 🆕 v0.10.0), `SpirrowBridgeLevelCommands.cpp` (create_level / save_current_level / open_level / get_world_settings / set_world_properties) |
 
 > Note: `editor` is the only meta-tool routed to **two** handler classes. The `else if` in `SpirrowBridge.cpp` has separate branches (one for actor commands → `EditorCommands`, one for level/worldsettings commands → `LevelCommands`).
 
@@ -42,7 +42,7 @@ Adding a new command means touching exactly:
 
 | Meta-tool | Commands | Python | C++ router | C++ implementation files |
 |---|---|---|---|---|
-| `umg_widget` | 19 | `umg_meta.py` | `FSpirrowBridgeUMGWidgetCommands` (`SpirrowBridgeUMGWidgetCommands.cpp`, ~1.5 KB) | `SpirrowBridgeUMGWidgetCoreCommands.cpp` (create widget / viewport / anchor + parent_class generalized in v0.9.6), `SpirrowBridgeUMGWidgetBasicCommands.cpp` (text / image / progressbar / **border** 🆕 v0.9.6), `SpirrowBridgeUMGWidgetInteractiveCommands.cpp` (button / slider / checkbox / etc.) |
+| `umg_widget` | 18 | `umg_meta.py` | `FSpirrowBridgeUMGWidgetCommands` (`SpirrowBridgeUMGWidgetCommands.cpp`, ~1.5 KB) | `SpirrowBridgeUMGWidgetCoreCommands.cpp` (create widget / viewport / anchor + parent_class generalized in v0.9.6), `SpirrowBridgeUMGWidgetBasicCommands.cpp` (text / image / progressbar / **border** 🆕 v0.9.6), `SpirrowBridgeUMGWidgetInteractiveCommands.cpp` (button / slider / checkbox / etc.) |
 | `umg_layout` | 6 | `umg_meta.py` | — | `SpirrowBridgeUMGLayoutCommands.cpp` (vbox / hbox / **widget_switcher** 🆕 v0.9.6 / scrollbox / reparent / get-elements / set-slot [extended with anchor_min/max + LTRB offsets 🆕 v0.9.6] / remove) |
 | `umg_variable` | 5 | `umg_meta.py` | — | `SpirrowBridgeUMGVariableCommands.cpp` (widget variables / array vars / functions / events) |
 | `umg_animation` | 4 | `umg_meta.py` | — | `SpirrowBridgeUMGAnimationCommands.cpp` (create animation / track / keyframe / list) |
@@ -63,6 +63,12 @@ Adding a new command means touching exactly:
 | `config` | 3 | `config_meta.py` | `SpirrowBridgeConfigCommands.cpp` (INI read / write / list) |
 | `material` | 6 (4 RAG + 2 C++) | `material_meta.py` (async) | `SpirrowBridgeMaterialCommands.cpp` (create from template) — RAG-only commands hit the standalone material RAG service |
 | `gas` | 8 | `gas_meta.py` | `SpirrowBridgeGASCommands.cpp` (gameplay tags / effects / abilities / attribute set / replication) |
+
+### PIE (Play-In-Editor) 🆕 v0.10.0
+
+| Meta-tool | Commands | Python | C++ implementation files |
+|---|---|---|---|
+| `pie` | 26 | `pie_meta.py` | `SpirrowBridgePIECommands.cpp` (start/stop/state, console exec, input simulation, PIE actor enumeration, **screenshot + take_pie_pov_screenshot via SceneCapture2D 🆕 v0.10.1**, log tail/filter/search/scan, frame stepping) |
 
 ---
 
@@ -134,6 +140,7 @@ get_config_value / ...                     → ConfigCommands
 create_behavior_tree / add_bb_key / ...    → AICommands (router → splits to Blackboard/BT/BTNode*)
 configure_ai_perception_sight / ...        → AIPerceptionCommands
 register_eqs_query / ...                   → EQSCommands
+start_pie / take_pie_screenshot / take_pie_pov_screenshot / ... → PIECommands
 ```
 
 If your new command doesn't fit any existing branch, you're either creating a new meta-tool (separate workflow) or you misclassified — re-pick from the table above.

@@ -4,6 +4,60 @@
 
 ---
 
+## 2026-05-11: Primitive I/O Layer 制度化 (v0.11.0)
+
+**Issue**: [#14](https://github.com/SpirrowGames/spirrow-unrealwise/issues/14)
+**Branch**: `refactor/v0.11.0-primitive-io-layer`
+
+### 概要
+
+過去 1 年に繰り返し発生した同型バグ (Issue #11 nested struct / SafeCompileBlueprint AV / BT 2 層問題) の根本原因 — 「ハンドラが UE 内部 API を直接叩き、各ハンドラが個別に不変条件を再実装」 — を断ち切るため、`SpirrowBridgePrimitives` namespace を **ハンドラ層より下の必須レイヤー** として制度化。バグ実績のあるパターン 2 種 (`FBlueprintEditorUtils::CompileBlueprint` / `FGraphNodeCreator<>`) の直呼びを CI lint で禁止。
+
+スコープは naysayer-review で削減済。`SafeFindWidget` / `SafeSaveAsset` / 全 148 ハンドラ移行 / clang-tidy / Editor-Runtime-PIE 分離は OUT。
+
+### 修正内容
+
+#### 1. `SpirrowBridgePrimitives` namespace 整備
+
+`SpirrowBridgeCommonUtils.{h,cpp}` に namespace 新設。既存の 2 関数を移管:
+
+- `SafeCompileBlueprint(UBlueprint*)` — GeneratedClass/SkeletonGeneratedClass 不整合解消
+- `SetPropertyValueAtAddress(FProperty*, void*, JsonValue, FString&)` — 再帰 property writer (Issue #11)
+
+`FSpirrowBridgeCommonUtils` の static method は thin wrapper として残置 (既存 22 call site の source 互換を維持)。新規ハンドラは namespace を直呼び。
+
+#### 2. `SafeCreateBTGraphAndRuntimeNode<TGraphNode, TRuntimeBase>` 新規実装
+
+BT 2 層不変条件 (`FGraphNodeCreator` → `CreateNode` → `NewObject(outer=GraphNode)` → `NodeInstance/ClassData` wiring → `Finalize`) を template primitive として集約。Explicit instantiation を 4 ペア追加:
+
+- `<UBehaviorTreeGraphNode_Composite, UBTCompositeNode>`
+- `<UBehaviorTreeGraphNode_SimpleParallel, UBTCompositeNode>`
+- `<UBehaviorTreeGraphNode_Task, UBTTaskNode>`
+- `<UBehaviorTreeGraphNode_SubtreeTask, UBTTaskNode>`
+
+#### 3. `Docs/Architecture/PrimitiveLayerMigration.md` 新規作成
+
+primitive 層の役割、sub-function 分解ガイドライン (~200 行で再分解)、boy scout rule (専用 migration 期間は作らない)、`SPIRROW_PRIMITIVE_BYPASS` escape hatch、Future primitive 候補 (`SafeCaptureSceneAndReadback` + Live Coding 互換性メモ) を記載。
+
+#### 4. CI lint workflow (`.github/workflows/lint-primitive-bypass.yml`)
+
+ripgrep ベースで `FBlueprintEditorUtils::CompileBlueprint(` / `FGraphNodeCreator<\w` の直呼びを検出。`SpirrowBridgeCommonUtils.cpp` (primitive impl 本体) を除外。同一行に `SPIRROW_PRIMITIVE_BYPASS: <理由>` コメントがあればスキップ。
+
+#### 5. お手本ハンドラ書き換え
+
+`SpirrowBridgeAICommands_BTNodeCreation.cpp` の regular Composite (Sequence/Selector/Parallel) 分岐を `SafeCreateBTGraphAndRuntimeNode` 経由に書き換え。新規ハンドラ作成時の参照実装。残り 3 分岐 (SimpleParallel / Task / SubtreeTask) は boy scout 待ちとして `SPIRROW_PRIMITIVE_BYPASS` tag 付与。
+
+### Verify
+
+- `Python/tests/verify_safe_create_bt_graph_runtime_node.py` — primitive 経由の composite 生成 + 2 層不変条件の確認 (子 task 接続成功 = `GraphNode->NodeInstance` が有効) + structure dump 検証
+
+### 設計討論ログ
+
+- Chatroom thread: `T-primitive-io-layer-mandate` (project=spirrow-unrealwise)
+  - msg-001 propose / msg-002 naysayer-review / msg-003 decide / msg-004 handoff / msg-005 future-candidate report
+
+---
+
 ## 2026-05-11: `take_pie_pov_screenshot` via SceneCapture2D (v0.10.3)
 
 > ブランチ作業開始時点では v0.10.1 として番号付けされていたが、main の merge 順序 (v0.10.0 → v0.10.2 → 本 PR) と semver bump 順序を一致させるため、PR #13 review F の指摘を受けて v0.10.3 に bump (commit message の `v0.10.1` 表記は歴史的事実として残置)。

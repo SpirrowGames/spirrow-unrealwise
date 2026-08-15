@@ -422,7 +422,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTCompositeNode(
 	// SimpleParallel用の特別処理
 	if (NodeClass->GetName().Contains(TEXT("SimpleParallel")))
 	{
-		FGraphNodeCreator<UBehaviorTreeGraphNode_SimpleParallel> NodeCreator(*BTGraph);
+		FGraphNodeCreator<UBehaviorTreeGraphNode_SimpleParallel> NodeCreator(*BTGraph); // SPIRROW_PRIMITIVE_BYPASS: boy-scout migration deferred (Issue #14)
 		UBehaviorTreeGraphNode_SimpleParallel* ParallelNode = NodeCreator.CreateNode();
 
 		// ★ ユニークな名前を生成（問題3修正）★
@@ -462,42 +462,26 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTCompositeNode(
 	}
 	else
 	{
-		FGraphNodeCreator<UBehaviorTreeGraphNode_Composite> NodeCreator(*BTGraph);
-		UBehaviorTreeGraphNode_Composite* CompositeNode = NodeCreator.CreateNode();
-
-		// ★ ユニークな名前を生成（問題3修正）★
+		// お手本 migration (Issue #14): regular Composite (Sequence/Selector/Parallel)
+		// goes through SpirrowBridgePrimitives — 2-layer invariant enforced in one place.
 		FName UniqueName = GenerateUniqueBTNodeNameForCreation(BTGraph, NodeClass);
 
-		// ランタイムノード作成
-		UBTCompositeNode* RuntimeNode = NewObject<UBTCompositeNode>(
-			CompositeNode,
-			NodeClass,
-			UniqueName,             // ★ユニークな名前を使用★
-			RF_Transactional
-		);
+		FString PrimitiveError;
+		UBehaviorTreeGraphNode_Composite* CompositeNode =
+			SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<
+				UBehaviorTreeGraphNode_Composite, UBTCompositeNode>(
+				BTGraph, NodeClass, UniqueName, NodeName, PrimitiveError);
 
-		// ★ NodeInstance生成失敗チェック ★
-		if (!RuntimeNode)
+		if (!CompositeNode)
 		{
 			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
 				ESpirrowErrorCode::NodeCreationFailed,
-				FString::Printf(TEXT("Failed to create runtime composite node for class: %s"), *NodeType));
+				FString::Printf(TEXT("Failed to create runtime composite node for class %s: %s"),
+					*NodeType, *PrimitiveError));
 		}
-
-		// グラフノードにランタイムノードを関連付け
-		CompositeNode->NodeInstance = RuntimeNode;
-		CompositeNode->ClassData = FGraphNodeClassData(NodeClass, TEXT(""));
-
-		// ノード名設定
-		if (!NodeName.IsEmpty())
-		{
-			RuntimeNode->NodeName = NodeName;
-		}
-
-		NodeCreator.Finalize();
 
 		GraphNode = CompositeNode;
-		NodeId = RuntimeNode->GetName();
+		NodeId = CompositeNode->NodeInstance->GetName();
 	}
 
 	if (!GraphNode)
@@ -654,7 +638,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTTaskNode(
 
 	if (bIsSubtreeTask)
 	{
-		FGraphNodeCreator<UBehaviorTreeGraphNode_SubtreeTask> NodeCreator(*BTGraph);
+		FGraphNodeCreator<UBehaviorTreeGraphNode_SubtreeTask> NodeCreator(*BTGraph); // SPIRROW_PRIMITIVE_BYPASS: boy-scout migration deferred (Issue #14)
 		UBehaviorTreeGraphNode_SubtreeTask* SubtreeNode = NodeCreator.CreateNode();
 
 		// ★ ユニークな名前を生成（問題3修正）★
@@ -691,7 +675,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTTaskNode(
 	}
 	else
 	{
-		FGraphNodeCreator<UBehaviorTreeGraphNode_Task> NodeCreator(*BTGraph);
+		FGraphNodeCreator<UBehaviorTreeGraphNode_Task> NodeCreator(*BTGraph); // SPIRROW_PRIMITIVE_BYPASS: boy-scout migration deferred (Issue #14)
 		UBehaviorTreeGraphNode_Task* TaskNode = NodeCreator.CreateNode();
 
 		// ★ ユニークな名前を生成（問題3修正）★

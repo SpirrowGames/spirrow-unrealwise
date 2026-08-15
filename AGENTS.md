@@ -10,7 +10,7 @@ SpirrowUnrealWiseは、Unreal Engine 5とMCP（Model Context Protocol）を接�
 
 - **言語**: Python（MCP Server）+ C++（Unreal Plugin）
 - **UE バージョン**: 5.5+ / 5.7
-- **バージョン**: v0.10.0 (27 MCPツール / 188コマンド)
+- **バージョン**: v0.11.0 WIP — Primitive I/O Layer (Issue #14) / v0.10.3 base (27 MCPツール / 189コマンド)
 
 ---
 
@@ -132,6 +132,17 @@ spirrow-unrealwise/
 | 5 | `Python/tools/*_tools.py` | Pythonツール定義 |
 
 > ⚠️ #4を忘れると「Unknown command」エラー
+
+### Primitive I/O Layer 経由 (v0.11.0+)
+
+以下の UE API は **ハンドラから直接呼ぶことを禁止** (CI lint で検出)。`SpirrowBridgePrimitives` 名前空間経由で呼ぶこと:
+
+| 禁止パターン | 代わりに使う primitive |
+|---|---|
+| `FBlueprintEditorUtils::CompileBlueprint(BP)` | `SpirrowBridgePrimitives::SafeCompileBlueprint(BP)` |
+| `FGraphNodeCreator<TGraphNode>` (BT 系) | `SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<TGraphNode, TRuntimeBase>(...)` |
+
+例外的に直呼びが必要な場合は **同じ行に** `// SPIRROW_PRIMITIVE_BYPASS: <理由>` コメントを付ける。詳細は [`Docs/Architecture/PrimitiveLayerMigration.md`](Docs/Architecture/PrimitiveLayerMigration.md) を参照 (boy scout rule、sub-function 分解ガイドライン、Future primitive 候補を含む)。
 
 ---
 

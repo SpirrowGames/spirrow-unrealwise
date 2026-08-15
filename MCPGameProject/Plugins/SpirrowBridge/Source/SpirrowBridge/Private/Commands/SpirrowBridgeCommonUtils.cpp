@@ -326,13 +326,16 @@ TGraphNode* SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode(
 }
 
 // Explicit instantiations — every (TGraphNode, TRuntimeBase) pair the handlers use.
-template UBehaviorTreeGraphNode_Composite* SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<UBehaviorTreeGraphNode_Composite, UBTCompositeNode>(
+// SPIRROWBRIDGE_API on each instantiation exports the symbol from the module DLL;
+// without it the template body (private to this TU) is unreachable from any other
+// module that includes the public header — a link error, not a compile error.
+template SPIRROWBRIDGE_API UBehaviorTreeGraphNode_Composite* SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<UBehaviorTreeGraphNode_Composite, UBTCompositeNode>(
     UBehaviorTreeGraph*, UClass*, const FName&, const FString&, FString&);
-template UBehaviorTreeGraphNode_SimpleParallel* SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<UBehaviorTreeGraphNode_SimpleParallel, UBTCompositeNode>(
+template SPIRROWBRIDGE_API UBehaviorTreeGraphNode_SimpleParallel* SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<UBehaviorTreeGraphNode_SimpleParallel, UBTCompositeNode>(
     UBehaviorTreeGraph*, UClass*, const FName&, const FString&, FString&);
-template UBehaviorTreeGraphNode_Task* SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<UBehaviorTreeGraphNode_Task, UBTTaskNode>(
+template SPIRROWBRIDGE_API UBehaviorTreeGraphNode_Task* SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<UBehaviorTreeGraphNode_Task, UBTTaskNode>(
     UBehaviorTreeGraph*, UClass*, const FName&, const FString&, FString&);
-template UBehaviorTreeGraphNode_SubtreeTask* SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<UBehaviorTreeGraphNode_SubtreeTask, UBTTaskNode>(
+template SPIRROWBRIDGE_API UBehaviorTreeGraphNode_SubtreeTask* SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<UBehaviorTreeGraphNode_SubtreeTask, UBTTaskNode>(
     UBehaviorTreeGraph*, UClass*, const FName&, const FString&, FString&);
 
 // Blueprint node utilities

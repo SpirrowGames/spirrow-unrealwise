@@ -76,7 +76,7 @@ Files you do not touch stay as-is. This avoids main destabilization and lets pri
 When direct API use is genuinely justified (primitive impl itself, narrow Editor-only case primitive doesn't cover yet, etc.), suppress the lint by placing a comment on the same line:
 
 ```cpp
-FGraphNodeCreator<UBehaviorTreeGraphNode_SimpleParallel> NodeCreator(*BTGraph); // SPIRROW_PRIMITIVE_BYPASS: boy-scout migration deferred (Issue #14)
+FGraphNodeCreator<TGraphNode> NodeCreator(*BTGraph); // SPIRROW_PRIMITIVE_BYPASS: primitive impl
 ```
 
 The comment must:
@@ -84,7 +84,7 @@ The comment must:
 1. Include the literal token `SPIRROW_PRIMITIVE_BYPASS`.
 2. Give a reason — vague reasons get rejected in review.
 
-Bypass is for the rare exception, not the common case.
+Bypass is for the rare exception, not the common case. **As of v0.11.1 there are zero bypasses in handler code** — the only one left is inside the primitive implementation itself (which the lint excludes anyway). Treat a new handler-side bypass as something that needs justifying in review, not as a normal move.
 
 ---
 
@@ -107,14 +107,16 @@ Template primitive that enforces the BT 2-layer creation invariant:
 3. `GraphNode->NodeInstance` / `GraphNode->ClassData` wired.
 4. `NodeCreator.Finalize()` runs after wiring so `AllocateDefaultPins` sees `NodeInstance`.
 
-Explicit instantiations in `SpirrowBridgeCommonUtils.cpp` cover:
+The template body lives in `SpirrowBridgeCommonUtils.cpp` (not the header), so every pair a caller needs must be explicitly instantiated there. Current coverage — all four are consumed by `SpirrowBridgeAICommands_BTNodeCreation.cpp` as of v0.11.1:
 
-- `<UBehaviorTreeGraphNode_Composite, UBTCompositeNode>`
-- `<UBehaviorTreeGraphNode_SimpleParallel, UBTCompositeNode>`
-- `<UBehaviorTreeGraphNode_Task, UBTTaskNode>`
-- `<UBehaviorTreeGraphNode_SubtreeTask, UBTTaskNode>`
+- `<UBehaviorTreeGraphNode_Composite, UBTCompositeNode>` — regular Composite (Sequence / Selector / Parallel)
+- `<UBehaviorTreeGraphNode_SimpleParallel, UBTCompositeNode>` — SimpleParallel
+- `<UBehaviorTreeGraphNode_Task, UBTTaskNode>` — regular Task
+- `<UBehaviorTreeGraphNode_SubtreeTask, UBTTaskNode>` — `UBTTask_RunBehavior` subtree task
 
-Add new instantiations to that file when a new graph-node/runtime-base pair is introduced.
+Add new instantiations to that file when a new graph-node/runtime-base pair is introduced. **Mark each one `SPIRROWBRIDGE_API`** (`template SPIRROWBRIDGE_API TGraphNode* ...`) — the macro exports the symbol from the module DLL. Omitting it compiles fine and only fails at link time, and only for a *different* module, so the mistake stays invisible until the plugin is consumed from outside `SpirrowBridge`.
+
+Decorators and services are deliberately **not** covered: they build their graph nodes without `FGraphNodeCreator` (see the `FGraphNodeCreator不使用` paths in `SpirrowBridgeAICommands_BTNodeCreation.cpp`), so the 2-layer invariant this primitive enforces does not apply to them as written.
 
 ---
 

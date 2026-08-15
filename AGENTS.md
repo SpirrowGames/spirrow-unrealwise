@@ -10,7 +10,7 @@ SpirrowUnrealWiseは、Unreal Engine 5とMCP（Model Context Protocol）を接�
 
 - **言語**: Python（MCP Server）+ C++（Unreal Plugin）
 - **UE バージョン**: 5.5+ / 5.7
-- **バージョン**: v0.11.0 WIP — Primitive I/O Layer (Issue #14) / v0.10.3 base (27 MCPツール / 189コマンド)
+- **バージョン**: v0.11.1 — Primitive I/O Layer (Issue #14, 全 BT 分岐移行済) / v0.10.3 base (27 MCPツール / 189コマンド)
 
 ---
 

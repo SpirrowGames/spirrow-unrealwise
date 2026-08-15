@@ -422,43 +422,27 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTCompositeNode(
 	// SimpleParallel用の特別処理
 	if (NodeClass->GetName().Contains(TEXT("SimpleParallel")))
 	{
-		FGraphNodeCreator<UBehaviorTreeGraphNode_SimpleParallel> NodeCreator(*BTGraph); // SPIRROW_PRIMITIVE_BYPASS: boy-scout migration deferred (Issue #14)
-		UBehaviorTreeGraphNode_SimpleParallel* ParallelNode = NodeCreator.CreateNode();
-
-		// ★ ユニークな名前を生成（問題3修正）★
+		// boy-scout migration (Issue #14): SimpleParallel も primitive 経由。
+		// 2 層不変条件 (Outer=GraphNode / RF_Transactional / wiring 後に Finalize) は
+		// SafeCreateBTGraphAndRuntimeNode 側で一元的に強制される。
 		FName UniqueName = GenerateUniqueBTNodeNameForCreation(BTGraph, NodeClass);
 
-		// ランタイムノード作成（★Outer は GraphNode に★）
-		UBTCompositeNode* RuntimeNode = NewObject<UBTCompositeNode>(
-			ParallelNode,           // ★重要: GraphNode を Outer に★
-			NodeClass,
-			UniqueName,             // ★ユニークな名前を使用★
-			RF_Transactional        // ★重要: RF_Transactional フラグ★
-		);
+		FString PrimitiveError;
+		UBehaviorTreeGraphNode_SimpleParallel* ParallelNode =
+			SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<
+				UBehaviorTreeGraphNode_SimpleParallel, UBTCompositeNode>(
+				BTGraph, NodeClass, UniqueName, NodeName, PrimitiveError);
 
-		// ★ NodeInstance生成失敗チェック ★
-		if (!RuntimeNode)
+		if (!ParallelNode)
 		{
 			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
 				ESpirrowErrorCode::NodeCreationFailed,
-				FString::Printf(TEXT("Failed to create runtime composite node for class: %s"), *NodeType));
+				FString::Printf(TEXT("Failed to create runtime composite node for class %s: %s"),
+					*NodeType, *PrimitiveError));
 		}
-
-		// グラフノードにランタイムノードを関連付け
-		ParallelNode->NodeInstance = RuntimeNode;
-		ParallelNode->ClassData = FGraphNodeClassData(NodeClass, TEXT(""));
-
-		// ノード名設定
-		if (!NodeName.IsEmpty())
-		{
-			RuntimeNode->NodeName = NodeName;
-		}
-
-		// ★重要: Finalize() を必ず呼ぶ（AllocateDefaultPins() が実行される）★
-		NodeCreator.Finalize();
 
 		GraphNode = ParallelNode;
-		NodeId = RuntimeNode->GetName();
+		NodeId = ParallelNode->NodeInstance->GetName();
 	}
 	else
 	{
@@ -638,77 +622,47 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTTaskNode(
 
 	if (bIsSubtreeTask)
 	{
-		FGraphNodeCreator<UBehaviorTreeGraphNode_SubtreeTask> NodeCreator(*BTGraph); // SPIRROW_PRIMITIVE_BYPASS: boy-scout migration deferred (Issue #14)
-		UBehaviorTreeGraphNode_SubtreeTask* SubtreeNode = NodeCreator.CreateNode();
-
-		// ★ ユニークな名前を生成（問題3修正）★
+		// boy-scout migration (Issue #14): SubtreeTask も primitive 経由。
 		FName UniqueName = GenerateUniqueBTNodeNameForCreation(BTGraph, TaskClass);
 
-		// ランタイムノード作成
-		UBTTaskNode* RuntimeNode = NewObject<UBTTaskNode>(
-			SubtreeNode,
-			TaskClass,
-			UniqueName,             // ★ユニークな名前を使用★
-			RF_Transactional
-		);
+		FString PrimitiveError;
+		UBehaviorTreeGraphNode_SubtreeTask* SubtreeNode =
+			SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<
+				UBehaviorTreeGraphNode_SubtreeTask, UBTTaskNode>(
+				BTGraph, TaskClass, UniqueName, NodeName, PrimitiveError);
 
-		// ★ NodeInstance生成失敗チェック ★
-		if (!RuntimeNode)
+		if (!SubtreeNode)
 		{
 			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
 				ESpirrowErrorCode::NodeCreationFailed,
-				FString::Printf(TEXT("Failed to create runtime task node for class: %s"), *TaskType));
+				FString::Printf(TEXT("Failed to create runtime task node for class %s: %s"),
+					*TaskType, *PrimitiveError));
 		}
-
-		SubtreeNode->NodeInstance = RuntimeNode;
-		SubtreeNode->ClassData = FGraphNodeClassData(TaskClass, TEXT(""));
-
-		if (!NodeName.IsEmpty())
-		{
-			RuntimeNode->NodeName = NodeName;
-		}
-
-		NodeCreator.Finalize();
 
 		GraphNode = SubtreeNode;
-		NodeId = RuntimeNode->GetName();
+		NodeId = SubtreeNode->NodeInstance->GetName();
 	}
 	else
 	{
-		FGraphNodeCreator<UBehaviorTreeGraphNode_Task> NodeCreator(*BTGraph); // SPIRROW_PRIMITIVE_BYPASS: boy-scout migration deferred (Issue #14)
-		UBehaviorTreeGraphNode_Task* TaskNode = NodeCreator.CreateNode();
-
-		// ★ ユニークな名前を生成（問題3修正）★
+		// boy-scout migration (Issue #14): regular Task も primitive 経由。
 		FName UniqueName = GenerateUniqueBTNodeNameForCreation(BTGraph, TaskClass);
 
-		// ランタイムノード作成
-		UBTTaskNode* RuntimeNode = NewObject<UBTTaskNode>(
-			TaskNode,
-			TaskClass,
-			UniqueName,             // ★ユニークな名前を使用★
-			RF_Transactional
-		);
+		FString PrimitiveError;
+		UBehaviorTreeGraphNode_Task* TaskNode =
+			SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<
+				UBehaviorTreeGraphNode_Task, UBTTaskNode>(
+				BTGraph, TaskClass, UniqueName, NodeName, PrimitiveError);
 
-		// ★ NodeInstance生成失敗チェック ★
-		if (!RuntimeNode)
+		if (!TaskNode)
 		{
 			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
 				ESpirrowErrorCode::NodeCreationFailed,
-				FString::Printf(TEXT("Failed to create runtime task node for class: %s"), *TaskType));
+				FString::Printf(TEXT("Failed to create runtime task node for class %s: %s"),
+					*TaskType, *PrimitiveError));
 		}
-
-		TaskNode->NodeInstance = RuntimeNode;
-		TaskNode->ClassData = FGraphNodeClassData(TaskClass, TEXT(""));
-
-		if (!NodeName.IsEmpty())
-		{
-			RuntimeNode->NodeName = NodeName;
-		}
-
-		NodeCreator.Finalize();
 
 		GraphNode = TaskNode;
-		NodeId = RuntimeNode->GetName();
+		NodeId = TaskNode->NodeInstance->GetName();
 	}
 
 	if (!GraphNode)

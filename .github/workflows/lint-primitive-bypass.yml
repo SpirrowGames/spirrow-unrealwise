@@ -7,11 +7,13 @@ name: lint-primitive-bypass
 on:
   push:
     branches: [main]
+  # No `paths:` filter on purpose. A path-filtered workflow is simply *not run*
+  # for a PR that touches nothing in the filter, so its check never reports —
+  # and a required status check that never reports blocks the PR forever.
+  # The lint itself is a single ripgrep pass (seconds), so running it on every
+  # PR is cheaper than that failure mode. Keep it unfiltered if it is ever made
+  # a required check.
   pull_request:
-    paths:
-      - 'MCPGameProject/Plugins/SpirrowBridge/Source/SpirrowBridge/**/*.cpp'
-      - 'MCPGameProject/Plugins/SpirrowBridge/Source/SpirrowBridge/**/*.h'
-      - '.github/workflows/lint-primitive-bypass.yml'
 
 jobs:
   lint:

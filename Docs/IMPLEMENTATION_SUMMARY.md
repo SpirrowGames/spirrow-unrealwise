@@ -2,7 +2,7 @@
 
 C++ 実装の全体像。新しいセッション開始時の参照用。
 
-> **最終更新**: 2026-05-12 | **バージョン**: v0.11.0 WIP (Primitive I/O Layer — Issue #14, PR #15) — v0.10.3 take_pie_pov_screenshot via SceneCapture2D + v0.10.2 set_struct_array_property nested struct fix base
+> **最終更新**: 2026-08-15 | **バージョン**: v0.11.1 (Primitive I/O Layer — Issue #14 / PR #15 merged、全 BT 分岐を primitive 経由に移行済) — v0.10.3 take_pie_pov_screenshot via SceneCapture2D + v0.10.2 set_struct_array_property nested struct fix base
 
 ---
 
@@ -185,6 +185,18 @@ Blueprint/BlueprintNode/UMGWidget/AICommands は内部で更に分割ファイ�
 
 ---
 
+## v0.11.1 (2026-08-15) — Primitive I/O Layer follow-up 完了
+
+v0.11.0 (PR #15) merge 時レビューの非ブロッカー指摘を消化。詳細は [`CHANGELOG.md`](CHANGELOG.md)。
+
+- **全 BT 分岐が primitive 経由に** — SimpleParallel / Task / SubtreeTask を移行し、`SPIRROW_PRIMITIVE_BYPASS` タグを撤去。**ハンドラ側の bypass は 0 件**、残るのは primitive 実装本体 (lint 除外) のみ。decorator / service は `FGraphNodeCreator` 非使用の別経路のため対象外。
+- **explicit instantiation に `SPIRROWBRIDGE_API`** — 無いと他モジュールからリンクエラー (コンパイルは通るため発覚が遅れる)。
+- **verify を 6 本に拡張** — 4 つの explicit instantiation すべてを live editor で通す (6/6 PASS)。戻り値の tuple/bool 不整合も修正。
+- **lint workflow の `paths` フィルタ撤去** — required check 化したときに「実行されず永久ブロック」になる罠を回避。
+- **`build_editor.bat` をリポジトリ相対に** — 別マシンの絶対パス hardcode を `%~dp0` + `UE_ROOT` に。
+
+---
+
 ## v0.11.0 新機能 (2026-05-12) — Primitive I/O Layer (Issue #14, PR #15)
 
 ### 目的
@@ -197,9 +209,9 @@ Issue #11 nested struct / SafeCompileBlueprint AV / BT 2 層問題 で繰り返�
 |---|---|---|
 | 新規 | `Docs/Architecture/PrimitiveLayerMigration.md` | primitive 層の役割 / boy scout rule / sub-function 分解ガイドライン / `SPIRROW_PRIMITIVE_BYPASS` escape hatch / Future primitive 候補 (`SafeCaptureSceneAndReadback` / Live Coding `TWeakObjectPtr` 静的キャッシュ) |
 | 新規 | `.github/workflows/lint-primitive-bypass.yml` | ripgrep ベースの CI lint。pattern は実コードのみマッチ (doc コメント false positive 回避) |
-| 新規 | `Python/tests/verify_safe_create_bt_graph_runtime_node.py` | BT primitive の E2E verify (3/3 PASS 確認済 on live MCPGameProject editor) |
+| 新規 | `Python/tests/verify_safe_create_bt_graph_runtime_node.py` | BT primitive の E2E verify (3/3 PASS 確認済 on live MCPGameProject editor) → v0.11.1 で 6/6 に拡張 |
 | 変更 | `SpirrowBridgeCommonUtils.{h,cpp}` | `namespace SpirrowBridgePrimitives` 整備。`SafeCompileBlueprint` / `SetPropertyValueAtAddress` を移管 (class member は thin wrapper として残置、22 call site の source 互換維持)。`SafeCreateBTGraphAndRuntimeNode<TGraphNode, TRuntimeBase>` template + 4 ペア explicit instantiation 追加 |
-| 変更 | `SpirrowBridgeAICommands_BTNodeCreation.cpp` | お手本書き換え: regular Composite (Sequence/Selector/Parallel) 分岐を primitive 経由に。残り 3 分岐 (SimpleParallel / Task / SubtreeTask) は boy scout 待ちで `SPIRROW_PRIMITIVE_BYPASS: boy-scout migration deferred (Issue #14)` tag |
+| 変更 | `SpirrowBridgeAICommands_BTNodeCreation.cpp` | お手本書き換え: regular Composite (Sequence/Selector/Parallel) 分岐を primitive 経由に。残り 3 分岐 (SimpleParallel / Task / SubtreeTask) は boy scout 待ちで `SPIRROW_PRIMITIVE_BYPASS: boy-scout migration deferred (Issue #14)` tag → **v0.11.1 で 3 分岐とも移行完了、tag は撤去済** |
 
 ### `SafeCreateBTGraphAndRuntimeNode<TGraphNode, TRuntimeBase>` 不変条件
 

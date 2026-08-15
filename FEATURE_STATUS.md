@@ -1,8 +1,8 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: v0.11.0 WIP (Primitive I/O Layer — Issue #14, PR #15) — v0.10.3 take_pie_pov_screenshot via SceneCapture2D + v0.10.2 set_struct_array_property nested struct fix ベース
+> **バージョン**: v0.11.1 (Primitive I/O Layer — Issue #14 / PR #15 merged + follow-up 完了) — v0.10.3 take_pie_pov_screenshot via SceneCapture2D + v0.10.2 set_struct_array_property nested struct fix ベース
 > **ステータス**: Beta
-> **最終更新**: 2026-05-12
+> **最終更新**: 2026-08-15
 
 ---
 

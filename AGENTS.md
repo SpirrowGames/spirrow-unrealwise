@@ -10,7 +10,7 @@ SpirrowUnrealWiseは、Unreal Engine 5とMCP（Model Context Protocol）を接�
 
 - **言語**: Python（MCP Server）+ C++（Unreal Plugin）
 - **UE バージョン**: 5.5+ / 5.7
-- **バージョン**: v0.11.0 WIP — Primitive I/O Layer (Issue #14) / v0.10.3 base (27 MCPツール / 189コマンド)
+- **バージョン**: v0.11.1 — Primitive I/O Layer (Issue #14, 全 BT 分岐移行済) / v0.10.3 base (27 MCPツール / 189コマンド)
 
 ---
 
@@ -143,6 +143,27 @@ spirrow-unrealwise/
 | `FGraphNodeCreator<TGraphNode>` (BT 系) | `SpirrowBridgePrimitives::SafeCreateBTGraphAndRuntimeNode<TGraphNode, TRuntimeBase>(...)` |
 
 例外的に直呼びが必要な場合は **同じ行に** `// SPIRROW_PRIMITIVE_BYPASS: <理由>` コメントを付ける。詳細は [`Docs/Architecture/PrimitiveLayerMigration.md`](Docs/Architecture/PrimitiveLayerMigration.md) を参照 (boy scout rule、sub-function 分解ガイドライン、Future primitive 候補を含む)。
+
+v0.11.1 時点で **ハンドラ側の bypass は 0 件**。新しく bypass を足すのは「レビューで理由を説明するもの」であって、通常手段ではない。
+
+---
+
+## ⚠️ PR を出す前に必ずローカルで通すこと
+
+**この repo の CI は ripgrep lint だけで、C++ を一切ビルドしない。** つまり CI が green でもコンパイルが通る保証はゼロで、ビルドの正しさは PR を出す人のローカル実行だけが担保している。self-hosted runner の都合でビルドゲートは意図的に見送っている (2026-08-15 判断) ため、この手順を飛ばすと壊れたコードがそのまま main に入る。
+
+C++ を触る PR は、出す前に最低限これを通す:
+
+```bat
+REM 1) ビルド (UE_ROOT で engine を差し替え可能、既定 UE_5.7)
+build_editor.bat
+
+REM 2) 触った領域の verify script を live editor に対して実行
+REM    例: BT primitive を触ったら
+.venv\Scripts\python.exe Python\tests\verify_safe_create_bt_graph_runtime_node.py
+```
+
+PR 本文の Test plan に **ビルド結果と verify の PASS 数を実際の出力から書く**こと (「通るはず」ではなく実行結果)。verify script が無い領域を触ったなら、`Python/tests/verify_<feature>.py` を足すところまでが PR の範囲。
 
 ---
 

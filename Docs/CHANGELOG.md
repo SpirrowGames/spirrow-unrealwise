@@ -37,6 +37,13 @@ path-filtered workflow は対象外の PR で **実行されない** = check が
 
 別マシンの絶対パス (`C:\Users\owner\Documents\Unreal Projects\...`) がハードコードされており、他の checkout では動作しなかった。`%~dp0` ベースに変更し、`UE_ROOT` 環境変数でエンジンを差し替え可能に。cmd.exe が非 ASCII を含む `REM` 行を誤パースするため ASCII のみで記述。
 
+### 6. CI ビルドゲートは入れず、ローカルビルド必須を明文化 (2026-08-15 判断)
+
+この repo の CI は ripgrep lint のみで **C++ を一切ビルドしない**。sg-tomtebo-01 の self-hosted runner は `Spirrow-VoxelWorld` に repo-level 登録されており本 repo からは使えず、UE のフルビルドを CI に載せると voxelworld CI と同一マシンで取り合いになる。稼働が断続的な本 repo にはコスト対効果が合わないため、**ビルドゲートは意図的に見送り**、代わりに手順を規約化した:
+
+- `AGENTS.md` に「PR を出す前に必ずローカルで通すこと」節を追加 (`build_editor.bat` + 該当 `verify_*.py`、結果を Test plan に実出力で書く)
+- `.github/pull_request_template.md` を新規作成し、上記をチェックリスト化
+
 ### Verify
 
 - UE 5.7 / VS 2022 で `MCPGameProjectEditor Win64 Development` ビルド成功 (`Result: Succeeded`)。新規 warning なし。

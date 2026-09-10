@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:tools-blueprint
+title: Tool Docs Blueprint Tools
+product: spirrow-unrealwise
+type: reference
+status: active
+version: 1.0
+created: 2025-03-26
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [ツール, Blueprint, リファレンス]
+legacy_drive_id: [18xN4JAulpQEE8k7FcUKfM7afMVM1aylAhLu_oQSD1YA]
+---
+
 # Unreal MCP Blueprint Tools
 
 This document provides detailed information about the Blueprint tools available in the Unreal MCP integration.

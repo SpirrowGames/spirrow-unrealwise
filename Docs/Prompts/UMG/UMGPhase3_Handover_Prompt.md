@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:umg-phase3-handover-prompt
+title: UMG Phase 3 完了報告 & 引き継ぎ
+product: spirrow-unrealwise
+type: brief
+status: active
+version: 1.0
+created: 2026-01-03
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [UMG, Phase3, Animation, Array, 引き継ぎ]
+legacy_drive_id: [1tkUkc7PPv2rM1f9OMtf4fjdj0FIBg4WBtLSvV_hMa2Q]
+---
+
 # UMG Phase 3 完了報告 & 引き継ぎドキュメント
 
 ## プロジェクト情報

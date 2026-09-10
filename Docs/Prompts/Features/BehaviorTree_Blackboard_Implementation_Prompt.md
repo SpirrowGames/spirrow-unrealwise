@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:phase-f-bt-blackboard-prompt
+title: Phase F BehaviorTree/Blackboard 実装Prompt
+product: spirrow-unrealwise
+type: brief
+status: active
+version: 1.0
+created: 2026-01-06
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [PhaseF, BehaviorTree, Blackboard, プロンプト]
+legacy_drive_id: [1ZJan6oonorfPns_TbaShunAegxvwrD1BWU6Utiiww38]
+---
+
 # BehaviorTree / Blackboard 操作ツール実装
 
 ## 概要

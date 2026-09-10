@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:patterns
+title: PATTERNS 実装パターン集
+product: spirrow-unrealwise
+type: reference
+status: active
+version: 1.0
+created: 2026-01-03
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [実装パターン, リファレンス]
+legacy_drive_id: [1Na_8Mv4KRaaJkfMHVYHw9zLHsiTUTInHskEPHBGk7FM]
+---
+
 # SpirrowBridge 実装パターン集
 
 このドキュメントは、SpirrowBridge開発時に使用する標準的な実装パターンをまとめたものです。

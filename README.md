@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:readme
+title: README プロジェクト概要
+product: spirrow-unrealwise
+type: reference
+status: active
+version: 1.0
+created: 2025-03-26
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [README, 概要]
+legacy_drive_id: [1fiMtintyaatvrFIe30L4GswjCGflntF32rNmOug1aQE]
+---
+
 # SpirrowUnrealWise
 
 [![Unreal Engine](https://img.shields.io/badge/Unreal%20Engine-5.5+-blue)](https://www.unrealengine.com/)

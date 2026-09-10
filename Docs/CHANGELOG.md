@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:changelog
+title: CHANGELOG 更新履歴
+product: spirrow-unrealwise
+type: reference
+status: active
+version: 1.0
+created: 2026-01-06
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [CHANGELOG, 更新履歴]
+legacy_drive_id: [1mtX6Ut2qfSA7k_oFm_dipGT7xZt02Tv5E73LQhXO5ZA]
+---
+
 # 更新履歴 (Changelog)
 
 このファイルはspirrow-unrealwiseの詳細な更新履歴をアーカイブしています。

@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:implementation-summary
+title: IMPLEMENTATION_SUMMARY C++実装サマリ
+product: spirrow-unrealwise
+type: reference
+status: active
+version: 1.0
+created: 2026-01-02
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [実装サマリ, C++, リファレンス]
+legacy_drive_id: [1WrJN-S9bDeabc9rvBfz1wSjGUzEUYKqWYfU-V1sSZQQ]
+---
+
 # SpirrowBridge 実装サマリ
 
 C++ 実装の全体像。新しいセッション開始時の参照用。

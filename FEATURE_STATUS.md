@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:feature-status
+title: FEATURE_STATUS 全ツール一覧
+product: spirrow-unrealwise
+type: reference
+status: active
+version: 1.0
+created: 2025-12-03
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [FEATURE_STATUS, ツール一覧]
+legacy_drive_id: [1jBpq8oFi9SvKzZIVaBhOuyXjbROpEnwJKNHxVkMGLDo]
+---
+
 # spirrow-unrealwise 機能ステータス
 
 > **バージョン**: v0.11.1 (Primitive I/O Layer — Issue #14 / PR #15 merged + follow-up 完了) — v0.10.3 take_pie_pov_screenshot via SceneCapture2D + v0.10.2 set_struct_array_property nested struct fix ベース

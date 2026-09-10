@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:umg-phase2-handover-prompt
+title: UMG Phase 2 完了 & Phase 3 引き継ぎ
+product: spirrow-unrealwise
+type: brief
+status: active
+version: 1.0
+created: 2026-01-03
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [UMG, Phase2, 引き継ぎ]
+legacy_drive_id: [1JpxB74VKImFMfasuk1l5z4ceC7He0IVtqSbh_gKBAZ8]
+---
+
 # UMG Phase 2 完了報告 & Phase 3 引き継ぎドキュメント
 
 ## プロジェクト情報

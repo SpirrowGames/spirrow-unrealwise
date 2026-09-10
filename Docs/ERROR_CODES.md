@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:error-codes
+title: ERROR_CODES エラーコード一覧
+product: spirrow-unrealwise
+type: reference
+status: active
+version: 1.0
+created: 2026-01-06
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [エラーコード, リファレンス]
+legacy_drive_id: [1gmuZfCoUSI3YwPHIAFQ0YI4fGVGCtSRUodR5mfVotpk]
+---
+
 # エラーコード一覧
 
 SpirrowBridge で使用されるエラーコード体系。

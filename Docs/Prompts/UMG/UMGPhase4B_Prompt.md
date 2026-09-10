@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:umg-phase4b-prompt
+title: UMG Phase 4B
+product: spirrow-unrealwise
+type: brief
+status: active
+version: 1.0
+created: 2026-01-03
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [UMG, Phase4B, プロンプト]
+legacy_drive_id: [1TKVrl5iediGt7mUhw1gi7FmEqbeI-JFqo1yyLVuuZKA]
+---
+
 # UMG Phase 4-B: 追加インタラクティブ Widget 実装
 
 ## 概要

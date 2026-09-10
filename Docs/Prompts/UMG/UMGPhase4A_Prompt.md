@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:umg-phase4a-prompt
+title: UMG Phase 4A Interactive Widgets
+product: spirrow-unrealwise
+type: brief
+status: active
+version: 1.0
+created: 2026-01-03
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [UMG, Phase4A, Interactive Widgets, プロンプト]
+legacy_drive_id: [1a9p6VuLI_EPxCMhvh8NdxafiulHdY5Btx-Wtttr80E8]
+---
+
 # UMG Phase 4-A: インタラクティブ Widget 実装
 
 ## 概要

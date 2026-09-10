@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:bt-graph-based-node-creation-prompt
+title: BT Graph-Based Node Creation (UE5.7対応)
+product: spirrow-unrealwise
+type: brief
+status: active
+version: 1.0
+created: 2026-01-09
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [BehaviorTree, ノード生成, UE5.7, プロンプト]
+legacy_drive_id: [1BSpsu0tdRKwEPL7JWpMyCdg-Fe5eAY2fyL_iXPFTMqA]
+---
+
 # BehaviorTree グラフベースノード作成 - 修正指示書 v2
 # UE5.7対応 - RAGサーバ知見統合版
 

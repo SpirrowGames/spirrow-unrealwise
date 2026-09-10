@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:refactor-unrealmcpbridge-split
+title: Refactoring UnrealMCPBridge分割計画
+product: spirrow-unrealwise
+type: brief
+status: active
+version: 1.0
+created: 2025-03-29
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [refactoring, UnrealMCPBridge, 分割]
+legacy_drive_id: [1AudzuaENZ1y-HZ7YO6b41f3h58foPNtc62pEfAw4IAc]
+---
+
 # Refactoring Plan for UnrealMCPBridge
 
 ## Overview

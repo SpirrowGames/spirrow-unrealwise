@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:agents-guide
+title: AGENTS AIエージェント実装ガイド
+product: spirrow-unrealwise
+type: reference
+status: active
+version: 1.0
+created: 2025-12-03
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [AGENTS, エージェント, 運用ルール]
+legacy_drive_id: [1CNAyVvUvlrZPKayvExI-6qw0MwCv6yYgIc0zJ_tiXtM]
+---
+
 # AGENTS.md - SpirrowUnrealWise
 
 > AIエージェント向け実装ガイド（ツール非依存）

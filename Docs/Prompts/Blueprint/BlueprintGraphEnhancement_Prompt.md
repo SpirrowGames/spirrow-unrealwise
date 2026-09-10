@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:blueprint-graph-enhancement-prompt
+title: BlueprintGraph読み取り強化 実装Prompt
+product: spirrow-unrealwise
+type: brief
+status: active
+version: 1.0
+created: 2026-01-03
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [Blueprint, BlueprintGraph, プロンプト]
+legacy_drive_id: [1MgG90AAZRrT4bQ_5u54d6l77tGSoUCv3P9M2CDkxycA]
+---
+
 # Blueprint Graph読み取り機能強化 実装プロンプト
 
 ## 概要

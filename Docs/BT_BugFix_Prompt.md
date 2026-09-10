@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:bt-bugfix-prompt
+title: BT BugFix Decorator重複/Delete/ListNodes
+product: spirrow-unrealwise
+type: brief
+status: active
+version: 1.0
+created: 2026-01-09
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [BehaviorTree, バグ修正, Decorator, プロンプト]
+legacy_drive_id: [1Crr_zwyWjE7jw6U9E6ud8kMT35qH9v-6j2z1YjSxpik]
+---
+
 # Claude Code 引き継ぎ指示書: BehaviorTree バグ修正
 
 ## コンテキスト

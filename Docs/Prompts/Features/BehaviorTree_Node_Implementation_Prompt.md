@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:phase-g-bt-node-prompt
+title: Phase G BT Node操作 実装Prompt
+product: spirrow-unrealwise
+type: brief
+status: active
+version: 1.0
+created: 2026-01-06
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [PhaseG, BehaviorTree, ノード操作, プロンプト]
+legacy_drive_id: [1K8GTOMOZUSZRD7V4j1EO4Qq9qiXNxbXLBiLUvIDN55M]
+---
+
 # BehaviorTree ノード操作ツール実装 (Phase G)
 
 ## 概要

@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:umg-phase1-designer-operations-prompt
+title: UMG Phase 1 Designer操作 実装Prompt
+product: spirrow-unrealwise
+type: brief
+status: active
+version: 1.0
+created: 2026-01-03
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [UMG, Phase1, Designer, プロンプト]
+legacy_drive_id: [1l1lxMfueCKoTQPfOw5BO1JlrfgfqG65Lu3Xslxwkkv8]
+---
+
 # UMG Phase 1: Designer 操作の完全化
 
 ## 概要

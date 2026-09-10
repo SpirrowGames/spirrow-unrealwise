@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:tools-project
+title: Tool Docs Project & Enhanced Input Tools
+product: spirrow-unrealwise
+type: reference
+status: active
+version: 1.0
+created: 2025-12-13
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [ツール, Project, EnhancedInput, リファレンス]
+legacy_drive_id: [1LY1KzMyxA1n9Q6FjDy_5oPIcT0XynBuGc8dCh_b04Dk]
+---
+
 # Project Tools
 
 Project-wide tools for managing input systems and project settings.

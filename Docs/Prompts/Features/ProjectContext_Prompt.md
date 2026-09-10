@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:projectcontext-rag-prompt
+title: ProjectContext RAG機能 実装Prompt
+product: spirrow-unrealwise
+type: brief
+status: active
+version: 1.0
+created: 2026-01-03
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [ProjectContext, RAG, プロンプト]
+legacy_drive_id: [1-OPX5lzlfeMXwiW-ZYcal6arSAld3WlDZilETBsvz8I]
+---
+
 # 機能名: プロジェクトコンテキスト管理機能 実装
 
 ## 概要

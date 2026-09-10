@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:refactor-umgcommands-split-prompt
+title: Refactoring UMGCommands分割 Prompt
+product: spirrow-unrealwise
+type: brief
+status: active
+version: 1.0
+created: 2026-01-03
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [refactoring, UMGCommands, 分割, プロンプト]
+legacy_drive_id: [1h1_g86fJGP8tFXOC8yAvc6G7AXXlBoiS_q7G5PGc060]
+---
+
 # UMGCommands 分割リファクタリング実装プロンプト
 
 ## 概要

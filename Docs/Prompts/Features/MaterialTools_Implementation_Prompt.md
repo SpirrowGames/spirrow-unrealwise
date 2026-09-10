@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:material-tools-prompt
+title: Material Tools 実装Prompt
+product: spirrow-unrealwise
+type: brief
+status: active
+version: 1.0
+created: 2026-01-03
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [Material, ツール, プロンプト]
+legacy_drive_id: [1JYoOtcWo6psX6T9vmXAMq_puJbS0yY-uZGGt2XarQ7c]
+---
+
 # マテリアル作成ツール実装
 
 ## 概要

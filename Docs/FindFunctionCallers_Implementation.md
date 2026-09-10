@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:findfunctioncallers-implementation
+title: FindFunctionCallers 実装ドキュメント
+product: spirrow-unrealwise
+type: note
+status: active
+version: 1.0
+created: 2026-01-26
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [FindFunctionCallers, 実装, Blueprint]
+legacy_drive_id: [1DNrfw3ycSgNpTrwmzsFhhx-l0aHuptw7ethvSFc6Nx0]
+---
+
 # Blueprint参照検索機能 (find_function_callers) 実装
 
 ## 概要

@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:tools-editor
+title: Tool Docs Editor Tools
+product: spirrow-unrealwise
+type: reference
+status: active
+version: 1.0
+created: 2025-03-26
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [ツール, Editor, リファレンス]
+legacy_drive_id: [1Aig46FWUfZVldXGP38KPybd1TZsIlK-fZwHg8E1OFEI]
+---
+
 # Unreal MCP Editor Tools
 
 This document provides detailed information about the editor tools available in the Unreal MCP integration.

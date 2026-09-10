@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:phase-h-aiperception-eqs-prompt
+title: Phase H AIPerception & EQS 実装Prompt
+product: spirrow-unrealwise
+type: brief
+status: active
+version: 1.0
+created: 2026-01-06
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [PhaseH, AIPerception, EQS, プロンプト]
+legacy_drive_id: [12V1qRb9zpgSD9O8H2g6tm1JIn2gqT9y5YjiDjSi8FDw]
+---
+
 # Phase H: AIPerception & EQS ツール実装
 
 ## 概要

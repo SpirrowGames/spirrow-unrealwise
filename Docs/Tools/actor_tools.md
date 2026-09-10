@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:tools-actor
+title: Tool Docs Actor Tools
+product: spirrow-unrealwise
+type: reference
+status: active
+version: 1.0
+created: 2025-03-26
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [ツール, Actor, リファレンス]
+legacy_drive_id: [10uch84hVuHEX8st6n-ESZjF8Aw-vOBdqav0kvD44nbY]
+---
+
 # Unreal MCP Editor Tools
 
 This document provides detailed information about the actor tools available in the Unreal MCP integration.

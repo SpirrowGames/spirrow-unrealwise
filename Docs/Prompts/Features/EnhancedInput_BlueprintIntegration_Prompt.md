@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:enhanced-input-blueprint-integration-prompt
+title: Enhanced Input Blueprint統合 実装Prompt
+product: spirrow-unrealwise
+type: brief
+status: active
+version: 1.0
+created: 2026-01-03
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [EnhancedInput, Blueprint, プロンプト]
+legacy_drive_id: [1bAsi6lAireal3Q-itbErpWWeU5sziPu0XwGcUTfzCLs]
+---
+
 # 機能名: Enhanced Input Blueprint統合機能 実装
 
 ## 概要

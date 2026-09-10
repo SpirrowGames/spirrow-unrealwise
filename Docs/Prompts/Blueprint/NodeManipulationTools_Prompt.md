@@ -1,3 +1,18 @@
+---
+id: spirrow-unrealwise:node-manipulation-tools-prompt
+title: Node Manipulation Tools 実装Prompt
+product: spirrow-unrealwise
+type: brief
+status: active
+version: 1.0
+created: 2026-01-03
+last_verified: 2026-09-10
+supersedes: []
+related: []
+keywords: [Blueprint, ノード操作, プロンプト]
+legacy_drive_id: [18v7SHbqi1ZpXVp22r6jZHT2UgYJJW00azemt_-v6Ho0]
+---
+
 # Node Manipulation Tools Implementation
 
 ## Date: 2024-12-25

@@ -196,7 +196,7 @@ Blueprintのイベントグラフ内でノードを検索します。
 **パラメータ:**
 - `blueprint_name` (string) - 対象のBlueprint名
 - `node_type` (string, optional) - 検索するノードタイプ (Event, Function, Variable, など)
-- `event_type` (string, optional) - 検索する特定のイベントタイプ (BeginPlay, Tick, など)
+- `event_type` (string, optional) - 検索する特定のイベント名。エディタ上の名前 (`BeginPlay`, `Event BeginPlay`) と内部名 (`ReceiveBeginPlay`) のどちらでも可。大文字小文字と空白は無視
 - `path` (string, optional) - コンテンツブラウザパス (デフォルト: "/Game/Blueprints")
 
 **戻り値:**

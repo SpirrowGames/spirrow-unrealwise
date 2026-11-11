@@ -434,6 +434,19 @@ COMMAND_SCHEMAS = {
                 "level_path": {"type": "str", "desc": "Level asset path. Omit for current level. Only used when target_type=level_blueprint"},
             },
         },
+        "disconnect_blueprint_nodes": {
+            "brief": "Break pin links. node_id only: every link on the node. + pin_name: every link on that pin. + target_node_id and target_pin: that one link",
+            "params": {
+                "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
+                "node_id": {"type": "str", "required": True, "desc": "Node ID whose links are broken"},
+                "pin_name": {"type": "str", "desc": "Pin on node_id. Omit to break every link on the node"},
+                "target_node_id": {"type": "str", "desc": "Other end of the single link to break (needs pin_name and target_pin)"},
+                "target_pin": {"type": "str", "desc": "Pin on target_node_id (needs pin_name and target_node_id)"},
+                "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
+                "target_type": {"type": "str", "default": "blueprint", "desc": "'blueprint' or 'level_blueprint'"},
+                "level_path": {"type": "str", "desc": "Level asset path. Omit for current level. Only used when target_type=level_blueprint"},
+            },
+        },
         "add_blueprint_variable": {
             "brief": "Add a variable to a Blueprint",
             "params": {
@@ -467,7 +480,9 @@ COMMAND_SCHEMAS = {
             "params": {
                 "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
                 "node_type": {"type": "any", "desc": "Filter by node type"},
-                "event_type": {"type": "any", "desc": "Filter by event type"},
+                "event_type": {"type": "any", "desc": "Filter events by name. Accepts the editor name (BeginPlay, 'Event BeginPlay') or the internal one (ReceiveBeginPlay); case and spaces are ignored. Each result carries name (internal) and display_name"},
+                "function_name": {"type": "str", "desc": "Filter Function nodes by exact function name"},
+                "variable_name": {"type": "str", "desc": "Filter VariableGet/VariableSet nodes by exact variable name"},
                 "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
                 "target_type": {"type": "str", "default": "blueprint", "desc": "'blueprint' or 'level_blueprint'"},
                 "level_path": {"type": "str", "desc": "Level asset path. Omit for current level. Only used when target_type=level_blueprint"},

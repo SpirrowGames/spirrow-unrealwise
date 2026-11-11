@@ -10,6 +10,10 @@
 #include "K2Node_InputAction.h"
 #include "K2Node_Self.h"
 #include "K2Node_GetSubsystem.h"
+#include "K2Node_MakeArray.h"
+#include "K2Node_MakeContainer.h"
+#include "K2Node_MakeMap.h"
+#include "K2Node_MakeSet.h"
 #include "Subsystems/EngineSubsystem.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Subsystems/WorldSubsystem.h"
@@ -59,6 +63,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeVariableCommands::HandleComma
     {
         return HandleAddGetSubsystemNode(Params);
     }
+    else if (CommandType == TEXT("add_make_container_node"))
+    {
+        return HandleAddMakeContainerNode(Params);
+    }
 
     return nullptr;
 }
@@ -87,26 +95,16 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeVariableCommands::HandleAddBl
         return Error;
     }
 
+    // Issue #23: the type used to be one of five hard-coded names. Now any
+    // built-in type, struct, enum or class, optionally in Array<> / Set<> /
+    // Map<,>. See FSpirrowBridgeCommonUtils::ResolvePinTypeFromString.
     FEdGraphPinType PinType;
-    
-    if (VariableType == TEXT("Boolean"))
-        PinType.PinCategory = UEdGraphSchema_K2::PC_Boolean;
-    else if (VariableType == TEXT("Integer") || VariableType == TEXT("Int"))
-        PinType.PinCategory = UEdGraphSchema_K2::PC_Int;
-    else if (VariableType == TEXT("Float"))
-        PinType.PinCategory = UEdGraphSchema_K2::PC_Float;
-    else if (VariableType == TEXT("String"))
-        PinType.PinCategory = UEdGraphSchema_K2::PC_String;
-    else if (VariableType == TEXT("Vector"))
-    {
-        PinType.PinCategory = UEdGraphSchema_K2::PC_Struct;
-        PinType.PinSubCategoryObject = TBaseStructure<FVector>::Get();
-    }
-    else
+    FString TypeError;
+    if (!FSpirrowBridgeCommonUtils::ResolvePinTypeFromString(VariableType, PinType, TypeError))
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(
             ESpirrowErrorCode::InvalidParameter,
-            FString::Printf(TEXT("Unsupported variable type: %s"), *VariableType));
+            FString::Printf(TEXT("Unsupported variable type: %s (%s)"), *VariableType, *TypeError));
     }
 
     FBlueprintEditorUtils::AddMemberVariable(Blueprint, FName(*VariableName), PinType);
@@ -132,6 +130,166 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeVariableCommands::HandleAddBl
     ResultObj->SetBoolField(TEXT("success"), true);
     ResultObj->SetStringField(TEXT("variable_name"), VariableName);
     ResultObj->SetStringField(TEXT("variable_type"), VariableType);
+    ResultObj->SetStringField(TEXT("resolved_type"), FSpirrowBridgeCommonUtils::DescribePinType(PinType));
+    return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeVariableCommands::HandleAddMakeContainerNode(const TSharedPtr<FJsonObject>& Params)
+{
+    FString Container;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("container"), Container))
+    {
+        return Error;
+    }
+
+    UClass* NodeClass = nullptr;
+    const FString ContainerLower = Container.ToLower();
+    if (ContainerLower == TEXT("array")) NodeClass = UK2Node_MakeArray::StaticClass();
+    else if (ContainerLower == TEXT("set")) NodeClass = UK2Node_MakeSet::StaticClass();
+    else if (ContainerLower == TEXT("map")) NodeClass = UK2Node_MakeMap::StaticClass();
+    else
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidParamValue,
+            FString::Printf(TEXT("container must be 'array', 'set' or 'map' (got '%s')"), *Container));
+    }
+    const bool bIsMap = (NodeClass == UK2Node_MakeMap::StaticClass());
+
+    int32 NumEntries = 1;
+    double NumEntriesRaw = 0.0;
+    if (Params->TryGetNumberField(TEXT("num_entries"), NumEntriesRaw))
+    {
+        NumEntries = FMath::RoundToInt32(NumEntriesRaw);
+    }
+    if (NumEntries < 1 || NumEntries > 64)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidParamValue,
+            FString::Printf(TEXT("num_entries must be between 1 and 64 (got %d)"), NumEntries));
+    }
+
+    // Optional explicit type. Without it the pins are wildcards and take their
+    // type from the first connection made through connect_blueprint_nodes.
+    FString ElementTypeName, KeyTypeName, ValueTypeName;
+    Params->TryGetStringField(TEXT("element_type"), ElementTypeName);
+    Params->TryGetStringField(TEXT("key_type"), KeyTypeName);
+    Params->TryGetStringField(TEXT("value_type"), ValueTypeName);
+
+    bool bHasExplicitType = false;
+    FEdGraphPinType ExplicitType;
+    {
+        FString TypeString;
+        if (bIsMap)
+        {
+            if (KeyTypeName.IsEmpty() != ValueTypeName.IsEmpty())
+            {
+                return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                    ESpirrowErrorCode::InvalidParams,
+                    TEXT("A map needs both key_type and value_type, or neither"));
+            }
+            if (!KeyTypeName.IsEmpty())
+            {
+                TypeString = FString::Printf(TEXT("Map<%s,%s>"), *KeyTypeName, *ValueTypeName);
+            }
+        }
+        else if (!ElementTypeName.IsEmpty())
+        {
+            TypeString = FString::Printf(TEXT("%s<%s>"), ContainerLower == TEXT("array") ? TEXT("Array") : TEXT("Set"), *ElementTypeName);
+        }
+
+        if (!TypeString.IsEmpty())
+        {
+            FString TypeError;
+            if (!FSpirrowBridgeCommonUtils::ResolvePinTypeFromString(TypeString, ExplicitType, TypeError))
+            {
+                return FSpirrowBridgeCommonUtils::CreateErrorResponse(ESpirrowErrorCode::InvalidParamValue, TypeError);
+            }
+            bHasExplicitType = true;
+        }
+    }
+
+    FVector2D NodePosition(0.0f, 0.0f);
+    if (Params->HasField(TEXT("node_position")))
+    {
+        NodePosition = FSpirrowBridgeCommonUtils::GetVector2DFromJson(Params, TEXT("node_position"));
+    }
+
+    UBlueprint* Blueprint = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetBlueprint(Params, Blueprint))
+    {
+        return Error;
+    }
+
+    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
+    if (!EventGraph)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::GraphNotFound,
+            TEXT("Failed to get event graph"));
+    }
+
+    UK2Node_MakeContainer* Node = NewObject<UK2Node_MakeContainer>(EventGraph, NodeClass);
+    Node->NodePosX = NodePosition.X;
+    Node->NodePosY = NodePosition.Y;
+    EventGraph->AddNode(Node, true);
+    Node->CreateNewGuid();
+    Node->PostPlacedNewNode();
+    Node->AllocateDefaultPins();
+    for (int32 i = 1; i < NumEntries; ++i)
+    {
+        Node->AddInputPin();
+    }
+
+    if (bHasExplicitType)
+    {
+        if (UEdGraphPin* OutputPin = Node->GetOutputPin())
+        {
+            OutputPin->PinType = ExplicitType;
+
+            // Same result as UK2Node_MakeContainer::PropagatePinType (which is
+            // protected): key / element pins take the container's key type,
+            // map value pins take its value type.
+            TArray<UEdGraphPin*> KeyPins;
+            TArray<UEdGraphPin*> ValuePins;
+            Node->GetKeyAndValuePins(KeyPins, ValuePins);
+            for (UEdGraphPin* KeyPin : KeyPins)
+            {
+                KeyPin->PinType.PinCategory = ExplicitType.PinCategory;
+                KeyPin->PinType.PinSubCategory = ExplicitType.PinSubCategory;
+                KeyPin->PinType.PinSubCategoryObject = ExplicitType.PinSubCategoryObject;
+            }
+            for (UEdGraphPin* ValuePin : ValuePins)
+            {
+                ValuePin->PinType.PinCategory = ExplicitType.PinValueType.TerminalCategory;
+                ValuePin->PinType.PinSubCategory = ExplicitType.PinValueType.TerminalSubCategory;
+                ValuePin->PinType.PinSubCategoryObject = ExplicitType.PinValueType.TerminalSubCategoryObject;
+            }
+        }
+    }
+
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
+    ResultObj->SetStringField(TEXT("node_id"), Node->NodeGuid.ToString());
+    ResultObj->SetStringField(TEXT("node_class"), Node->GetClass()->GetName());
+    ResultObj->SetStringField(TEXT("container"), ContainerLower);
+    ResultObj->SetBoolField(TEXT("typed"), bHasExplicitType);
+
+    TArray<TSharedPtr<FJsonValue>> InputPins;
+    for (const UEdGraphPin* Pin : Node->Pins)
+    {
+        if (Pin && Pin->Direction == EGPD_Input)
+        {
+            InputPins.Add(MakeShared<FJsonValueString>(Pin->PinName.ToString()));
+        }
+    }
+    ResultObj->SetArrayField(TEXT("input_pins"), InputPins);
+    if (const UEdGraphPin* OutputPin = Node->GetOutputPin())
+    {
+        ResultObj->SetStringField(TEXT("output_pin"), OutputPin->PinName.ToString());
+        ResultObj->SetStringField(TEXT("output_type"), FSpirrowBridgeCommonUtils::DescribePinType(OutputPin->PinType));
+    }
     return ResultObj;
 }
 

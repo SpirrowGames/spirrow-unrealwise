@@ -369,14 +369,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeLevelCommands::HandleSetWorldProperties(co
     for (const auto& Pair : (*PropsObjPtr)->Values)
     {
         FString ErrMsg;
-        if (FSpirrowBridgeCommonUtils::SetObjectProperty(Settings, Pair.Key, Pair.Value, ErrMsg))
+        if (FSpirrowBridgeCommonUtils::SetObjectProperty(Settings, FString(Pair.Key), Pair.Value, ErrMsg))
         {
-            AppliedArr.Add(MakeShared<FJsonValueString>(Pair.Key));
+            AppliedArr.Add(MakeShared<FJsonValueString>(FString(Pair.Key)));
         }
         else
         {
             TSharedPtr<FJsonObject> FailObj = MakeShareable(new FJsonObject);
-            FailObj->SetStringField(TEXT("property"), Pair.Key);
+            FailObj->SetStringField(TEXT("property"), FString(Pair.Key));
             FailObj->SetStringField(TEXT("error"), ErrMsg);
             FailedArr.Add(MakeShared<FJsonValueObject>(FailObj));
         }

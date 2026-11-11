@@ -1341,7 +1341,7 @@ bool FSpirrowBridgeCommonUtils::SetObjectProperty(UObject* Object, const FString
             }
             else
             {
-                CastField<FStrProperty>(KeyProp)->SetPropertyValue(MapHelper.GetKeyPtr(NewIndex), Pair.Key);
+                CastField<FStrProperty>(KeyProp)->SetPropertyValue(MapHelper.GetKeyPtr(NewIndex), FString(Pair.Key));
             }
 
             // Set value
@@ -2370,7 +2370,7 @@ bool FSpirrowBridgeCommonUtils::SetStructPropertyValue(void* StructAddr, FStruct
         for (const auto& Pair : JsonObj->Values)
         {
             FString FieldError;
-            if (!SetStructFieldValue(StructAddr, ScriptStruct, Pair.Key, Pair.Value, FieldError))
+            if (!SetStructFieldValue(StructAddr, ScriptStruct, FString(Pair.Key), Pair.Value, FieldError))
             {
                 UE_LOG(LogTemp, Warning, TEXT("Failed to set struct field '%s': %s"), *Pair.Key, *FieldError);
                 // Continue trying other fields, but mark as partial success
@@ -2724,7 +2724,7 @@ bool SpirrowBridgePrimitives::SetPropertyValueAtAddress(FProperty* Property, voi
             uint8* KeyAddr = MapHelper.GetKeyPtr(NewIdx);
             uint8* ValAddr = MapHelper.GetValuePtr(NewIdx);
             // Set key (must be a string-coercible type — wrap key as JSON string)
-            TSharedPtr<FJsonValue> KeyJson = MakeShared<FJsonValueString>(Pair.Key);
+            TSharedPtr<FJsonValue> KeyJson = MakeShared<FJsonValueString>(FString(Pair.Key));
             FString KeyError;
             if (!SetPropertyValueAtAddress(MapProp->KeyProp, KeyAddr, KeyJson, KeyError))
             {

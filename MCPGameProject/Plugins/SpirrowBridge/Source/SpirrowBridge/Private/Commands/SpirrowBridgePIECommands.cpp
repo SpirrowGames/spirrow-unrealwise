@@ -1089,12 +1089,12 @@ TSharedPtr<FJsonObject> FSpirrowBridgePIECommands::HandleSimulatePIEInput(const 
     FViewport* InputViewport = GetPIEViewportOrNull();
     auto PressKey = [&]()
     {
-        FInputKeyEventArgs Args(InputViewport, PlayerIndex, Key, IE_Pressed, 1.0f, Key.IsGamepadKey());
+        FInputKeyEventArgs Args(InputViewport, FInputDeviceId::CreateFromInternalId(PlayerIndex), Key, IE_Pressed, 1.0f, Key.IsGamepadKey(), uint64(0));
         PC->InputKey(Args);
     };
     auto ReleaseKey = [&]()
     {
-        FInputKeyEventArgs Args(InputViewport, PlayerIndex, Key, IE_Released, 0.0f, Key.IsGamepadKey());
+        FInputKeyEventArgs Args(InputViewport, FInputDeviceId::CreateFromInternalId(PlayerIndex), Key, IE_Released, 0.0f, Key.IsGamepadKey(), uint64(0));
         PC->InputKey(Args);
     };
 

@@ -497,7 +497,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetStruct
         {
             FString FieldError;
             if (!FSpirrowBridgeCommonUtils::SetStructFieldValue(
-                    ElementPtr, StructType, Pair.Key, Pair.Value, FieldError))
+                    ElementPtr, StructType, FString(Pair.Key), Pair.Value, FieldError))
             {
                 Errors.Add(FString::Printf(TEXT("Element %d field '%s': %s"),
                     i, *Pair.Key, *FieldError));
@@ -627,7 +627,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleCreateDat
         for (const auto& Pair : (*InitialValues)->Values)
         {
             FString ErrorMsg;
-            FSpirrowBridgeCommonUtils::SetObjectProperty(DataAsset, Pair.Key, Pair.Value, ErrorMsg);
+            FSpirrowBridgeCommonUtils::SetObjectProperty(DataAsset, FString(Pair.Key), Pair.Value, ErrorMsg);
         }
     }
 
@@ -1045,9 +1045,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetStruct
     {
         FString FieldError;
         if (FSpirrowBridgeCommonUtils::SetStructFieldValue(
-                ElementPtr, StructType, Pair.Key, Pair.Value, FieldError))
+                ElementPtr, StructType, FString(Pair.Key), Pair.Value, FieldError))
         {
-            UpdatedFields.Add(Pair.Key);
+            UpdatedFields.Add(FString(Pair.Key));
         }
         else
         {
@@ -1285,9 +1285,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleBatchSetP
     for (const auto& Pair : (*PropertiesObj)->Values)
     {
         FString ErrorMsg;
-        if (FSpirrowBridgeCommonUtils::SetObjectProperty(Asset, Pair.Key, Pair.Value, ErrorMsg))
+        if (FSpirrowBridgeCommonUtils::SetObjectProperty(Asset, FString(Pair.Key), Pair.Value, ErrorMsg))
         {
-            SuccessProperties.Add(Pair.Key);
+            SuccessProperties.Add(FString(Pair.Key));
         }
         else
         {

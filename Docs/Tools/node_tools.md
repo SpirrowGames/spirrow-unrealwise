@@ -110,6 +110,13 @@ Blueprintのイベントグラフ内で2つのノードを接続します。
 
 **戻り値:**
 - 成功または失敗を示すレスポンス
+- 変換ノードが自動で挿入された場合は `conversion_nodes_added` (挿入された数)
+
+**動作:**
+接続はグラフの schema を通して行われます (エディタでワイヤーをドラッグしたときと同じ)。
+- 互換性の無いピン同士はエラーになり、エラー文に schema の理由が入ります
+- ワイルドカードピン (Make Array / Make Set / Make Map) は接続先の型になります
+- 型は違うが変換が存在する場合 (int → string など)、変換ノードが間に挿入されます
 
 **例:**
 ```python
@@ -129,7 +136,7 @@ Blueprintに変数を追加します。
 **パラメータ:**
 - `blueprint_name` (string) - 対象のBlueprint名
 - `variable_name` (string) - 変数名
-- `variable_type` (string) - 変数の型 (Boolean, Integer, Float, Vector, String, など)
+- `variable_type` (string) - 変数の型。下の「変数タイプ」を参照 (コンテナ `Array<T>` / `Set<T>` / `Map<K,V>` を含む)
 - `is_exposed` (boolean, optional) - エディタに変数を公開するか (デフォルト: false)
 - `path` (string, optional) - コンテンツブラウザパス (デフォルト: "/Game/Blueprints")
 - `rationale` (string, optional) - ナレッジベース用の設計根拠
@@ -387,6 +394,36 @@ move_blueprint_node(
     blueprint_name="BP_Test",
     node_id="ABC123...",
     position=[1000, 300]
+)
+```
+
+### add_make_container_node
+
+Make Array / Make Set / Make Map ノードを追加します。配列・Set・Map を引数に取る関数へ値を渡すときに使います。
+
+**パラメータ:**
+- `blueprint_name` (string) - 対象のBlueprint名
+- `container` (string) - `array` / `set` / `map`
+- `num_entries` (int, optional) - 要素数 (map はキーと値の組の数)。1〜64 (デフォルト: 1)
+- `element_type` (string, optional) - array / set の要素の型
+- `key_type` / `value_type` (string, optional) - map のキーと値の型 (両方指定するか、両方省略)
+- `node_position` (array, optional) - [X, Y] 位置
+- `path` (string, optional) - コンテンツブラウザパス (デフォルト: "/Game/Blueprints")
+
+型を省略するとピンはワイルドカードになり、`connect_blueprint_nodes` で型のあるピンに繋いだ時点で型が決まります。
+
+**戻り値:**
+- `node_id`, `node_class`, `input_pins` (入力ピン名の配列), `output_pin`, `output_type`, `typed`
+- ピン名: array / set は `[0]`, `[1]`, ...、map は `Key 0`, `Value 0`, `Key 1`, ...。出力は `Array` / `Set` / `Map`
+
+**例:**
+```python
+add_make_container_node(
+    blueprint_name="BP_Test",
+    container="map",
+    key_type="String",
+    value_type="Vector",
+    num_entries=2
 )
 ```
 
@@ -903,10 +940,16 @@ compile_blueprint(
 `add_blueprint_variable` コマンドで使用される一般的な変数タイプ:
 
 - `Boolean` - True/false値
-- `Integer` / `Int` - 整数
-- `Float` - 浮動小数点数
-- `Vector` - 3Dベクトル値 (X, Y, Z)
-- `String` - テキスト値
+- `Byte` / `Integer` (`Int`) / `Int64` - 整数
+- `Float` - 浮動小数点数 (エディタの Float と同じ倍精度)。単精度は `Float32`
+- `String` / `Name` / `Text` - 文字列系
+- struct の名前 - `Vector`, `Rotator`, `Transform`, 自作の struct など (`F` 接頭辞はあってもなくてもよい)
+- enum の名前 - `ECollisionChannel` など
+- クラスの名前 - `Actor` など。そのクラスのオブジェクト参照になる
+- `Object<Class>` / `Class<Class>` / `SoftObject<Class>` / `SoftClass<Class>` - 参照の種類を明示
+- `Array<T>` / `Set<T>` / `Map<K,V>` - コンテナ。例 `Array<Integer>`, `Map<String,Vector>` (入れ子は不可)
+
+struct / enum / クラスは、素の名前のほかフルパス (`/Script/Module.Name`) でも指定できます。
 
 ### ピン名
 

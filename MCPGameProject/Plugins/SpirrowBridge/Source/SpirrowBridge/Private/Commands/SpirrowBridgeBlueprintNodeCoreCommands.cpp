@@ -967,7 +967,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
         // function with a return value or out parameters used to report
         // success and leave a Blueprint that does not compile (or compiles
         // with the outputs silently dropped). Such a function is overridden
-        // with a function graph, as the editor does.
+        // with a function graph, as the editor does (add_function_override).
         FString Reason;
         if (UEdGraphSchema_K2::HasFunctionAnyOutputParameter(ParentFunction))
         {
@@ -993,7 +993,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(
             ESpirrowErrorCode::InvalidOperation,
             FString::Printf(
-                TEXT("'%s' (declared on %s) cannot be overridden with an event node because %s. It must be overridden as a function graph, which add_blueprint_event_node cannot create."),
+                TEXT("'%s' (declared on %s) cannot be overridden with an event node because %s. It must be overridden as a function graph: use add_function_override. No node was added."),
                 *EventName, ParentClass ? *ParentClass->GetName() : TEXT("?"), *Reason),
             Details);
     }

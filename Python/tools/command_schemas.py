@@ -408,7 +408,7 @@ COMMAND_SCHEMAS = {
             },
         },
         "add_blueprint_function_node": {
-            "brief": "Add a function call node (regular BP or LSB). Falls back to external UPROPERTY Set/Get if function_name is Set<Prop>/Get<Prop> and no matching function exists",
+            "brief": "Add a function call node (regular BP or LSB). A UBlueprintAsyncActionBase factory is placed as an async node (response has async_action and exec_outputs, one per delegate). Falls back to external UPROPERTY Set/Get if function_name is Set<Prop>/Get<Prop> and no matching function exists",
             "params": {
                 "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
                 "target": {"type": "str", "required": True, "desc": "Target class name (function owner, or owner of UPROPERTY for fallback)"},

@@ -7,6 +7,8 @@
 #include "EdGraph/EdGraphPin.h"
 #include "K2Node_Event.h"
 #include "K2Node_CallFunction.h"
+#include "K2Node_AsyncAction.h"
+#include "Kismet/BlueprintAsyncActionBase.h"
 #include "K2Node_VariableGet.h"
 #include "K2Node_VariableSet.h"
 #include "K2Node_InputAction.h"
@@ -820,6 +822,43 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
     return ResultObj;
 }
 
+// ---------------------------------------------------------------------------
+// Async action nodes (Issue #22)
+// ---------------------------------------------------------------------------
+
+// True for the factory function of a UBlueprintAsyncActionBase subclass: the
+// functions the editor offers as an async node (UK2Node_AsyncAction) with one
+// exec output per BlueprintAssignable delegate. Same test the editor applies
+// in UK2Node_AsyncAction::GetMenuActions / RegisterClassFactoryActions.
+static bool IsAsyncActionFactory(const UFunction* Function)
+{
+    if (!Function || !Function->HasAnyFunctionFlags(FUNC_Static))
+    {
+        return false;
+    }
+    const UClass* OwnerClass = Function->GetOwnerClass();
+    if (!OwnerClass || !OwnerClass->IsChildOf(UBlueprintAsyncActionBase::StaticClass()))
+    {
+        return false;
+    }
+    const FObjectProperty* ReturnProp = CastField<FObjectProperty>(Function->GetReturnProperty());
+    return ReturnProp && ReturnProp->PropertyClass
+        && ReturnProp->PropertyClass->IsChildOf(UBlueprintAsyncActionBase::StaticClass());
+}
+
+static UK2Node_AsyncAction* CreateAsyncActionNode(UEdGraph* Graph, const UFunction* FactoryFunction, const FVector2D& Position)
+{
+    UK2Node_AsyncAction* Node = NewObject<UK2Node_AsyncAction>(Graph);
+    Node->InitializeProxyFromFunction(FactoryFunction);
+    Node->NodePosX = Position.X;
+    Node->NodePosY = Position.Y;
+    Graph->AddNode(Node, true);
+    Node->CreateNewGuid();
+    Node->PostPlacedNewNode();
+    Node->AllocateDefaultPins();
+    return Node;
+}
+
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBlueprintFunctionCall(const TSharedPtr<FJsonObject>& Params)
 {
     // Validate required parameters
@@ -868,6 +907,12 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
         {
             TargetClass = LoadObject<UClass>(nullptr, *(TEXT("/Script/Engine.") + Target));
         }
+        if (!TargetClass)
+        {
+            // Bare names of classes outside /Script/Engine (project and plugin
+            // modules), where most async action classes live.
+            TargetClass = FSpirrowBridgeCommonUtils::FindClassByNameAnywhere(Target);
+        }
         
         if (TargetClass)
         {
@@ -897,7 +942,36 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
         Function = Blueprint->GeneratedClass->FindFunctionByName(*FunctionName);
     }
 
-    if (Function && !FunctionNode)
+    // Issue #22: a UBlueprintAsyncActionBase factory placed as a plain
+    // K2Node_CallFunction has no delegate exec outputs, so nothing can ever be
+    // wired to "Completed". Place the node the editor places.
+    UK2Node_AsyncAction* AsyncNode = nullptr;
+    if (Function && IsAsyncActionFactory(Function))
+    {
+        if (Function->GetOwnerClass()->HasMetaData(TEXT("HasDedicatedAsyncNode")))
+        {
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::NotSupported,
+                FString::Printf(
+                    TEXT("'%s::%s' is an async action with its own dedicated Blueprint node class (HasDedicatedAsyncNode), which add_blueprint_function_node cannot create. No node was added."),
+                    *Function->GetOwnerClass()->GetName(), *FunctionName));
+        }
+        AsyncNode = CreateAsyncActionNode(EventGraph, Function, NodePosition);
+    }
+    // Other BlueprintInternalUseOnly functions are still placed as call nodes
+    // (some are usable that way, and the engine's own node expansion emits
+    // them), but the editor never offers them directly: they are meant to be
+    // wrapped by a dedicated node class (latent gameplay tasks, ability
+    // tasks, ...). Say so instead of returning a bare success.
+    FString InternalUseWarning;
+    if (Function && !AsyncNode && Function->GetBoolMetaData(FBlueprintMetadata::MD_BlueprintInternalUseOnly))
+    {
+        InternalUseWarning = FString::Printf(
+            TEXT("'%s::%s' is BlueprintInternalUseOnly: the editor does not offer it as a call node, and a plain call node lacks whatever its dedicated node class adds (for example delegate exec outputs)."),
+            *Function->GetOwnerClass()->GetName(), *FunctionName);
+    }
+
+    if (Function && !FunctionNode && !AsyncNode)
     {
         FunctionNode = FSpirrowBridgeCommonUtils::CreateFunctionCallNode(EventGraph, Function, NodePosition);
     }
@@ -912,7 +986,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
     UK2Node_VariableGet* FallbackGetNode = nullptr;
     FString FallbackClassName;
     FString FallbackPropertyName;
-    if (!FunctionNode && !Target.IsEmpty())
+    if (!FunctionNode && !AsyncNode && !Target.IsEmpty())
     {
         UClass* FallbackClass = FSpirrowBridgeCommonUtils::FindClassByNameAnywhere(Target);
         if (FallbackClass)
@@ -975,6 +1049,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
 
     // Resolve the final spawned node (either a function call or a variable node)
     UEdGraphNode* SpawnedNode = FunctionNode;
+    if (!SpawnedNode) SpawnedNode = AsyncNode;
     if (!SpawnedNode) SpawnedNode = FallbackSetNode;
     if (!SpawnedNode) SpawnedNode = FallbackGetNode;
 
@@ -1110,6 +1185,26 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
     ResultObj->SetBoolField(TEXT("success"), true);
     ResultObj->SetStringField(TEXT("node_id"), SpawnedNode->NodeGuid.ToString());
+    ResultObj->SetStringField(TEXT("node_class"), SpawnedNode->GetClass()->GetName());
+    if (AsyncNode)
+    {
+        // Tell the caller which exec outputs exist: "then" fires right after
+        // the call, the others when the corresponding delegate fires.
+        ResultObj->SetBoolField(TEXT("async_action"), true);
+        TArray<TSharedPtr<FJsonValue>> ExecOutputs;
+        for (const UEdGraphPin* Pin : AsyncNode->Pins)
+        {
+            if (Pin && Pin->Direction == EGPD_Output && Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec)
+            {
+                ExecOutputs.Add(MakeShared<FJsonValueString>(Pin->PinName.ToString()));
+            }
+        }
+        ResultObj->SetArrayField(TEXT("exec_outputs"), ExecOutputs);
+    }
+    if (!InternalUseWarning.IsEmpty())
+    {
+        ResultObj->SetStringField(TEXT("warning"), InternalUseWarning);
+    }
     if (FallbackSetNode || FallbackGetNode)
     {
         // Surface the fallback so callers can detect the variable-node path

@@ -1316,6 +1316,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleGetProjectInfo(cons
     ResultObj->SetStringField(TEXT("project_name"), FApp::GetProjectName());
     ResultObj->SetStringField(TEXT("engine_version"), FEngineVersion::Current().ToString());
     ResultObj->SetStringField(TEXT("project_dir"), FPaths::ProjectDir());
+    // Absolute, so two editors on different ports can be told apart (Issue #25).
+    ResultObj->SetStringField(TEXT("project_file"), FPaths::ConvertRelativePathToFull(FPaths::GetProjectFilePath()));
     ResultObj->SetStringField(TEXT("content_dir"), FPaths::ProjectContentDir());
     ResultObj->SetStringField(TEXT("saved_dir"), FPaths::ProjectSavedDir());
 

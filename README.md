@@ -91,8 +91,8 @@ Add to your `claude_desktop_config.json`:
       "command": "uv",
       "args": ["--directory", "C:/path/to/spirrow-unrealwise/Python", "run", "python", "unreal_mcp_server.py"],
       "env": {
-        "SPIRROW_UE_HOST": "127.0.0.1",
-        "SPIRROW_UE_PORT": "8080"
+        "UNREAL_HOST": "127.0.0.1",
+        "UNREAL_PORT": "55557"
       }
     }
   }
@@ -154,9 +154,27 @@ See [Docs/PATTERNS.md](Docs/PATTERNS.md) for implementation patterns and guideli
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SPIRROW_UE_HOST` | `127.0.0.1` | Unreal Editor host |
-| `SPIRROW_UE_PORT` | `8080` | Unreal Editor port |
+| `UNREAL_HOST` | `127.0.0.1` | Host the SpirrowBridge plugin listens on |
+| `UNREAL_PORT` | `55557` | Port the SpirrowBridge plugin listens on |
 | `AI_IMAGE_SERVER_URL` | `http://localhost:7860` | Stable Diffusion server |
+
+### Running two editors on one machine
+
+Each editor needs its own bridge port, and each MCP server must be pointed at the port of the editor it should drive.
+
+Editor side, first match wins:
+
+1. Command line: `UnrealEditor.exe MyProject.uproject -SpirrowBridgePort=55558`
+2. Editor ini, e.g. `Config/DefaultEditor.ini`:
+   ```ini
+   [SpirrowBridge]
+   Port=55558
+   ```
+3. Default: `55557`
+
+MCP server side: set `UNREAL_PORT` to the same number in that server's `env` block.
+
+If the port is already taken, the second editor logs `SpirrowBridge: Failed to bind listener socket ...` and is not reachable over MCP; it does not share the port. `get_project_info` returns `project_file`, which tells you which editor a connection reached.
 
 ---
 

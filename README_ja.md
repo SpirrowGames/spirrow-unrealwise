@@ -76,8 +76,8 @@ cd Python && uv sync
       "command": "uv",
       "args": ["--directory", "C:/path/to/spirrow-unrealwise/Python", "run", "python", "unreal_mcp_server.py"],
       "env": {
-        "SPIRROW_UE_HOST": "127.0.0.1",
-        "SPIRROW_UE_PORT": "8080"
+        "UNREAL_HOST": "127.0.0.1",
+        "UNREAL_PORT": "55557"
       }
     }
   }
@@ -139,9 +139,27 @@ cd Python && python tests/run_tests.py
 
 | 変数 | デフォルト | 説明 |
 |------|-----------|------|
-| `SPIRROW_UE_HOST` | `127.0.0.1` | Unreal Editorホスト |
-| `SPIRROW_UE_PORT` | `8080` | Unreal Editorポート |
+| `UNREAL_HOST` | `127.0.0.1` | SpirrowBridge プラグインが待ち受けるホスト |
+| `UNREAL_PORT` | `55557` | SpirrowBridge プラグインが待ち受けるポート |
 | `AI_IMAGE_SERVER_URL` | `http://localhost:7860` | Stable Diffusionサーバー |
+
+### 同じ PC で 2 つのエディタを動かす
+
+エディタごとに別の bridge ポートが必要で、MCP サーバーは操作したいエディタのポートに向ける。
+
+エディタ側（上から順に優先）:
+
+1. コマンドライン: `UnrealEditor.exe MyProject.uproject -SpirrowBridgePort=55558`
+2. エディタの ini（例: `Config/DefaultEditor.ini`）:
+   ```ini
+   [SpirrowBridge]
+   Port=55558
+   ```
+3. 既定値: `55557`
+
+MCP サーバー側: そのサーバーの `env` で `UNREAL_PORT` を同じ番号にする。
+
+ポートが既に使われている場合、後から起動したエディタは `SpirrowBridge: Failed to bind listener socket ...` をログに出し、MCP からは到達できない（ポートを共有しない）。`get_project_info` が返す `project_file` で、接続先がどのエディタかを確認できる。
 
 ---
 

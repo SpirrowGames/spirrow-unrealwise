@@ -22,6 +22,9 @@
 #include "Engine/Selection.h"
 #include "Kismet/GameplayStatics.h"
 #include "Async/Async.h"
+#include "Misc/CommandLine.h"
+#include "Misc/ConfigCacheIni.h"
+#include "Misc/Parse.h"
 #include "Containers/Ticker.h"  // For FTSTicker (import operations that bypass TaskGraph)
 // Add Blueprint related includes
 #include "Engine/Blueprint.h"
@@ -72,7 +75,41 @@
 
 // Default settings
 #define MCP_SERVER_HOST "127.0.0.1"
-#define MCP_SERVER_PORT 55557
+#define MCP_SERVER_DEFAULT_PORT 55557
+
+// Issue #25: the listen port used to be a compile-time constant, so two
+// editors on one machine fought over it. Resolution order:
+//   1. -SpirrowBridgePort=<n> on the editor command line
+//   2. [SpirrowBridge] Port=<n> in the editor ini (e.g. Config/DefaultEditor.ini)
+//   3. MCP_SERVER_DEFAULT_PORT
+// The Python side selects the same port with the UNREAL_PORT environment variable.
+static int32 ResolveBridgePort()
+{
+    auto IsUsable = [](int32 Candidate) { return Candidate >= 1 && Candidate <= 65535; };
+
+    int32 Value = 0;
+    if (FParse::Value(FCommandLine::Get(), TEXT("SpirrowBridgePort="), Value))
+    {
+        if (IsUsable(Value))
+        {
+            UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Port %d from -SpirrowBridgePort"), Value);
+            return Value;
+        }
+        UE_LOG(LogTemp, Warning, TEXT("SpirrowBridge: Ignoring -SpirrowBridgePort=%d (must be 1-65535)"), Value);
+    }
+
+    if (GConfig && GConfig->GetInt(TEXT("SpirrowBridge"), TEXT("Port"), Value, GEditorIni))
+    {
+        if (IsUsable(Value))
+        {
+            UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Port %d from [SpirrowBridge] Port in the editor ini"), Value);
+            return Value;
+        }
+        UE_LOG(LogTemp, Warning, TEXT("SpirrowBridge: Ignoring [SpirrowBridge] Port=%d (must be 1-65535)"), Value);
+    }
+
+    return MCP_SERVER_DEFAULT_PORT;
+}
 
 USpirrowBridge::USpirrowBridge()
 {
@@ -123,7 +160,7 @@ void USpirrowBridge::Initialize(FSubsystemCollectionBase& Collection)
     ListenerSocket = nullptr;
     ConnectionSocket = nullptr;
     ServerThread = nullptr;
-    Port = MCP_SERVER_PORT;
+    Port = ResolveBridgePort();
     FIPv4Address::Parse(MCP_SERVER_HOST, ServerAddress);
 
     // Start the server automatically
@@ -162,15 +199,24 @@ void USpirrowBridge::StartServer()
         return;
     }
 
-    // Allow address reuse for quick restarts
+    // Allow address reuse for quick restarts - except on Windows, where
+    // SO_REUSEADDR lets a second process bind a port that is already being
+    // listened on. That is how two editors ended up sharing one port with the
+    // client reaching whichever one the OS picked (Issue #25). Without it the
+    // second editor's Bind fails and says so below. Windows does not need the
+    // option to rebind a listening port after a restart.
+#if !PLATFORM_WINDOWS
     NewListenerSocket->SetReuseAddr(true);
+#endif
     NewListenerSocket->SetNonBlocking(true);
 
     // Bind to address
     FIPv4Endpoint Endpoint(ServerAddress, Port);
     if (!NewListenerSocket->Bind(*Endpoint.ToInternetAddr()))
     {
-        UE_LOG(LogTemp, Error, TEXT("SpirrowBridge: Failed to bind listener socket to %s:%d"), *ServerAddress.ToString(), Port);
+        UE_LOG(LogTemp, Error,
+            TEXT("SpirrowBridge: Failed to bind listener socket to %s:%d. The port is probably in use by another editor; this editor is NOT reachable over MCP. Start it with -SpirrowBridgePort=<n> or set [SpirrowBridge] Port in the editor ini, and point the MCP server at the same port with UNREAL_PORT."),
+            *ServerAddress.ToString(), Port);
         return;
     }
 

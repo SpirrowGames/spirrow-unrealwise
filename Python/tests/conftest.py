@@ -2,6 +2,7 @@
 pytest configuration and fixtures for SpirrowUnrealWise tests
 """
 
+import os
 import pytest
 import logging
 from test_framework import UnrealMCPClient, TestSuite
@@ -16,7 +17,11 @@ logging.basicConfig(
 @pytest.fixture(scope="session")
 def mcp_client():
     """セッション全体で共有するMCPクライアント"""
-    client = UnrealMCPClient(host="127.0.0.1", port=55557, timeout=15.0)
+    client = UnrealMCPClient(
+        host=os.getenv("UNREAL_HOST", "127.0.0.1"),
+        port=int(os.getenv("UNREAL_PORT", "55557")),
+        timeout=15.0,
+    )
     yield client
     client.disconnect()
 

@@ -261,13 +261,59 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCoreCommands::HandleCompileBluepr
         return Error;
     }
 
-    FSpirrowBridgeCommonUtils::SafeCompileBlueprint(Blueprint);
+    // Issue #19: run the compiler for real and report what it said. This used
+    // to go through SafeCompileBlueprint, which only marks an already-compiled
+    // Blueprint dirty, so every call answered success regardless of the graph.
+    SpirrowBridgePrimitives::FBlueprintCompileReport Report;
+    SpirrowBridgePrimitives::CompileBlueprintWithResults(Blueprint, Report);
+
+    auto ToJsonArray = [](const TArray<FString>& Lines)
+    {
+        TArray<TSharedPtr<FJsonValue>> Out;
+        for (const FString& Line : Lines)
+        {
+            Out.Add(MakeShared<FJsonValueString>(Line));
+        }
+        return Out;
+    };
+
+    if (Report.bHasErrors)
+    {
+        // The response envelope forwards only the error string, so the compiler
+        // output goes into the message itself, not just into details.
+        FString Message = FString::Printf(
+            TEXT("Blueprint '%s' failed to compile (status=%s, %d error(s), %d warning(s))"),
+            *Blueprint->GetName(), *Report.Status, Report.Errors.Num(), Report.Warnings.Num());
+        for (int32 i = 0; i < Report.Errors.Num(); ++i)
+        {
+            Message += FString::Printf(TEXT(" [E%d] %s"), i + 1, *Report.Errors[i]);
+        }
+        for (int32 i = 0; i < Report.Warnings.Num(); ++i)
+        {
+            Message += FString::Printf(TEXT(" [W%d] %s"), i + 1, *Report.Warnings[i]);
+        }
+
+        TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+        Details->SetStringField(TEXT("name"), Blueprint->GetName());
+        Details->SetStringField(TEXT("path"), Blueprint->GetPathName());
+        Details->SetBoolField(TEXT("compiled"), true);
+        Details->SetStringField(TEXT("status"), Report.Status);
+        Details->SetArrayField(TEXT("errors"), ToJsonArray(Report.Errors));
+        Details->SetArrayField(TEXT("warnings"), ToJsonArray(Report.Warnings));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::BlueprintCompileFailed, Message, Details);
+    }
 
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
     ResultObj->SetBoolField(TEXT("success"), true);
     ResultObj->SetStringField(TEXT("name"), Blueprint->GetName());
     ResultObj->SetStringField(TEXT("path"), Blueprint->GetPathName());
     ResultObj->SetBoolField(TEXT("compiled"), true);
+    ResultObj->SetStringField(TEXT("status"), Report.Status);
+    ResultObj->SetNumberField(TEXT("num_errors"), 0);
+    ResultObj->SetNumberField(TEXT("num_warnings"), Report.Warnings.Num());
+    ResultObj->SetArrayField(TEXT("errors"), ToJsonArray(Report.Errors));
+    ResultObj->SetArrayField(TEXT("warnings"), ToJsonArray(Report.Warnings));
     return ResultObj;
 }
 

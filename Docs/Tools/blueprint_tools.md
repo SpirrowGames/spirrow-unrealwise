@@ -169,7 +169,10 @@ Compile a Blueprint.
 - `blueprint_name` (string) - The name of the Blueprint to compile
 
 **Returns:**
-- Result of the compilation operation including success status and message
+- On success: `compiled: true`, `status` (`UpToDate` or `UpToDateWithWarnings`), `num_warnings`, `warnings[]`
+- On a compile error: an error response with code `1201` (`BlueprintCompileFailed`). The `error` string lists every compiler error (`[E1] ...`) and warning (`[W1] ...`)
+
+The command always runs the Kismet compiler, including for a Blueprint that was already compiled.
 
 **Example:**
 ```json

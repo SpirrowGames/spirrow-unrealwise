@@ -18,6 +18,8 @@
 #include "EdGraphSchema_K2.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
+#include "Kismet2/CompilerResultsLog.h"
+#include "Logging/TokenizedMessage.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/LightComponent.h"
 #include "Components/PrimitiveComponent.h"
@@ -261,6 +263,67 @@ void SpirrowBridgePrimitives::SafeCompileBlueprint(UBlueprint* Blueprint)
         // 既にコンパイル済みの場合はDirtyマークのみ（再コンパイルはクラッシュの原因になる）
         Blueprint->MarkPackageDirty();
     }
+}
+
+void SpirrowBridgePrimitives::CompileBlueprintWithResults(UBlueprint* Blueprint, FBlueprintCompileReport& OutReport)
+{
+    OutReport = FBlueprintCompileReport();
+    if (!Blueprint)
+    {
+        OutReport.Status = TEXT("Unknown");
+        return;
+    }
+
+    // Same reconciliation as SafeCompileBlueprint: a Blueprint whose generated
+    // class is missing or still aliases the skeleton needs a fresh skeleton
+    // before the compiler may touch it.
+    const bool bNeedsSkeleton = (Blueprint->GeneratedClass == nullptr)
+        || (Blueprint->GeneratedClass == Blueprint->SkeletonGeneratedClass);
+    if (bNeedsSkeleton)
+    {
+        Blueprint->GeneratedClass = nullptr;
+        FKismetEditorUtilities::GenerateBlueprintSkeleton(Blueprint, true);
+        FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    }
+
+    FCompilerResultsLog Results;
+    Results.SetSourcePath(Blueprint->GetPathName());
+    // Keep the messages in Results only; the caller gets them in the response.
+    Results.bSilentMode = true;
+    Results.bAnnotateMentionedNodes = true;
+
+    // GC is skipped because this runs inside a bridge command; the editor's
+    // regular GC collects the replaced class afterwards.
+    FKismetEditorUtilities::CompileBlueprint(Blueprint, EBlueprintCompileOptions::SkipGarbageCollection, &Results);
+
+    switch (Blueprint->Status)
+    {
+    case BS_UpToDate:             OutReport.Status = TEXT("UpToDate"); break;
+    case BS_UpToDateWithWarnings: OutReport.Status = TEXT("UpToDateWithWarnings"); break;
+    case BS_Error:                OutReport.Status = TEXT("Error"); break;
+    case BS_Dirty:                OutReport.Status = TEXT("Dirty"); break;
+    case BS_BeingCreated:         OutReport.Status = TEXT("BeingCreated"); break;
+    default:                      OutReport.Status = TEXT("Unknown"); break;
+    }
+
+    for (const TSharedRef<FTokenizedMessage>& Message : Results.Messages)
+    {
+        const FString Text = Message->ToText().ToString();
+        switch (Message->GetSeverity())
+        {
+        case EMessageSeverity::Error:
+            OutReport.Errors.Add(Text);
+            break;
+        case EMessageSeverity::PerformanceWarning:
+        case EMessageSeverity::Warning:
+            OutReport.Warnings.Add(Text);
+            break;
+        default:
+            break;
+        }
+    }
+
+    OutReport.bHasErrors = (Blueprint->Status == BS_Error) || OutReport.Errors.Num() > 0;
 }
 
 // BT 2-layer invariant primitive — template body. Explicit instantiations follow.

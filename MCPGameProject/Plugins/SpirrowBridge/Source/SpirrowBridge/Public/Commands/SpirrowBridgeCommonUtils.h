@@ -328,6 +328,27 @@ namespace SpirrowBridgePrimitives
     /** GeneratedClass / SkeletonGeneratedClass の不整合を解消して安全に compile。 */
     SPIRROWBRIDGE_API void SafeCompileBlueprint(UBlueprint* Blueprint);
 
+    /** What a real compile produced. Filled by CompileBlueprintWithResults. */
+    struct FBlueprintCompileReport
+    {
+        /** Blueprint->Status after the compile: "UpToDate", "UpToDateWithWarnings", "Error", ... */
+        FString Status;
+        bool bHasErrors = false;
+        TArray<FString> Errors;
+        TArray<FString> Warnings;
+    };
+
+    /**
+     * Always runs the Kismet compiler and reports what it said (Issue #19).
+     *
+     * SafeCompileBlueprint deliberately skips the compiler for a Blueprint that
+     * already has a generated class, so it cannot tell a caller whether the
+     * graph compiles. This one is for the explicit compile_blueprint command,
+     * where the caller is asking exactly that question. It applies the same
+     * GeneratedClass / SkeletonGeneratedClass reconciliation first.
+     */
+    SPIRROWBRIDGE_API void CompileBlueprintWithResults(UBlueprint* Blueprint, FBlueprintCompileReport& OutReport);
+
     /**
      * Recursively write a JSON value to any FProperty at the given address.
      * Handles FStructProperty, FArrayProperty, FMapProperty, FSetProperty, enums,

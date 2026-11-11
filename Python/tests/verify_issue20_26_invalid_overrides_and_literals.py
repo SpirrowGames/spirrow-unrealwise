@@ -2,7 +2,8 @@
 
 #20  add_blueprint_event_node refuses a parent function that has a return
      value or out parameters (it needs a function-graph override) and adds no
-     node. A plain BlueprintImplementableEvent is still placed.
+     node. The error names add_function_override, and that command then
+     creates the override. A plain BlueprintImplementableEvent is still placed.
 
 #26  1. A literal for a pin that cannot hold one (by-ref / container input) is
         an error, and add_blueprint_function_node leaves no node behind.
@@ -120,7 +121,12 @@ def test_event_overrides():
         print(f"  {parent}.{fn}: {err(r)[:200]}")
         check(f"{parent}.{fn} ({what}) is rejected", is_error(r), str(r))
         check(f"{parent}.{fn}: message points at a function graph", "function graph" in err(r), err(r))
+        check(f"{parent}.{fn}: message names add_function_override", "add_function_override" in err(r), err(r))
         check(f"{parent}.{fn}: no node was added", len(nodes(name)) == before, f"{before} -> {len(nodes(name))}")
+        # The command the message names does create the override.
+        r = bp("add_function_override", name, function_name=fn)
+        check(f"{parent}.{fn}: add_function_override then succeeds",
+              not is_error(r) and data(r).get("graph_name") == fn and bool(data(r).get("result_node_id")), str(r))
 
     # Still works: an implementable event with no outputs.
     name = "BP_Issue20_GameMode"

@@ -284,6 +284,77 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleDisconnec
     return ResultObj;
 }
 
+// Issue #27: callers know events by the name the editor shows ("BeginPlay"),
+// not by the UFunction name ("ReceiveBeginPlay"). An event filter matches:
+//  - the internal name, with or without its Receive / K2_ prefix;
+//  - the function's DisplayName metadata, which is the unlocalized source of
+//    the editor name;
+//  - the node title as shown, which is localized ("Event BeginPlay" in an
+//    English editor, "イベント BeginPlay" in a Japanese one).
+// A leading "Event" on the filter is optional. Case and spaces are ignored.
+static FString NormalizeEventNameForMatch(const FString& In)
+{
+    return In.Replace(TEXT(" "), TEXT("")).ToLower();
+}
+
+// Culture-invariant name the editor derives the event title from.
+static FString GetEventDisplayName(const UK2Node_Event* EventNode)
+{
+    const FString InternalName = EventNode->GetFunctionName().ToString();
+    if (const UFunction* Signature = EventNode->FindEventSignatureFunction())
+    {
+        const FString& MetaName = Signature->GetMetaData(TEXT("DisplayName"));
+        if (!MetaName.IsEmpty())
+        {
+            return MetaName;
+        }
+    }
+    if (InternalName.StartsWith(TEXT("Receive"), ESearchCase::CaseSensitive))
+    {
+        return InternalName.RightChop(7);
+    }
+    if (InternalName.StartsWith(TEXT("K2_"), ESearchCase::CaseSensitive))
+    {
+        return InternalName.RightChop(3);
+    }
+    return InternalName;
+}
+
+static bool EventNodeMatchesFilter(const UK2Node_Event* EventNode, const FString& Filter)
+{
+    const FString Wanted = NormalizeEventNameForMatch(Filter);
+    if (Wanted.IsEmpty()) return true;
+
+    const FString InternalName = EventNode->GetFunctionName().ToString();
+
+    TArray<FString> Candidates;
+    Candidates.Add(InternalName);
+    Candidates.Add(GetEventDisplayName(EventNode));
+    Candidates.Add(EventNode->GetNodeTitle(ENodeTitleType::ListView).ToString());
+    if (InternalName.StartsWith(TEXT("Receive"), ESearchCase::CaseSensitive))
+    {
+        Candidates.Add(InternalName.RightChop(7));
+    }
+    if (InternalName.StartsWith(TEXT("K2_"), ESearchCase::CaseSensitive))
+    {
+        Candidates.Add(InternalName.RightChop(3));
+    }
+
+    // "Event BeginPlay" / "EventBeginPlay" -> also try "beginplay".
+    TArray<FString> WantedForms;
+    WantedForms.Add(Wanted);
+    if (Wanted.StartsWith(TEXT("event")) && Wanted.Len() > 5)
+    {
+        WantedForms.Add(Wanted.RightChop(5));
+    }
+
+    for (const FString& Candidate : Candidates)
+    {
+        if (WantedForms.Contains(NormalizeEventNameForMatch(Candidate))) return true;
+    }
+    return false;
+}
+
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleFindBlueprintNodes(const TSharedPtr<FJsonObject>& Params)
 {
     // Get optional filter parameters
@@ -316,12 +387,15 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleFindBluep
 
         FString DetectedType = TEXT("Other");
         FString NodeName;
+        FString EventDisplayName;
 
         if (UK2Node_Event* EventNode = Cast<UK2Node_Event>(Node))
         {
             DetectedType = TEXT("Event");
-            NodeName = EventNode->EventReference.GetMemberName().ToString();
-            if (!EventType.IsEmpty() && NodeName != EventType) continue;
+            // GetFunctionName() also covers custom events, whose EventReference is empty.
+            NodeName = EventNode->GetFunctionName().ToString();
+            EventDisplayName = GetEventDisplayName(EventNode);
+            if (!EventNodeMatchesFilter(EventNode, EventType)) continue;
         }
         else if (UK2Node_CallFunction* FuncNode = Cast<UK2Node_CallFunction>(Node))
         {
@@ -381,6 +455,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleFindBluep
         NodeObj->SetStringField(TEXT("node_type"), DetectedType);
         NodeObj->SetStringField(TEXT("node_class"), Node->GetClass()->GetName());
         NodeObj->SetStringField(TEXT("name"), NodeName);
+        if (!EventDisplayName.IsEmpty())
+        {
+            NodeObj->SetStringField(TEXT("display_name"), EventDisplayName);
+        }
 
         TSharedPtr<FJsonObject> PosObj = MakeShared<FJsonObject>();
         PosObj->SetNumberField(TEXT("x"), Node->NodePosX);

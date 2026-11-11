@@ -11,6 +11,7 @@ COMMANDS = {
     "add_blueprint_input_action_node": "add_blueprint_input_action_node",
     "add_blueprint_function_node": "add_blueprint_function_node",
     "connect_blueprint_nodes": "connect_blueprint_nodes",
+    "disconnect_blueprint_nodes": "disconnect_blueprint_nodes",
     "add_blueprint_variable": "add_blueprint_variable",
     "add_blueprint_get_self_component_reference": "add_blueprint_get_self_component_reference",
     "add_blueprint_self_reference": "add_blueprint_self_reference",
@@ -47,7 +48,8 @@ def register_node_meta_tool(mcp: FastMCP):
     def blueprint_node(ctx: Context, command: str, params: Dict[str, Any] = {}) -> Dict[str, Any]:
         """Blueprint nodes: events, functions, variables, flow control, math.
         Commands: add_blueprint_event_node, add_blueprint_input_action_node,
-        add_blueprint_function_node, connect_blueprint_nodes, add_blueprint_variable,
+        add_blueprint_function_node, connect_blueprint_nodes, disconnect_blueprint_nodes,
+        add_blueprint_variable,
         add_blueprint_get_self_component_reference, add_blueprint_self_reference,
         find_blueprint_nodes, set_node_pin_value, add_variable_get_node,
         add_variable_set_node, add_branch_node, delete_blueprint_node,

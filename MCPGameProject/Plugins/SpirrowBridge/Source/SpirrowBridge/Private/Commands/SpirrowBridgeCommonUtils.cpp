@@ -576,16 +576,297 @@ bool FSpirrowBridgeCommonUtils::ConnectGraphNodes(UEdGraph* Graph, UEdGraphNode*
         return false;
     }
     
+    FString IgnoredError;
+    return ConnectGraphNodes(Graph, SourceNode, SourcePinName, TargetNode, TargetPinName, IgnoredError);
+}
+
+bool FSpirrowBridgeCommonUtils::ConnectGraphNodes(UEdGraph* Graph, UEdGraphNode* SourceNode, const FString& SourcePinName,
+                                           UEdGraphNode* TargetNode, const FString& TargetPinName, FString& OutError)
+{
+    if (!Graph || !SourceNode || !TargetNode)
+    {
+        OutError = TEXT("Graph or node is null");
+        return false;
+    }
+
     UEdGraphPin* SourcePin = FindPin(SourceNode, SourcePinName, EGPD_Output);
     UEdGraphPin* TargetPin = FindPin(TargetNode, TargetPinName, EGPD_Input);
-    
-    if (SourcePin && TargetPin)
+    if (!SourcePin)
     {
-        SourcePin->MakeLinkTo(TargetPin);
+        OutError = FString::Printf(TEXT("Source node has no output pin named '%s'"), *SourcePinName);
+        return false;
+    }
+    if (!TargetPin)
+    {
+        OutError = FString::Printf(TEXT("Target node has no input pin named '%s'"), *TargetPinName);
+        return false;
+    }
+
+    // Issue #23: this used to be SourcePin->MakeLinkTo(TargetPin), which links
+    // any two pins without asking anyone. Going through the schema is what the
+    // editor does when the user drags a wire:
+    //  - incompatible pins are refused, with the schema's reason;
+    //  - both nodes get NotifyPinConnectionListChanged, which is how wildcard
+    //    pins (Make Array / Make Set / Make Map) take the connected type;
+    //  - a conversion node is inserted when the pins differ but the engine
+    //    has a conversion (int -> string).
+    const UEdGraphSchema* Schema = Graph->GetSchema();
+    if (!Schema)
+    {
+        OutError = TEXT("Graph has no schema");
+        return false;
+    }
+
+    const FPinConnectionResponse Response = Schema->CanCreateConnection(SourcePin, TargetPin);
+    if (Response.Response == CONNECT_RESPONSE_DISALLOW)
+    {
+        OutError = Response.Message.ToString();
+        if (OutError.IsEmpty())
+        {
+            OutError = TEXT("The graph schema does not allow this connection");
+        }
+        return false;
+    }
+
+    if (!Schema->TryCreateConnection(SourcePin, TargetPin))
+    {
+        OutError = Response.Message.IsEmpty()
+            ? FString(TEXT("The graph schema failed to create this connection"))
+            : Response.Message.ToString();
+        return false;
+    }
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Type names -> pin types (Issue #23)
+// ---------------------------------------------------------------------------
+namespace
+{
+    template <typename TObject>
+    TObject* FindTypeObjectByName(const FString& Name)
+    {
+        if (Name.IsEmpty())
+        {
+            return nullptr;
+        }
+        if (Name.StartsWith(TEXT("/")))
+        {
+            if (TObject* Found = FindObject<TObject>(nullptr, *Name))
+            {
+                return Found;
+            }
+            return LoadObject<TObject>(nullptr, *Name);
+        }
+        return FindFirstObject<TObject>(*Name, EFindFirstObjectOptions::NativeFirst);
+    }
+
+    /** Text inside the outermost <...>, or false when TypeString is not Head<...>. */
+    bool SplitWrapper(const FString& TypeString, FString& OutHead, FString& OutInner)
+    {
+        int32 Open = INDEX_NONE;
+        if (!TypeString.FindChar(TEXT('<'), Open) || !TypeString.EndsWith(TEXT(">")))
+        {
+            return false;
+        }
+        OutHead = TypeString.Left(Open).TrimStartAndEnd();
+        OutInner = TypeString.Mid(Open + 1, TypeString.Len() - Open - 2).TrimStartAndEnd();
         return true;
     }
-    
-    return false;
+
+    bool ResolveTerminalType(const FString& InName, FEdGraphTerminalType& Out, FString& OutError)
+    {
+        const FString Name = InName.TrimStartAndEnd();
+        const FString Lower = Name.ToLower();
+        Out = FEdGraphTerminalType();
+
+        if (Lower == TEXT("bool") || Lower == TEXT("boolean")) { Out.TerminalCategory = UEdGraphSchema_K2::PC_Boolean; return true; }
+        if (Lower == TEXT("byte") || Lower == TEXT("uint8")) { Out.TerminalCategory = UEdGraphSchema_K2::PC_Byte; return true; }
+        if (Lower == TEXT("int") || Lower == TEXT("integer") || Lower == TEXT("int32")) { Out.TerminalCategory = UEdGraphSchema_K2::PC_Int; return true; }
+        if (Lower == TEXT("int64") || Lower == TEXT("integer64")) { Out.TerminalCategory = UEdGraphSchema_K2::PC_Int64; return true; }
+        if (Lower == TEXT("float") || Lower == TEXT("double") || Lower == TEXT("real"))
+        {
+            // "Float" in the Blueprint editor is double precision.
+            Out.TerminalCategory = UEdGraphSchema_K2::PC_Real;
+            Out.TerminalSubCategory = UEdGraphSchema_K2::PC_Double;
+            return true;
+        }
+        if (Lower == TEXT("float32") || Lower == TEXT("singlefloat"))
+        {
+            Out.TerminalCategory = UEdGraphSchema_K2::PC_Real;
+            Out.TerminalSubCategory = UEdGraphSchema_K2::PC_Float;
+            return true;
+        }
+        if (Lower == TEXT("string") || Lower == TEXT("fstring")) { Out.TerminalCategory = UEdGraphSchema_K2::PC_String; return true; }
+        if (Lower == TEXT("name") || Lower == TEXT("fname")) { Out.TerminalCategory = UEdGraphSchema_K2::PC_Name; return true; }
+        if (Lower == TEXT("text") || Lower == TEXT("ftext")) { Out.TerminalCategory = UEdGraphSchema_K2::PC_Text; return true; }
+
+        // Object<Class> / Class<Class> / SoftObject<Class> / SoftClass<Class>
+        FString Head, Inner;
+        if (SplitWrapper(Name, Head, Inner))
+        {
+            const FString HeadLower = Head.ToLower();
+            FName Category;
+            if (HeadLower == TEXT("object")) Category = UEdGraphSchema_K2::PC_Object;
+            else if (HeadLower == TEXT("class")) Category = UEdGraphSchema_K2::PC_Class;
+            else if (HeadLower == TEXT("softobject")) Category = UEdGraphSchema_K2::PC_SoftObject;
+            else if (HeadLower == TEXT("softclass")) Category = UEdGraphSchema_K2::PC_SoftClass;
+            else
+            {
+                OutError = FString::Printf(TEXT("'%s' cannot be used here (containers cannot be nested, and the only wrappers are Object<>, Class<>, SoftObject<>, SoftClass<>)"), *Name);
+                return false;
+            }
+            UClass* Class = FSpirrowBridgeCommonUtils::FindClassByNameAnywhere(Inner);
+            if (!Class)
+            {
+                OutError = FString::Printf(TEXT("Class not found: %s"), *Inner);
+                return false;
+            }
+            Out.TerminalCategory = Category;
+            Out.TerminalSubCategoryObject = Class;
+            return true;
+        }
+
+        // Struct, with or without the F prefix.
+        UScriptStruct* Struct = FindTypeObjectByName<UScriptStruct>(Name);
+        if (!Struct && Name.Len() > 1 && Name[0] == TEXT('F') && FChar::IsUpper(Name[1]))
+        {
+            Struct = FindTypeObjectByName<UScriptStruct>(Name.RightChop(1));
+        }
+        if (Struct)
+        {
+            Out.TerminalCategory = UEdGraphSchema_K2::PC_Struct;
+            Out.TerminalSubCategoryObject = Struct;
+            return true;
+        }
+
+        if (UEnum* Enum = FindTypeObjectByName<UEnum>(Name))
+        {
+            Out.TerminalCategory = UEdGraphSchema_K2::PC_Byte;
+            Out.TerminalSubCategoryObject = Enum;
+            return true;
+        }
+
+        // A class name means an object reference of that class.
+        if (UClass* Class = FSpirrowBridgeCommonUtils::FindClassByNameAnywhere(Name))
+        {
+            Out.TerminalCategory = UEdGraphSchema_K2::PC_Object;
+            Out.TerminalSubCategoryObject = Class;
+            return true;
+        }
+
+        OutError = FString::Printf(TEXT("Unknown type '%s' (not a built-in type, struct, enum or class)"), *Name);
+        return false;
+    }
+
+    FString DescribeTerminal(const FName& Category, const FName& SubCategory, const UObject* SubObject)
+    {
+        FString Text = Category.ToString();
+        if (SubObject)
+        {
+            Text += TEXT(":") + SubObject->GetName();
+        }
+        else if (!SubCategory.IsNone())
+        {
+            Text += TEXT(":") + SubCategory.ToString();
+        }
+        return Text;
+    }
+}
+
+bool FSpirrowBridgeCommonUtils::ResolvePinTypeFromString(const FString& TypeString, FEdGraphPinType& OutPinType, FString& OutError)
+{
+    OutPinType = FEdGraphPinType();
+    const FString Trimmed = TypeString.TrimStartAndEnd();
+    if (Trimmed.IsEmpty())
+    {
+        OutError = TEXT("Type is empty");
+        return false;
+    }
+
+    EPinContainerType Container = EPinContainerType::None;
+    FString KeyName = Trimmed;
+    FString ValueName;
+
+    FString Head, Inner;
+    if (SplitWrapper(Trimmed, Head, Inner))
+    {
+        const FString HeadLower = Head.ToLower();
+        if (HeadLower == TEXT("array") || HeadLower == TEXT("tarray"))
+        {
+            Container = EPinContainerType::Array;
+            KeyName = Inner;
+        }
+        else if (HeadLower == TEXT("set") || HeadLower == TEXT("tset"))
+        {
+            Container = EPinContainerType::Set;
+            KeyName = Inner;
+        }
+        else if (HeadLower == TEXT("map") || HeadLower == TEXT("tmap"))
+        {
+            Container = EPinContainerType::Map;
+            // Split on the comma that is not inside a nested <...>.
+            int32 Depth = 0;
+            int32 Comma = INDEX_NONE;
+            for (int32 i = 0; i < Inner.Len(); ++i)
+            {
+                const TCHAR Ch = Inner[i];
+                if (Ch == TEXT('<')) ++Depth;
+                else if (Ch == TEXT('>')) --Depth;
+                else if (Ch == TEXT(',') && Depth == 0)
+                {
+                    Comma = i;
+                    break;
+                }
+            }
+            if (Comma == INDEX_NONE)
+            {
+                OutError = FString::Printf(TEXT("Map needs a key and a value type: Map<Key,Value> (got '%s')"), *Trimmed);
+                return false;
+            }
+            KeyName = Inner.Left(Comma);
+            ValueName = Inner.Mid(Comma + 1);
+        }
+    }
+
+    FEdGraphTerminalType Key;
+    if (!ResolveTerminalType(KeyName, Key, OutError))
+    {
+        return false;
+    }
+    OutPinType.PinCategory = Key.TerminalCategory;
+    OutPinType.PinSubCategory = Key.TerminalSubCategory;
+    OutPinType.PinSubCategoryObject = Key.TerminalSubCategoryObject;
+    OutPinType.ContainerType = Container;
+
+    if (Container == EPinContainerType::Map)
+    {
+        FEdGraphTerminalType Value;
+        if (!ResolveTerminalType(ValueName, Value, OutError))
+        {
+            return false;
+        }
+        OutPinType.PinValueType = Value;
+    }
+    return true;
+}
+
+FString FSpirrowBridgeCommonUtils::DescribePinType(const FEdGraphPinType& PinType)
+{
+    const FString Key = DescribeTerminal(PinType.PinCategory, PinType.PinSubCategory, PinType.PinSubCategoryObject.Get());
+    switch (PinType.ContainerType)
+    {
+    case EPinContainerType::Array:
+        return FString::Printf(TEXT("Array<%s>"), *Key);
+    case EPinContainerType::Set:
+        return FString::Printf(TEXT("Set<%s>"), *Key);
+    case EPinContainerType::Map:
+        return FString::Printf(TEXT("Map<%s,%s>"), *Key,
+            *DescribeTerminal(PinType.PinValueType.TerminalCategory, PinType.PinValueType.TerminalSubCategory,
+                PinType.PinValueType.TerminalSubCategoryObject.Get()));
+    default:
+        return Key;
+    }
 }
 
 UEdGraphPin* FSpirrowBridgeCommonUtils::FindPin(UEdGraphNode* Node, const FString& PinName, EEdGraphPinDirection Direction)

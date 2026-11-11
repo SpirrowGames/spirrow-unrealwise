@@ -422,7 +422,7 @@ COMMAND_SCHEMAS = {
             },
         },
         "connect_blueprint_nodes": {
-            "brief": "Connect two Blueprint nodes (works on regular BP or Level Script BP)",
+            "brief": "Connect two Blueprint nodes through the graph schema, like dragging a wire in the editor: incompatible pins are an error with the reason, wildcard pins take the connected type, and a conversion node is inserted when one exists (conversion_nodes_added). Works on regular BP or Level Script BP",
             "params": {
                 "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
                 "source_node_id": {"type": "str", "required": True, "desc": "Source node ID"},
@@ -452,7 +452,7 @@ COMMAND_SCHEMAS = {
             "params": {
                 "blueprint_name": {"type": "str", "required": True, "desc": "Blueprint name"},
                 "variable_name": {"type": "str", "required": True, "desc": "Variable name"},
-                "variable_type": {"type": "str", "required": True, "desc": "Variable type"},
+                "variable_type": {"type": "str", "required": True, "desc": "Boolean, Byte, Integer, Int64, Float, String, Name, Text; any struct, enum or class by name (Vector, Transform, MyStruct, Actor); Object<C> / Class<C> / SoftObject<C> / SoftClass<C>; containers Array<T>, Set<T>, Map<K,V> (e.g. Map<String,Vector>)"},
                 "is_exposed": {"type": "bool", "default": False, "desc": "Expose to editor"},
                 "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
                 "rationale": {"type": "str", "desc": "Design rationale"},
@@ -634,6 +634,21 @@ COMMAND_SCHEMAS = {
                 "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
                 "subsystem_class": {"type": "str", "required": True, "desc": "Subsystem class, e.g. '/Script/VoxelRuntime.VoxelCollapseSubsystem' or 'VoxelCollapseSubsystem'"},
                 "subsystem_kind": {"type": "str", "default": "GameInstance", "desc": "One of: 'GameInstance' (default), 'World', 'Engine', 'LocalPlayer'. Determines which K2 node variant is spawned and validates the class against the expected base"},
+                "node_position": {"type": "list[int]", "default": [0, 0], "desc": "Node position [x,y]"},
+                "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
+                "target_type": {"type": "str", "default": "blueprint", "desc": "'blueprint' or 'level_blueprint'"},
+                "level_path": {"type": "str", "desc": "Level asset path. Omit for current level. Only used when target_type=level_blueprint"},
+            },
+        },
+        "add_make_container_node": {
+            "brief": "Add a Make Array / Make Set / Make Map node. Element pins are wildcards until typed: pass element_type (or key_type + value_type), or connect the output to a typed pin",
+            "params": {
+                "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
+                "container": {"type": "str", "required": True, "desc": "'array', 'set' or 'map'"},
+                "num_entries": {"type": "int", "default": 1, "desc": "Number of elements (array/set) or key/value pairs (map), 1-64"},
+                "element_type": {"type": "str", "desc": "Element type for array/set (same names as add_blueprint_variable, without the container)"},
+                "key_type": {"type": "str", "desc": "Key type for map (needs value_type)"},
+                "value_type": {"type": "str", "desc": "Value type for map (needs key_type)"},
                 "node_position": {"type": "list[int]", "default": [0, 0], "desc": "Node position [x,y]"},
                 "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
                 "target_type": {"type": "str", "default": "blueprint", "desc": "'blueprint' or 'level_blueprint'"},

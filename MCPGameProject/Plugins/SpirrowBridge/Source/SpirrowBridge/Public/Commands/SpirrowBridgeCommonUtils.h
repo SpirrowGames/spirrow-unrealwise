@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "EdGraph/EdGraphPin.h"
 #include "Json.h"
 
 // Forward declarations
@@ -261,8 +262,30 @@ public:
         FString& OutError);
     static UK2Node_InputAction* CreateInputActionNode(UEdGraph* Graph, const FString& ActionName, const FVector2D& Position);
     static UK2Node_Self* CreateSelfReferenceNode(UEdGraph* Graph, const FVector2D& Position);
-    static bool ConnectGraphNodes(UEdGraph* Graph, UEdGraphNode* SourceNode, const FString& SourcePinName, 
+    static bool ConnectGraphNodes(UEdGraph* Graph, UEdGraphNode* SourceNode, const FString& SourcePinName,
                                 UEdGraphNode* TargetNode, const FString& TargetPinName);
+
+    /**
+     * Connect two pins through the graph schema (UEdGraphSchema::TryCreateConnection),
+     * as the editor does: the schema refuses incompatible pins, resolves wildcard
+     * pins (Make Array / Make Map ...), inserts a conversion node when one exists,
+     * and notifies both nodes. OutError says why a connection was refused.
+     */
+    static bool ConnectGraphNodes(UEdGraph* Graph, UEdGraphNode* SourceNode, const FString& SourcePinName,
+                                UEdGraphNode* TargetNode, const FString& TargetPinName, FString& OutError);
+
+    /**
+     * Parse a type name into a pin type (Issue #23).
+     *   scalars:    Boolean, Byte, Integer, Int64, Float (double), Float32, String, Name, Text
+     *   by name:    any struct (Vector, Transform, MyStruct), enum, or class (object reference)
+     *   wrappers:   Object<Class>, Class<Class>, SoftObject<Class>, SoftClass<Class>
+     *   containers: Array<T>, Set<T>, Map<K,V>
+     * Struct / enum / class names may be bare or a full object path.
+     */
+    static bool ResolvePinTypeFromString(const FString& TypeString, FEdGraphPinType& OutPinType, FString& OutError);
+
+    /** Compact text form of a pin type, e.g. "Map<string,struct:Vector>". For responses. */
+    static FString DescribePinType(const FEdGraphPinType& PinType);
     static UEdGraphPin* FindPin(UEdGraphNode* Node, const FString& PinName, EEdGraphPinDirection Direction = EGPD_MAX);
     static UK2Node_Event* FindExistingEventNode(UEdGraph* Graph, const FString& EventName);
 

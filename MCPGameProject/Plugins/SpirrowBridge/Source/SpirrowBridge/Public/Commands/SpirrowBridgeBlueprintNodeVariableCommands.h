@@ -31,4 +31,7 @@ private:
 
     // Typed subsystem accessor (UK2Node_GetSubsystem with class baked in)
     TSharedPtr<FJsonObject> HandleAddGetSubsystemNode(const TSharedPtr<FJsonObject>& Params);
+
+    // Make Array / Make Set / Make Map (Issue #23)
+    TSharedPtr<FJsonObject> HandleAddMakeContainerNode(const TSharedPtr<FJsonObject>& Params);
 };

@@ -184,19 +184,28 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleConnectBl
             FString::Printf(TEXT("Target node not found: %s"), *TargetNodeId));
     }
 
-    if (FSpirrowBridgeCommonUtils::ConnectGraphNodes(EventGraph, SourceNode, SourcePinName, TargetNode, TargetPinName))
+    const int32 NodeCountBefore = EventGraph->Nodes.Num();
+    FString ConnectError;
+    if (FSpirrowBridgeCommonUtils::ConnectGraphNodes(EventGraph, SourceNode, SourcePinName, TargetNode, TargetPinName, ConnectError))
     {
         FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
         TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
         ResultObj->SetBoolField(TEXT("success"), true);
         ResultObj->SetStringField(TEXT("source_node_id"), SourceNodeId);
         ResultObj->SetStringField(TEXT("target_node_id"), TargetNodeId);
+        // The schema inserts a conversion node (e.g. int -> string) when the
+        // pins differ but a conversion exists. Tell the caller it happened.
+        const int32 NodesAdded = EventGraph->Nodes.Num() - NodeCountBefore;
+        if (NodesAdded > 0)
+        {
+            ResultObj->SetNumberField(TEXT("conversion_nodes_added"), NodesAdded);
+        }
         return ResultObj;
     }
 
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(
         ESpirrowErrorCode::ConnectionFailed,
-        TEXT("Failed to connect nodes"));
+        FString::Printf(TEXT("Failed to connect %s -> %s: %s"), *SourcePinName, *TargetPinName, *ConnectError));
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleDisconnectBlueprintNodes(const TSharedPtr<FJsonObject>& Params)
@@ -517,6 +526,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleFindBluep
 
         TSharedPtr<FJsonObject> NodeObj = MakeShared<FJsonObject>();
         NodeObj->SetStringField(TEXT("node_id"), Node->NodeGuid.ToString());
+        // false for a disabled node, e.g. a default event node nothing is wired to yet.
+        NodeObj->SetBoolField(TEXT("enabled"), Node->IsNodeEnabled());
         NodeObj->SetStringField(TEXT("node_type"), DetectedType);
         NodeObj->SetStringField(TEXT("node_class"), Node->GetClass()->GetName());
         NodeObj->SetStringField(TEXT("name"), NodeName);
@@ -537,6 +548,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleFindBluep
             TSharedPtr<FJsonObject> PinObj = MakeShared<FJsonObject>();
             PinObj->SetStringField(TEXT("name"), Pin->PinName.ToString());
             PinObj->SetStringField(TEXT("direction"), Pin->Direction == EGPD_Input ? TEXT("Input") : TEXT("Output"));
+            // Full type including container and struct/class, e.g. "Array<string>", "Map<string,struct:Vector>".
+            PinObj->SetStringField(TEXT("full_type"), FSpirrowBridgeCommonUtils::DescribePinType(Pin->PinType));
             PinObj->SetStringField(TEXT("type"), Pin->PinType.PinCategory.ToString());
             PinObj->SetBoolField(TEXT("connected"), Pin->LinkedTo.Num() > 0);
             // Literal carried by the pin, so a caller can read back what it wrote.

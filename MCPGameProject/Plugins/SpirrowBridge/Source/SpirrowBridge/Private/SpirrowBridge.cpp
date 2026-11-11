@@ -488,7 +488,9 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("add_external_property_set_node") ||
                      CommandType == TEXT("add_external_property_get_node") ||
                      // Typed Get Subsystem node (K2Node_GetSubsystem with class baked in)
-                     CommandType == TEXT("add_get_subsystem_node"))
+                     CommandType == TEXT("add_get_subsystem_node") ||
+                     // Make Array / Make Set / Make Map
+                     CommandType == TEXT("add_make_container_node"))
             {
                 ResultJson = BlueprintNodeCommands->HandleCommand(CommandType, Params);
             }

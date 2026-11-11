@@ -32,6 +32,7 @@ COMMANDS = {
     "add_external_property_set_node": "add_external_property_set_node",
     "add_external_property_get_node": "add_external_property_get_node",
     "add_get_subsystem_node": "add_get_subsystem_node",
+    "add_make_container_node": "add_make_container_node",
 }
 
 RATIONALE_COMMANDS = {
@@ -57,7 +58,7 @@ def register_node_meta_tool(mcp: FastMCP):
         add_forloop_with_break_node, add_print_string_node,
         add_math_node, add_comparison_node,
         add_external_property_set_node, add_external_property_get_node,
-        add_get_subsystem_node
+        add_get_subsystem_node, add_make_container_node
 
         Level Blueprint support: every command in this tool accepts optional
         target_type="level_blueprint" to edit the current level's Level Script

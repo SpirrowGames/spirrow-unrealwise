@@ -17,6 +17,10 @@ legacy_drive_id: [1gmuZfCoUSI3YwPHIAFQ0YI4fGVGCtSRUodR5mfVotpk]
 
 SpirrowBridge で使用されるエラーコード体系。
 
+エラー応答は `{"status": "error", "error": "<メッセージ>", "error_code": <値>, "details": {...}}` の形です (`details` はハンドラが付けたときだけ)。
+`error` の本文は、エンジン由来の部分がエディタの表示言語になります (コンパイラのメッセージ、schema の拒否理由など)。
+応答を判定するときは `error_code` と `details` のフィールドを使ってください (Issue #39。それ以前は `error` の文字列しか返っていませんでした)。
+
 ---
 
 ## General (1000-1099)

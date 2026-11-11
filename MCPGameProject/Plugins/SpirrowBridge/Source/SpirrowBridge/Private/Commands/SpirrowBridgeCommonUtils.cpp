@@ -20,6 +20,7 @@
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Kismet2/CompilerResultsLog.h"
 #include "Logging/TokenizedMessage.h"
+#include "EdGraphToken.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/LightComponent.h"
 #include "Components/PrimitiveComponent.h"
@@ -382,18 +383,63 @@ void SpirrowBridgePrimitives::CompileBlueprintWithResults(UBlueprint* Blueprint,
     for (const TSharedRef<FTokenizedMessage>& Message : Results.Messages)
     {
         const FString Text = Message->ToText().ToString();
+
+        FBlueprintCompileReport::FMessage Entry;
+        Entry.Text = Text;
         switch (Message->GetSeverity())
         {
         case EMessageSeverity::Error:
             OutReport.Errors.Add(Text);
+            Entry.Severity = TEXT("error");
             break;
         case EMessageSeverity::PerformanceWarning:
+            OutReport.Warnings.Add(Text);
+            Entry.Severity = TEXT("performance_warning");
+            break;
         case EMessageSeverity::Warning:
             OutReport.Warnings.Add(Text);
+            Entry.Severity = TEXT("warning");
             break;
         default:
+            Entry.Severity = TEXT("info");
             break;
         }
+
+        // The compiler attaches the node (and sometimes the pin) a message is
+        // about as an EdGraph token, already mapped back from its intermediate
+        // copy to the node in the Blueprint's own graph. The first one names
+        // the subject of the message.
+        for (const TSharedRef<IMessageToken>& Token : Message->GetMessageTokens())
+        {
+            if (Token->GetType() != EMessageToken::EdGraph)
+            {
+                continue;
+            }
+            const FEdGraphToken& GraphToken = static_cast<const FEdGraphToken&>(Token.Get());
+            const UEdGraphPin* Pin = GraphToken.GetPin();
+            const UObject* GraphObject = GraphToken.GetGraphObject();
+            const UEdGraphNode* Node = Pin ? Pin->GetOwningNodeUnchecked() : Cast<UEdGraphNode>(GraphObject);
+            if (Node)
+            {
+                Entry.NodeId = Node->NodeGuid.ToString();
+                Entry.NodeClass = Node->GetClass()->GetName();
+                Entry.NodeName = FSpirrowBridgeCommonUtils::GetNodeInternalName(Node);
+                if (const UEdGraph* NodeGraph = Node->GetGraph())
+                {
+                    Entry.Graph = NodeGraph->GetName();
+                }
+                if (Pin)
+                {
+                    Entry.PinName = Pin->PinName.ToString();
+                }
+                break;
+            }
+            if (const UEdGraph* TokenGraph = Cast<UEdGraph>(GraphObject))
+            {
+                Entry.Graph = TokenGraph->GetName();
+            }
+        }
+        OutReport.Messages.Add(MoveTemp(Entry));
     }
 
     OutReport.bHasErrors = (Blueprint->Status == BS_Error) || OutReport.Errors.Num() > 0;
@@ -653,26 +699,59 @@ bool FSpirrowBridgeCommonUtils::ConnectGraphNodes(UEdGraph* Graph, UEdGraphNode*
     return ConnectGraphNodes(Graph, SourceNode, SourcePinName, TargetNode, TargetPinName, IgnoredError);
 }
 
-bool FSpirrowBridgeCommonUtils::ConnectGraphNodes(UEdGraph* Graph, UEdGraphNode* SourceNode, const FString& SourcePinName,
-                                           UEdGraphNode* TargetNode, const FString& TargetPinName, FString& OutError)
+FString FSpirrowBridgeCommonUtils::GetNodeInternalName(const UEdGraphNode* Node)
 {
+    if (!Node)
+    {
+        return FString();
+    }
+    if (const UK2Node_Event* EventNode = Cast<UK2Node_Event>(Node))
+    {
+        return EventNode->GetFunctionName().ToString();
+    }
+    if (const UK2Node_CallFunction* CallNode = Cast<UK2Node_CallFunction>(Node))
+    {
+        return CallNode->GetFunctionName().ToString();
+    }
+    if (const UK2Node_Variable* VariableNode = Cast<UK2Node_Variable>(Node))
+    {
+        return VariableNode->GetVarName().ToString();
+    }
+    return Node->GetName();
+}
+
+bool FSpirrowBridgeCommonUtils::ConnectGraphNodes(UEdGraph* Graph, UEdGraphNode* SourceNode, const FString& SourcePinName,
+                                           UEdGraphNode* TargetNode, const FString& TargetPinName, FString& OutError,
+                                           FString* OutReasonCode)
+{
+    // Issue #39: OutError may carry the schema's own message, which is in the
+    // editor's display language. The reason code is what a caller can test.
+    auto Fail = [&OutError, OutReasonCode](const TCHAR* ReasonCode, const FString& Message)
+    {
+        OutError = Message;
+        if (OutReasonCode)
+        {
+            *OutReasonCode = ReasonCode;
+        }
+        return false;
+    };
+
     if (!Graph || !SourceNode || !TargetNode)
     {
-        OutError = TEXT("Graph or node is null");
-        return false;
+        return Fail(TEXT("invalid_argument"), TEXT("Graph or node is null"));
     }
 
     UEdGraphPin* SourcePin = FindPin(SourceNode, SourcePinName, EGPD_Output);
     UEdGraphPin* TargetPin = FindPin(TargetNode, TargetPinName, EGPD_Input);
     if (!SourcePin)
     {
-        OutError = FString::Printf(TEXT("Source node has no output pin named '%s'"), *SourcePinName);
-        return false;
+        return Fail(TEXT("source_pin_not_found"),
+            FString::Printf(TEXT("Source node has no output pin named '%s'"), *SourcePinName));
     }
     if (!TargetPin)
     {
-        OutError = FString::Printf(TEXT("Target node has no input pin named '%s'"), *TargetPinName);
-        return false;
+        return Fail(TEXT("target_pin_not_found"),
+            FString::Printf(TEXT("Target node has no input pin named '%s'"), *TargetPinName));
     }
 
     // Issue #23: this used to be SourcePin->MakeLinkTo(TargetPin), which links
@@ -686,27 +765,22 @@ bool FSpirrowBridgeCommonUtils::ConnectGraphNodes(UEdGraph* Graph, UEdGraphNode*
     const UEdGraphSchema* Schema = Graph->GetSchema();
     if (!Schema)
     {
-        OutError = TEXT("Graph has no schema");
-        return false;
+        return Fail(TEXT("no_schema"), TEXT("Graph has no schema"));
     }
 
     const FPinConnectionResponse Response = Schema->CanCreateConnection(SourcePin, TargetPin);
     if (Response.Response == CONNECT_RESPONSE_DISALLOW)
     {
-        OutError = Response.Message.ToString();
-        if (OutError.IsEmpty())
-        {
-            OutError = TEXT("The graph schema does not allow this connection");
-        }
-        return false;
+        return Fail(TEXT("schema_disallow"), Response.Message.IsEmpty()
+            ? FString(TEXT("The graph schema does not allow this connection"))
+            : Response.Message.ToString());
     }
 
     if (!Schema->TryCreateConnection(SourcePin, TargetPin))
     {
-        OutError = Response.Message.IsEmpty()
+        return Fail(TEXT("schema_failed"), Response.Message.IsEmpty()
             ? FString(TEXT("The graph schema failed to create this connection"))
-            : Response.Message.ToString();
-        return false;
+            : Response.Message.ToString());
     }
     return true;
 }

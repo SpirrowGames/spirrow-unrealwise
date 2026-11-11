@@ -115,6 +115,8 @@ Blueprintのイベントグラフ内で2つのノードを接続します。
 **動作:**
 接続はグラフの schema を通して行われます (エディタでワイヤーをドラッグしたときと同じ)。
 - 互換性の無いピン同士はエラーになり、エラー文に schema の理由が入ります
+  - schema の理由はエディタの表示言語で返ります。判定には `details.reason` を使ってください: `source_pin_not_found` / `target_pin_not_found` / `schema_disallow` / `schema_failed`
+  - `details` には `source_pin_type` / `target_pin_type` (ピンの型) と、渡したノード ID・ピン名も入ります
 - ワイルドカードピン (Make Array / Make Set / Make Map) は接続先の型になります
 - 型は違うが変換が存在する場合 (int → string など)、変換ノードが間に挿入されます
 

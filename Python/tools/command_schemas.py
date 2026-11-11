@@ -225,7 +225,7 @@ COMMAND_SCHEMAS = {
             },
         },
         "compile_blueprint": {
-            "brief": "Compile a Blueprint (regular or Level Script) and report the result. Returns status (UpToDate / UpToDateWithWarnings) and warnings[]; a compile error is an error response (code 1201) whose message lists the compiler errors",
+            "brief": "Compile a Blueprint (regular or Level Script) and report the result. Returns status (UpToDate / UpToDateWithWarnings) and warnings[]; a compile error is an error response (error_code 1201) whose message lists the compiler errors. Compiler texts are in the editor's display language; for tests use messages[] (also in details on error): {severity: error|warning|performance_warning|info, message, node_id, node_class, node_name, graph, pin_name} - the node/pin fields are present when the compiler attached the message to a node",
             "params": {
                 "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
                 "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
@@ -252,7 +252,7 @@ COMMAND_SCHEMAS = {
             },
         },
         "get_blueprint_graph": {
-            "brief": "Get node graph structure of a Blueprint (regular or Level Script)",
+            "brief": "Get node graph structure of a Blueprint (regular or Level Script). Each node has 'title' (as shown in the editor, localized) and 'name' (language-independent: function / event / variable name)",
             "params": {
                 "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
                 "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
@@ -429,7 +429,7 @@ COMMAND_SCHEMAS = {
             },
         },
         "connect_blueprint_nodes": {
-            "brief": "Connect two Blueprint nodes through the graph schema, like dragging a wire in the editor: incompatible pins are an error with the reason, wildcard pins take the connected type, and a conversion node is inserted when one exists (conversion_nodes_added). Works on regular BP or Level Script BP",
+            "brief": "Connect two Blueprint nodes through the graph schema, like dragging a wire in the editor: incompatible pins are an error with the reason (the text is in the editor's display language; details.reason is not: source_pin_not_found | target_pin_not_found | schema_disallow | schema_failed, with source_pin_type / target_pin_type), wildcard pins take the connected type, and a conversion node is inserted when one exists (conversion_nodes_added). Works on regular BP or Level Script BP",
             "params": {
                 "graph_name": {"type": "str", "desc": "Graph to work in: a function graph from add_function_graph / add_function_override. Omit for the event graph"},
                 "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},

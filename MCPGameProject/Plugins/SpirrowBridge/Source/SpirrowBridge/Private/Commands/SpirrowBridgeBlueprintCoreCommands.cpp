@@ -277,10 +277,36 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCoreCommands::HandleCompileBluepr
         return Out;
     };
 
+    // Issue #39: the message texts are in the editor's display language. Each
+    // entry also says, in fields that are not, how severe it is and which
+    // node / pin it is about.
+    TArray<TSharedPtr<FJsonValue>> MessagesJson;
+    for (const SpirrowBridgePrimitives::FBlueprintCompileReport::FMessage& Entry : Report.Messages)
+    {
+        TSharedPtr<FJsonObject> EntryObj = MakeShared<FJsonObject>();
+        EntryObj->SetStringField(TEXT("severity"), Entry.Severity);
+        EntryObj->SetStringField(TEXT("message"), Entry.Text);
+        if (!Entry.NodeId.IsEmpty())
+        {
+            EntryObj->SetStringField(TEXT("node_id"), Entry.NodeId);
+            EntryObj->SetStringField(TEXT("node_class"), Entry.NodeClass);
+            EntryObj->SetStringField(TEXT("node_name"), Entry.NodeName);
+        }
+        if (!Entry.Graph.IsEmpty())
+        {
+            EntryObj->SetStringField(TEXT("graph"), Entry.Graph);
+        }
+        if (!Entry.PinName.IsEmpty())
+        {
+            EntryObj->SetStringField(TEXT("pin_name"), Entry.PinName);
+        }
+        MessagesJson.Add(MakeShared<FJsonValueObject>(EntryObj));
+    }
+
     if (Report.bHasErrors)
     {
-        // The response envelope forwards only the error string, so the compiler
-        // output goes into the message itself, not just into details.
+        // The error string carries the compiler output too, for callers that
+        // read only that. The same data, structured, is in details.
         FString Message = FString::Printf(
             TEXT("Blueprint '%s' failed to compile (status=%s, %d error(s), %d warning(s))"),
             *Blueprint->GetName(), *Report.Status, Report.Errors.Num(), Report.Warnings.Num());
@@ -298,8 +324,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCoreCommands::HandleCompileBluepr
         Details->SetStringField(TEXT("path"), Blueprint->GetPathName());
         Details->SetBoolField(TEXT("compiled"), true);
         Details->SetStringField(TEXT("status"), Report.Status);
+        Details->SetNumberField(TEXT("num_errors"), Report.Errors.Num());
+        Details->SetNumberField(TEXT("num_warnings"), Report.Warnings.Num());
         Details->SetArrayField(TEXT("errors"), ToJsonArray(Report.Errors));
         Details->SetArrayField(TEXT("warnings"), ToJsonArray(Report.Warnings));
+        Details->SetArrayField(TEXT("messages"), MessagesJson);
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(
             ESpirrowErrorCode::BlueprintCompileFailed, Message, Details);
     }
@@ -314,6 +343,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCoreCommands::HandleCompileBluepr
     ResultObj->SetNumberField(TEXT("num_warnings"), Report.Warnings.Num());
     ResultObj->SetArrayField(TEXT("errors"), ToJsonArray(Report.Errors));
     ResultObj->SetArrayField(TEXT("warnings"), ToJsonArray(Report.Warnings));
+    ResultObj->SetArrayField(TEXT("messages"), MessagesJson);
     return ResultObj;
 }
 
@@ -553,7 +583,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCoreCommands::HandleGetBlueprintG
             TSharedPtr<FJsonObject> NodeObj = MakeShareable(new FJsonObject());
             NodeObj->SetStringField(TEXT("id"), Node->NodeGuid.ToString());
             NodeObj->SetStringField(TEXT("class"), Node->GetClass()->GetName());
+            // "title" is what the editor shows, in the editor's language.
+            // "name" is the same for every language (Issue #39).
             NodeObj->SetStringField(TEXT("title"), Node->GetNodeTitle(ENodeTitleType::FullTitle).ToString());
+            NodeObj->SetStringField(TEXT("name"), FSpirrowBridgeCommonUtils::GetNodeInternalName(Node));
             NodeObj->SetNumberField(TEXT("pos_x"), Node->NodePosX);
             NodeObj->SetNumberField(TEXT("pos_y"), Node->NodePosY);
 

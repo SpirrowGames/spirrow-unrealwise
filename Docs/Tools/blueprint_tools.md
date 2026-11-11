@@ -172,7 +172,12 @@ Compile a Blueprint.
 - On success: `compiled: true`, `status` (`UpToDate` or `UpToDateWithWarnings`), `num_warnings`, `warnings[]`
 - On a compile error: an error response with code `1201` (`BlueprintCompileFailed`). The `error` string lists every compiler error (`[E1] ...`) and warning (`[W1] ...`)
 
+- Both carry `messages[]`, one entry per compiler message (on an error it is in `details.messages`):
+  `severity` (`error` / `warning` / `performance_warning` / `info`), `message`, and - when the compiler attached the message to a node - `node_id`, `node_class`, `node_name`, `graph`, `pin_name`
+
 The command always runs the Kismet compiler, including for a Blueprint that was already compiled.
+
+Compiler texts (`errors[]`, `warnings[]`, `message`) are in the editor's display language. To test a result, use `status`, `error_code` and the non-text fields of `messages[]` (Issue #39).
 
 **Example:**
 ```json

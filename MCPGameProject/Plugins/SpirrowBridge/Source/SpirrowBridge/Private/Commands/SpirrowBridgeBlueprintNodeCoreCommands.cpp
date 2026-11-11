@@ -24,6 +24,69 @@ FSpirrowBridgeBlueprintNodeCoreCommands::FSpirrowBridgeBlueprintNodeCoreCommands
 {
 }
 
+// ---------------------------------------------------------------------------
+// Literal validation and formatting (Issue #26)
+// ---------------------------------------------------------------------------
+
+// Empty when the pin can carry a literal. Otherwise the reason it cannot, so
+// the caller can refuse instead of writing a default the compiler will reject
+// or silently drop. The conditions are the engine's own:
+//  - UK2Node_CallFunction marks a `const T&` parameter without
+//    AutoCreateRefTerm as bDefaultValueIsIgnored;
+//  - UEdGraphSchema_K2::IsPinDefaultValid rejects an unwired by-ref or
+//    container input unless the function has AutoCreateRefTerm for it.
+static FString WhyPinCannotHoldLiteral(const UEdGraphPin* Pin)
+{
+    if (!Pin || Pin->Direction != EGPD_Input)
+    {
+        return FString();
+    }
+
+    const bool bAutoCreateRefTerm = UEdGraphSchema_K2::IsAutoCreateRefTerm(Pin);
+    if (!bAutoCreateRefTerm)
+    {
+        if (Pin->PinType.IsContainer())
+        {
+            return TEXT("it is an array/set/map input, which must be wired (e.g. from a Make Array node)");
+        }
+        if (Pin->PinType.bIsReference)
+        {
+            return TEXT("it is a by-ref input without AutoCreateRefTerm, which must be wired to a variable or another node's output");
+        }
+    }
+    if (Pin->bDefaultValueIsIgnored)
+    {
+        return TEXT("the node ignores this pin's default value, so it must be wired");
+    }
+    return FString();
+}
+
+// Shortest decimal text that parses back to exactly the same double.
+// FString::SanitizeFloat and "%f" keep six fractional digits, and going
+// through float keeps about seven significant ones; both change the value.
+static FString DoubleToPinString(double Value)
+{
+    if (!FMath::IsFinite(Value))
+    {
+        return TEXT("0.0");
+    }
+    FString Text;
+    for (int32 Precision = 15; Precision <= 17; ++Precision)
+    {
+        Text = FString::Printf(TEXT("%.*g"), Precision, Value);
+        if (FCString::Atod(*Text) == Value)
+        {
+            break;
+        }
+    }
+    // Pin defaults for real numbers are written with a decimal point ("1.0").
+    if (!Text.Contains(TEXT(".")) && !Text.Contains(TEXT("e")) && !Text.Contains(TEXT("E")))
+    {
+        Text += TEXT(".0");
+    }
+    return Text;
+}
+
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params)
 {
     if (CommandType == TEXT("connect_blueprint_nodes"))
@@ -396,6 +459,15 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleFindBluep
             PinObj->SetStringField(TEXT("direction"), Pin->Direction == EGPD_Input ? TEXT("Input") : TEXT("Output"));
             PinObj->SetStringField(TEXT("type"), Pin->PinType.PinCategory.ToString());
             PinObj->SetBoolField(TEXT("connected"), Pin->LinkedTo.Num() > 0);
+            // Literal carried by the pin, so a caller can read back what it wrote.
+            if (!Pin->DefaultValue.IsEmpty())
+            {
+                PinObj->SetStringField(TEXT("default_value"), Pin->DefaultValue);
+            }
+            if (Pin->DefaultObject)
+            {
+                PinObj->SetStringField(TEXT("default_object"), Pin->DefaultObject->GetPathName());
+            }
             PinsArray.Add(MakeShared<FJsonValueObject>(PinObj));
         }
         NodeObj->SetArrayField(TEXT("pins"), PinsArray);
@@ -471,6 +543,20 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleSetNodePi
             ESpirrowErrorCode::PinNotFound,
             FString::Printf(TEXT("Pin not found: %s"), *PinName),
             Details);
+    }
+
+    // Issue #26: a pin that cannot hold a literal is an error, not a silent no-op.
+    {
+        const FString Reason = WhyPinCannotHoldLiteral(TargetPin);
+        if (!Reason.IsEmpty())
+        {
+            TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+            Details->SetStringField(TEXT("pin_name"), PinName);
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::InvalidParamValue,
+                FString::Printf(TEXT("Pin '%s' cannot take a literal: %s. Connect the pin instead."), *PinName, *Reason),
+                Details);
+        }
     }
 
     // Pin type dispatch:
@@ -577,7 +663,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleSetNodePi
     else if (PinT.PinCategory == UEdGraphSchema_K2::PC_Float ||
              PinT.PinCategory == UEdGraphSchema_K2::PC_Real)
     {
-        TargetPin->DefaultValue = FString::SanitizeFloat(FCString::Atof(*PinValue));
+        TargetPin->DefaultValue = DoubleToPinString(FCString::Atod(*PinValue));
     }
     else if (PinT.PinCategory == UEdGraphSchema_K2::PC_Boolean)
     {
@@ -758,6 +844,43 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
         }
         ParentFunction = nullptr;
         ParentClass = ParentClass->GetSuperClass();
+    }
+
+    if (ParentFunction && !UEdGraphSchema_K2::FunctionCanBePlacedAsEvent(ParentFunction))
+    {
+        // Issue #20: an event node cannot return anything. Placing one for a
+        // function with a return value or out parameters used to report
+        // success and leave a Blueprint that does not compile (or compiles
+        // with the outputs silently dropped). Such a function is overridden
+        // with a function graph, as the editor does.
+        FString Reason;
+        if (UEdGraphSchema_K2::HasFunctionAnyOutputParameter(ParentFunction))
+        {
+            Reason = TEXT("it has a return value or out parameters");
+        }
+        else if (ParentFunction->HasAnyFunctionFlags(FUNC_Const))
+        {
+            Reason = TEXT("it is const");
+        }
+        else if (ParentFunction->HasAnyFunctionFlags(FUNC_Static))
+        {
+            Reason = TEXT("it is static");
+        }
+        else
+        {
+            Reason = TEXT("the engine does not allow it to be placed as an event (ForceAsFunction, thread-safe, or not overridable)");
+        }
+
+        TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+        Details->SetStringField(TEXT("event_name"), EventName);
+        Details->SetStringField(TEXT("parent_class"), ParentClass ? ParentClass->GetName() : FString());
+        Details->SetBoolField(TEXT("requires_function_graph"), true);
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidOperation,
+            FString::Printf(
+                TEXT("'%s' (declared on %s) cannot be overridden with an event node because %s. It must be overridden as a function graph, which add_blueprint_event_node cannot create."),
+                *EventName, ParentClass ? *ParentClass->GetName() : TEXT("?"), *Reason),
+            Details);
     }
 
     if (ParentFunction)
@@ -1002,6 +1125,29 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
         {
             const UEdGraphSchema_K2* K2Schema = Cast<const UEdGraphSchema_K2>(EventGraph->GetSchema());
 
+            // Issue #26: refuse literals for pins that cannot hold one before
+            // writing anything, and take the node back out so a failed call
+            // leaves the graph as it was.
+            for (const auto& Param : (*ParamsObj)->Values)
+            {
+                const FString ParamName(Param.Key);
+                const UEdGraphPin* ParamPin = FSpirrowBridgeCommonUtils::FindPin(SpawnedNode, ParamName, EGPD_Input);
+                const FString Reason = WhyPinCannotHoldLiteral(ParamPin);
+                if (!Reason.IsEmpty())
+                {
+                    EventGraph->RemoveNode(SpawnedNode);
+                    TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+                    Details->SetStringField(TEXT("pin_name"), ParamName);
+                    Details->SetStringField(TEXT("function_name"), FunctionName);
+                    return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                        ESpirrowErrorCode::InvalidParamValue,
+                        FString::Printf(
+                            TEXT("Pin '%s' of '%s' cannot take a literal: %s. Remove it from params and connect the pin instead. No node was added."),
+                            *ParamName, *FunctionName, *Reason),
+                        Details);
+                }
+            }
+
             for (const TPair<FString, TSharedPtr<FJsonValue>>& Param : (*ParamsObj)->Values)
             {
                 UEdGraphPin* ParamPin = FSpirrowBridgeCommonUtils::FindPin(SpawnedNode, Param.Key, EGPD_Input);
@@ -1071,7 +1217,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
                     if (ParamCat == UEdGraphSchema_K2::PC_Int)
                         ParamPin->DefaultValue = FString::FromInt(FMath::RoundToInt(ParamValue->AsNumber()));
                     else
-                        ParamPin->DefaultValue = FString::SanitizeFloat(ParamValue->AsNumber());
+                        ParamPin->DefaultValue = DoubleToPinString(ParamValue->AsNumber());
                 }
                 else if (ParamValue->Type == EJson::Boolean)
                 {
@@ -1079,15 +1225,20 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleAddBluepr
                 }
                 else if (ParamValue->Type == EJson::Array)
                 {
+                    // [X,Y,Z] for a Vector pin, [Pitch,Yaw,Roll] for a Rotator pin.
+                    // Components stay double all the way and are written in the
+                    // comma form the editor itself stores for these pins
+                    // ("1.0,2.0,3.0"), which is what the pin widget reads back.
                     const TArray<TSharedPtr<FJsonValue>>* ArrayValue;
+                    const UObject* PinStruct = ParamPin->PinType.PinSubCategoryObject.Get();
                     if (ParamValue->TryGetArray(ArrayValue) && ArrayValue->Num() == 3 &&
                         ParamCat == UEdGraphSchema_K2::PC_Struct &&
-                        ParamPin->PinType.PinSubCategoryObject == TBaseStructure<FVector>::Get())
+                        (PinStruct == TBaseStructure<FVector>::Get() || PinStruct == TBaseStructure<FRotator>::Get()))
                     {
-                        float X = (*ArrayValue)[0]->AsNumber();
-                        float Y = (*ArrayValue)[1]->AsNumber();
-                        float Z = (*ArrayValue)[2]->AsNumber();
-                        ParamPin->DefaultValue = FString::Printf(TEXT("(X=%f,Y=%f,Z=%f)"), X, Y, Z);
+                        ParamPin->DefaultValue = FString::Printf(TEXT("%s,%s,%s"),
+                            *DoubleToPinString((*ArrayValue)[0]->AsNumber()),
+                            *DoubleToPinString((*ArrayValue)[1]->AsNumber()),
+                            *DoubleToPinString((*ArrayValue)[2]->AsNumber()));
                     }
                 }
             }

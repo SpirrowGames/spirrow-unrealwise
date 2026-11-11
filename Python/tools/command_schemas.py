@@ -225,7 +225,7 @@ COMMAND_SCHEMAS = {
             },
         },
         "compile_blueprint": {
-            "brief": "Compile a Blueprint (regular or Level Script)",
+            "brief": "Compile a Blueprint (regular or Level Script) and report the result. Returns status (UpToDate / UpToDateWithWarnings) and warnings[]; a compile error is an error response (code 1201) whose message lists the compiler errors",
             "params": {
                 "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
                 "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},

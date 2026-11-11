@@ -1863,10 +1863,12 @@ COMMAND_SCHEMAS = {
         # Console + runtime control
         # ---------------------------------------------------------------------
         "exec_console_command": {
-            "brief": "Run a UE console command (GEngine->Exec) with output capture",
+            "brief": "Run a UE console command (GEngine->Exec). Returns 'output' (what the command wrote to its own output device) and 'log' (the log lines written while it ran, e.g. LogPython lines of a 'py' command)",
             "params": {
-                "command": {"type": "str", "required": True, "desc": "Console command (e.g. 'stat fps', 'showflag.collision 1', 'voxel.show_chunk_borders 1')"},
+                "command": {"type": "str", "required": True, "desc": "Console command (e.g. 'stat fps', 'showflag.collision 1', 'py print(1+1)')"},
                 "target": {"type": "str", "default": "auto", "desc": "'pie' (PlayWorld), 'editor' (editor world), or 'auto' (PIE if running, else editor)"},
+                "capture_log": {"type": "bool", "default": True, "desc": "Return the log lines written during the command as 'log': [{category, verbosity, message}], with log_line_count / log_truncated / log_error_count / log_warning_count. A 'py' command that raises shows up as log_error_count > 0 (exec_returned_true stays true). Only lines written before the command returns are captured; a command that defers its work to a later tick logs after the response (so does 'py' in the first moments after the editor starts, before Python is initialized)"},
+                "max_log_lines": {"type": "int", "default": 200, "desc": "Cap on returned log lines (1-5000). log_truncated=true when more were written"},
             },
         },
         "set_global_time_dilation": {

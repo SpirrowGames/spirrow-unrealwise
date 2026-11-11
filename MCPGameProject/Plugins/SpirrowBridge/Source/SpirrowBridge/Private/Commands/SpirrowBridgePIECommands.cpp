@@ -969,6 +969,64 @@ namespace
             Captured.Append(TEXT("\n"));
         }
     };
+
+    /**
+     * Collects what is written to GLog while a console command runs (Issue #38).
+     *
+     * GEngine->Exec hands a command its own output device, and only what the
+     * command writes there comes back as "output". Many commands report through
+     * UE_LOG instead - `py` is the common one: print() and unreal.log() go to
+     * LogPython - so their result was visible in the editor log only.
+     *
+     * GLog hands lines to an ordinary output device from its own logging
+     * thread, some time after they were written, which is too late for a
+     * response built right after Exec returns. A device that declares itself
+     * usable on any thread is called directly by the thread that logs, so this
+     * one does that and keeps only the lines of the thread that created it -
+     * the thread running the command. Other threads' lines are not the
+     * command's output, and ignoring them means no lock is needed.
+     */
+    class FLogLineCapture : public FOutputDevice
+    {
+    public:
+        struct FLine
+        {
+            FString Category;
+            ELogVerbosity::Type Verbosity;
+            FString Message;
+        };
+
+        explicit FLogLineCapture(int32 InMaxLines)
+            : MaxLines(InMaxLines), OwnerThreadId(FPlatformTLS::GetCurrentThreadId()) {}
+
+        virtual bool CanBeUsedOnAnyThread() const override { return true; }
+        virtual bool CanBeUsedOnMultipleThreads() const override { return true; }
+
+        TArray<FLine> Lines;
+        int32 Total = 0;
+        int32 Errors = 0;
+        int32 Warnings = 0;
+
+        virtual void Serialize(const TCHAR* V, ELogVerbosity::Type Verbosity, const FName& Category) override
+        {
+            if (FPlatformTLS::GetCurrentThreadId() != OwnerThreadId)
+            {
+                return;
+            }
+            const ELogVerbosity::Type Level = static_cast<ELogVerbosity::Type>(Verbosity & ELogVerbosity::VerbosityMask);
+            ++Total;
+            if (Level == ELogVerbosity::Error || Level == ELogVerbosity::Fatal) { ++Errors; }
+            else if (Level == ELogVerbosity::Warning) { ++Warnings; }
+            if (Lines.Num() < MaxLines)
+            {
+                Lines.Add({ Category.ToString(), Level, FString(V) });
+            }
+        }
+
+    private:
+        int32 MaxLines;
+        uint32 OwnerThreadId;
+    };
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgePIECommands::HandleExecConsoleCommand(const TSharedPtr<FJsonObject>& Params)
@@ -1016,14 +1074,48 @@ TSharedPtr<FJsonObject> FSpirrowBridgePIECommands::HandleExecConsoleCommand(cons
             FString::Printf(TEXT("Target world '%s' not available"), *Target));
     }
 
+    bool bCaptureLog = true;
+    Params->TryGetBoolField(TEXT("capture_log"), bCaptureLog);
+    double MaxLogLinesParam = 200;
+    Params->TryGetNumberField(TEXT("max_log_lines"), MaxLogLinesParam);
+    const int32 MaxLogLines = FMath::Clamp(static_cast<int32>(MaxLogLinesParam), 1, 5000);
+
     FStringOutputCapture Capture;
+    FLogLineCapture LogCapture(MaxLogLines);
+    if (bCaptureLog && GLog)
+    {
+        GLog->AddOutputDevice(&LogCapture);
+    }
+
     const bool bOk = GEngine->Exec(TargetWorld, *Command, Capture);
+
+    if (bCaptureLog && GLog)
+    {
+        GLog->RemoveOutputDevice(&LogCapture);
+    }
 
     TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
     Data->SetBoolField(TEXT("exec_returned_true"), bOk);
     Data->SetStringField(TEXT("command"), Command);
     Data->SetStringField(TEXT("target"), ResolvedTarget);
     Data->SetStringField(TEXT("output"), Capture.Captured);
+    if (bCaptureLog)
+    {
+        TArray<TSharedPtr<FJsonValue>> LogArray;
+        for (const FLogLineCapture::FLine& Line : LogCapture.Lines)
+        {
+            TSharedPtr<FJsonObject> LineObj = MakeShared<FJsonObject>();
+            LineObj->SetStringField(TEXT("category"), Line.Category);
+            LineObj->SetStringField(TEXT("verbosity"), ::ToString(Line.Verbosity));
+            LineObj->SetStringField(TEXT("message"), Line.Message);
+            LogArray.Add(MakeShared<FJsonValueObject>(LineObj));
+        }
+        Data->SetArrayField(TEXT("log"), LogArray);
+        Data->SetNumberField(TEXT("log_line_count"), LogCapture.Total);
+        Data->SetBoolField(TEXT("log_truncated"), LogCapture.Total > LogCapture.Lines.Num());
+        Data->SetNumberField(TEXT("log_error_count"), LogCapture.Errors);
+        Data->SetNumberField(TEXT("log_warning_count"), LogCapture.Warnings);
+    }
     return FSpirrowBridgeCommonUtils::CreateSuccessResponse(Data);
 }
 // ----------------------------------------------------------------------------

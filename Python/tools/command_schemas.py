@@ -384,6 +384,12 @@ COMMAND_SCHEMAS = {
     #                target_type=level_blueprint; omit to target the currently
     #                edited persistent level's Level Script Blueprint.
     # When target_type=level_blueprint, blueprint_name / path are ignored.
+    #
+    # Every node command except add_blueprint_event_node and
+    # add_blueprint_input_action_node also accepts:
+    #   graph_name:  a function graph created by add_function_graph or
+    #                add_function_override. Omit to work in the event graph.
+    # It is spelled out below only for the commands used most inside functions.
     # =========================================================================
     "blueprint_node": {
         "add_blueprint_event_node": {
@@ -410,6 +416,7 @@ COMMAND_SCHEMAS = {
         "add_blueprint_function_node": {
             "brief": "Add a function call node (regular BP or LSB). A UBlueprintAsyncActionBase factory is placed as an async node (response has async_action and exec_outputs, one per delegate). Falls back to external UPROPERTY Set/Get if function_name is Set<Prop>/Get<Prop> and no matching function exists",
             "params": {
+                "graph_name": {"type": "str", "desc": "Graph to work in: a function graph from add_function_graph / add_function_override. Omit for the event graph"},
                 "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
                 "target": {"type": "str", "required": True, "desc": "Target class name (function owner, or owner of UPROPERTY for fallback)"},
                 "function_name": {"type": "str", "required": True, "desc": "Function name. If not found and starts with Set/Get/K2_Set/K2_Get, the handler falls back to spawning a UK2Node_VariableSet/Get for the matching UPROPERTY"},
@@ -424,6 +431,7 @@ COMMAND_SCHEMAS = {
         "connect_blueprint_nodes": {
             "brief": "Connect two Blueprint nodes through the graph schema, like dragging a wire in the editor: incompatible pins are an error with the reason, wildcard pins take the connected type, and a conversion node is inserted when one exists (conversion_nodes_added). Works on regular BP or Level Script BP",
             "params": {
+                "graph_name": {"type": "str", "desc": "Graph to work in: a function graph from add_function_graph / add_function_override. Omit for the event graph"},
                 "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
                 "source_node_id": {"type": "str", "required": True, "desc": "Source node ID"},
                 "source_pin": {"type": "str", "required": True, "desc": "Source pin name"},
@@ -478,6 +486,7 @@ COMMAND_SCHEMAS = {
         "find_blueprint_nodes": {
             "brief": "Find nodes in a Blueprint graph (works on regular BP or Level Script BP)",
             "params": {
+                "graph_name": {"type": "str", "desc": "Graph to work in: a function graph from add_function_graph / add_function_override. Omit for the event graph"},
                 "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
                 "node_type": {"type": "any", "desc": "Filter by node type"},
                 "event_type": {"type": "any", "desc": "Filter events by name. Accepts the editor name (BeginPlay, 'Event BeginPlay') or the internal one (ReceiveBeginPlay); case and spaces are ignored. Each result carries name (internal) and display_name"},
@@ -488,9 +497,38 @@ COMMAND_SCHEMAS = {
                 "level_path": {"type": "str", "desc": "Level asset path. Omit for current level. Only used when target_type=level_blueprint"},
             },
         },
+        "add_function_graph": {
+            "brief": "Create a user function graph with typed inputs and outputs. Returns graph_name plus the entry / result node ids and their pins; pass graph_name to the node commands to build the body",
+            "params": {
+                "blueprint_name": {"type": "str", "required": True, "desc": "Blueprint name"},
+                "function_name": {"type": "str", "required": True, "desc": "Name of the new function (also the graph name)"},
+                "inputs": {"type": "list[dict]", "default": [], "desc": "[{'name': 'Base', 'type': 'Integer'}, ...]. Types as in add_blueprint_variable, containers included"},
+                "outputs": {"type": "list[dict]", "default": [], "desc": "[{'name': 'Total', 'type': 'Float'}, ...]. A result node is created when this is not empty"},
+                "is_pure": {"type": "bool", "default": False, "desc": "Pure function (no exec pins on the call node)"},
+                "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
+            },
+        },
+        "add_function_override": {
+            "brief": "Override a parent-class or interface function that has a return value or out parameters, as a function graph (what the editor's Override Function menu does). Functions without outputs are overridden with add_blueprint_event_node instead",
+            "params": {
+                "blueprint_name": {"type": "str", "required": True, "desc": "Blueprint name"},
+                "function_name": {"type": "str", "required": True, "desc": "Function to override: the UFunction name (CanJumpInternal) or its editor name (CanJump)"},
+                "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
+            },
+        },
+        "list_blueprint_graphs": {
+            "brief": "List the event, function and macro graphs of a Blueprint with their node counts",
+            "params": {
+                "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
+                "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
+                "target_type": {"type": "str", "default": "blueprint", "desc": "'blueprint' or 'level_blueprint'"},
+                "level_path": {"type": "str", "desc": "Level asset path. Omit for current level. Only used when target_type=level_blueprint"},
+            },
+        },
         "set_node_pin_value": {
             "brief": "Set a default value on a node pin. Handles primitive, struct, Class, SoftClass, Object, SoftObject and Interface pins (regular BP or LSB)",
             "params": {
+                "graph_name": {"type": "str", "desc": "Graph to work in: a function graph from add_function_graph / add_function_override. Omit for the event graph"},
                 "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
                 "node_id": {"type": "str", "required": True, "desc": "Node ID"},
                 "pin_name": {"type": "str", "required": True, "desc": "Pin name"},
@@ -529,6 +567,7 @@ COMMAND_SCHEMAS = {
         "delete_blueprint_node": {
             "brief": "Delete a Blueprint node",
             "params": {
+                "graph_name": {"type": "str", "desc": "Graph to work in: a function graph from add_function_graph / add_function_override. Omit for the event graph"},
                 "blueprint_name": {"type": "str", "required": True, "desc": "Blueprint name"},
                 "node_id": {"type": "str", "required": True, "desc": "Node ID to delete"},
                 "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},

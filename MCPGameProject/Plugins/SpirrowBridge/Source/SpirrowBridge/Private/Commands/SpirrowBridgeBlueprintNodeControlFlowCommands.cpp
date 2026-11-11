@@ -67,12 +67,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
         return Error;
     }
 
-    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
-    if (!EventGraph)
+    // graph_name selects a function graph (Issue #21); default is the event graph.
+    UEdGraph* EventGraph = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetGraph(Params, Blueprint, EventGraph))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::GraphNotFound,
-            TEXT("Failed to get event graph"));
+        return Error;
     }
 
     UK2Node_IfThenElse* BranchNode = NewObject<UK2Node_IfThenElse>(EventGraph);
@@ -119,12 +118,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
         return Error;
     }
 
-    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
-    if (!EventGraph)
+    // graph_name selects a function graph (Issue #21); default is the event graph.
+    UEdGraph* EventGraph = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetGraph(Params, Blueprint, EventGraph))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::GraphNotFound,
-            TEXT("Failed to get event graph"));
+        return Error;
     }
 
     UK2Node_ExecutionSequence* SequenceNode = NewObject<UK2Node_ExecutionSequence>(EventGraph);
@@ -176,12 +174,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
         return Error;
     }
 
-    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
-    if (!EventGraph)
+    // graph_name selects a function graph (Issue #21); default is the event graph.
+    UEdGraph* EventGraph = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetGraph(Params, Blueprint, EventGraph))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::GraphNotFound,
-            TEXT("Failed to get event graph"));
+        return Error;
     }
 
     UFunction* DelayFunction = UKismetSystemLibrary::StaticClass()->FindFunctionByName(TEXT("Delay"));
@@ -244,12 +241,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
         return Error;
     }
 
-    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
-    if (!EventGraph)
+    // graph_name selects a function graph (Issue #21); default is the event graph.
+    UEdGraph* EventGraph = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetGraph(Params, Blueprint, EventGraph))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::GraphNotFound,
-            TEXT("Failed to get event graph"));
+        return Error;
     }
 
     UBlueprint* MacroLibrary = LoadObject<UBlueprint>(nullptr,
@@ -329,12 +325,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
         return Error;
     }
 
-    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
-    if (!EventGraph)
+    // graph_name selects a function graph (Issue #21); default is the event graph.
+    UEdGraph* EventGraph = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetGraph(Params, Blueprint, EventGraph))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::GraphNotFound,
-            TEXT("Failed to get event graph"));
+        return Error;
     }
 
     UFunction* PrintStringFunction = UKismetSystemLibrary::StaticClass()->FindFunctionByName(TEXT("PrintString"));
@@ -394,12 +389,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
         return Error;
     }
 
-    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
-    if (!EventGraph)
+    // graph_name selects a function graph (Issue #21); default is the event graph.
+    UEdGraph* EventGraph = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetGraph(Params, Blueprint, EventGraph))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::GraphNotFound,
-            TEXT("Failed to get event graph"));
+        return Error;
     }
 
     FString FunctionName;
@@ -479,12 +473,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeControlFlowCommands::HandleAd
         return Error;
     }
 
-    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
-    if (!EventGraph)
+    // graph_name selects a function graph (Issue #21); default is the event graph.
+    UEdGraph* EventGraph = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetGraph(Params, Blueprint, EventGraph))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::GraphNotFound,
-            TEXT("Failed to get event graph"));
+        return Error;
     }
 
     FString FunctionName;

@@ -220,12 +220,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeVariableCommands::HandleAddMa
         return Error;
     }
 
-    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
-    if (!EventGraph)
+    // graph_name selects a function graph (Issue #21); default is the event graph.
+    UEdGraph* EventGraph = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetGraph(Params, Blueprint, EventGraph))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::GraphNotFound,
-            TEXT("Failed to get event graph"));
+        return Error;
     }
 
     UK2Node_MakeContainer* Node = NewObject<UK2Node_MakeContainer>(EventGraph, NodeClass);
@@ -332,12 +331,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeVariableCommands::HandleAddVa
             FString::Printf(TEXT("Variable not found in blueprint: %s"), *VariableName));
     }
 
-    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
-    if (!EventGraph)
+    // graph_name selects a function graph (Issue #21); default is the event graph.
+    UEdGraph* EventGraph = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetGraph(Params, Blueprint, EventGraph))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::GraphNotFound,
-            TEXT("Failed to get event graph"));
+        return Error;
     }
 
     UK2Node_VariableGet* GetNode = NewObject<UK2Node_VariableGet>(EventGraph);
@@ -406,12 +404,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeVariableCommands::HandleAddVa
             FString::Printf(TEXT("Variable not found in blueprint: %s"), *VariableName));
     }
 
-    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
-    if (!EventGraph)
+    // graph_name selects a function graph (Issue #21); default is the event graph.
+    UEdGraph* EventGraph = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetGraph(Params, Blueprint, EventGraph))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::GraphNotFound,
-            TEXT("Failed to get event graph"));
+        return Error;
     }
 
     UK2Node_VariableSet* SetNode = NewObject<UK2Node_VariableSet>(EventGraph);
@@ -463,12 +460,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeVariableCommands::HandleAddBl
         return Error;
     }
 
-    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
-    if (!EventGraph)
+    // graph_name selects a function graph (Issue #21); default is the event graph.
+    UEdGraph* EventGraph = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetGraph(Params, Blueprint, EventGraph))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::GraphNotFound,
-            TEXT("Failed to get event graph"));
+        return Error;
     }
 
     UK2Node_VariableGet* GetComponentNode = NewObject<UK2Node_VariableGet>(EventGraph);
@@ -512,12 +508,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeVariableCommands::HandleAddBl
         return Error;
     }
 
-    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
-    if (!EventGraph)
+    // graph_name selects a function graph (Issue #21); default is the event graph.
+    UEdGraph* EventGraph = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetGraph(Params, Blueprint, EventGraph))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::GraphNotFound,
-            TEXT("Failed to get event graph"));
+        return Error;
     }
 
     UK2Node_Self* SelfNode = FSpirrowBridgeCommonUtils::CreateSelfReferenceNode(EventGraph, NodePosition);
@@ -637,12 +632,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeVariableCommands::HandleAddEx
         return Error;
     }
 
-    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
-    if (!EventGraph)
+    // graph_name selects a function graph (Issue #21); default is the event graph.
+    UEdGraph* EventGraph = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetGraph(Params, Blueprint, EventGraph))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::GraphNotFound,
-            TEXT("Failed to get event graph"));
+        return Error;
     }
 
     UClass* TargetClass = FSpirrowBridgeCommonUtils::FindClassByNameAnywhere(TargetClassName);
@@ -697,12 +691,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeVariableCommands::HandleAddEx
         return Error;
     }
 
-    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
-    if (!EventGraph)
+    // graph_name selects a function graph (Issue #21); default is the event graph.
+    UEdGraph* EventGraph = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetGraph(Params, Blueprint, EventGraph))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::GraphNotFound,
-            TEXT("Failed to get event graph"));
+        return Error;
     }
 
     UClass* TargetClass = FSpirrowBridgeCommonUtils::FindClassByNameAnywhere(TargetClassName);
@@ -772,12 +765,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeVariableCommands::HandleAddGe
         return Error;
     }
 
-    UEdGraph* EventGraph = FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(Blueprint);
-    if (!EventGraph)
+    // graph_name selects a function graph (Issue #21); default is the event graph.
+    UEdGraph* EventGraph = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ResolveTargetGraph(Params, Blueprint, EventGraph))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::GraphNotFound,
-            TEXT("Failed to get event graph"));
+        return Error;
     }
 
     // Resolve the subsystem class and validate it's a subsystem of the correct kind

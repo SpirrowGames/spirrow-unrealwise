@@ -25,6 +25,9 @@
 #include "Engine/Blueprint.h"
 #include "Engine/BlueprintGeneratedClass.h"
 #include "EditorAssetLibrary.h"
+#include "FileHelpers.h"        // UEditorLoadingAndSavingUtils (save_asset)
+#include "Misc/PackageName.h"
+#include "Misc/Paths.h"
 // Volume actors support
 #include "NavMesh/NavMeshBoundsVolume.h"
 #include "GameFramework/KillZVolume.h"
@@ -121,6 +124,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleCommand(const FStrin
     else if (CommandType == TEXT("rename_asset"))
     {
         return HandleRenameAsset(Params);
+    }
+    else if (CommandType == TEXT("save_asset"))
+    {
+        return HandleSaveAsset(Params);
     }
 
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown editor command: %s"), *CommandType));
@@ -639,37 +646,24 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSpawnBlueprintActor(
     FString Path;
     FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
 
-    // Ensure path ends with /
-    if (!Path.EndsWith(TEXT("/")))
+    // Issue #33: this used to gate on FPackageName::DoesPackageExist, which is
+    // true only for a package that is already on disk, so a Blueprint that was
+    // just created through the bridge (in memory, never saved) was reported as
+    // missing. ValidateBlueprint finds the in-memory object first and falls
+    // back to loading from disk.
+    UBlueprint* Blueprint = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
     {
-        Path += TEXT("/");
+        return Error;
     }
 
-    // Find the blueprint
-    if (BlueprintName.IsEmpty())
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Blueprint name is empty"));
-    }
-
-    FString AssetPath = Path + BlueprintName;
-
-    if (!FPackageName::DoesPackageExist(AssetPath))
-    {
-        TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
-        Details->SetStringField(TEXT("blueprint_name"), BlueprintName);
-        Details->SetStringField(TEXT("path"), AssetPath);
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::BlueprintNotFound,
-            FString::Printf(TEXT("Blueprint '%s' not found at path: %s"), *BlueprintName, *AssetPath),
-            Details);
-    }
-
-    UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *AssetPath);
-    if (!Blueprint)
+    UClass* SpawnClass = Blueprint->GeneratedClass;
+    if (!SpawnClass || !SpawnClass->IsChildOf(AActor::StaticClass()))
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::AssetLoadFailed,
-            FString::Printf(TEXT("Failed to load Blueprint: %s"), *BlueprintName));
+            ESpirrowErrorCode::ActorSpawnFailed,
+            FString::Printf(TEXT("Blueprint '%s' cannot be spawned: %s"), *BlueprintName,
+                SpawnClass ? TEXT("its class is not an Actor") : TEXT("it has no generated class (compile it first)")));
     }
 
     // Get transform parameters
@@ -702,18 +696,106 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSpawnBlueprintActor(
     SpawnTransform.SetRotation(FQuat(Rotation));
     SpawnTransform.SetScale3D(Scale);
 
+    // SpawnActor treats a taken name as a fatal error, so refuse it here.
+    for (TActorIterator<AActor> It(World); It; ++It)
+    {
+        if (It->GetName() == ActorName)
+        {
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::ActorSpawnFailed,
+                FString::Printf(TEXT("Actor with name '%s' already exists"), *ActorName));
+        }
+    }
+
     FActorSpawnParameters SpawnParams;
     SpawnParams.Name = *ActorName;
 
-    AActor* NewActor = World->SpawnActor<AActor>(Blueprint->GeneratedClass, SpawnTransform, SpawnParams);
+    AActor* NewActor = World->SpawnActor<AActor>(SpawnClass, SpawnTransform, SpawnParams);
     if (NewActor)
     {
+        NewActor->SetActorLabel(ActorName);
         return FSpirrowBridgeCommonUtils::ActorToJsonObject(NewActor, true);
     }
 
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(
         ESpirrowErrorCode::ActorSpawnFailed,
         FString::Printf(TEXT("Failed to spawn blueprint actor '%s'"), *BlueprintName));
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSaveAsset(const TSharedPtr<FJsonObject>& Params)
+{
+    // Issue #33: assets created through the bridge live only in memory until
+    // someone saves them, and the bridge had no way to do that.
+    FString AssetPath;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("asset_path"), AssetPath))
+    {
+        return Error;
+    }
+    bool bOnlyIfDirty = false;
+    Params->TryGetBoolField(TEXT("only_if_dirty"), bOnlyIfDirty);
+
+    // Accept "/Game/Dir/Asset", "/Game/Dir/Asset.Asset" and "/Game/Dir/Asset.Asset_C".
+    FString PackageName = AssetPath;
+    int32 DotIndex = INDEX_NONE;
+    if (PackageName.FindChar(TEXT('.'), DotIndex))
+    {
+        PackageName.LeftInline(DotIndex);
+    }
+
+    if (!FPackageName::IsValidLongPackageName(PackageName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidParamValue,
+            FString::Printf(TEXT("'%s' is not a valid asset path (expected e.g. /Game/Blueprints/BP_Thing)"), *AssetPath));
+    }
+
+    UPackage* Package = FindPackage(nullptr, *PackageName);
+    if (!Package && FPackageName::DoesPackageExist(PackageName))
+    {
+        Package = LoadPackage(nullptr, *PackageName, LOAD_None);
+    }
+    if (!Package)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetNotFound,
+            FString::Printf(TEXT("Asset not found (neither in memory nor on disk): %s"), *PackageName));
+    }
+
+    const bool bWasDirty = Package->IsDirty();
+    const bool bWasOnDisk = FPackageName::DoesPackageExist(PackageName);
+    const bool bSkipped = bOnlyIfDirty && !bWasDirty && bWasOnDisk;
+
+    if (!bSkipped)
+    {
+        // A map package gets the .umap extension inside SavePackages.
+        TArray<UPackage*> Packages;
+        Packages.Add(Package);
+        if (!UEditorLoadingAndSavingUtils::SavePackages(Packages, false))
+        {
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::OperationFailed,
+                FString::Printf(TEXT("Failed to save %s (see the editor log)"), *PackageName));
+        }
+    }
+
+    FString Filename;
+    FPackageName::DoesPackageExist(PackageName, &Filename);
+    if (Filename.IsEmpty())
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::OperationFailed,
+            FString::Printf(TEXT("Save of %s reported success but no file is on disk"), *PackageName));
+    }
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
+    ResultObj->SetStringField(TEXT("asset_path"), PackageName);
+    ResultObj->SetBoolField(TEXT("saved"), !bSkipped);
+    ResultObj->SetBoolField(TEXT("was_dirty"), bWasDirty);
+    ResultObj->SetBoolField(TEXT("was_on_disk"), bWasOnDisk);
+    ResultObj->SetBoolField(TEXT("dirty"), Package->IsDirty());
+    ResultObj->SetStringField(TEXT("filename"), FPaths::ConvertRelativePathToFull(Filename));
+    return ResultObj;
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleFocusViewport(const TSharedPtr<FJsonObject>& Params)

@@ -20,6 +20,7 @@ COMMANDS = {
     "rename_actor": "rename_actor",
     "spawn_blueprint_actor": "spawn_blueprint_actor",
     "rename_asset": "rename_asset",
+    "save_asset": "save_asset",
     "create_level": "create_level",
     "save_current_level": "save_current_level",
     "open_level": "open_level",
@@ -48,7 +49,7 @@ def register_editor_meta_tool(mcp: FastMCP):
         Commands: get_actors_in_level, find_actors_by_name, spawn_actor, delete_actor,
         set_actor_transform, get_actor_properties, set_actor_property,
         set_actor_component_property, get_actor_components, rename_actor,
-        spawn_blueprint_actor, rename_asset, create_level, save_current_level, open_level,
+        spawn_blueprint_actor, rename_asset, save_asset, create_level, save_current_level, open_level,
         get_world_settings, set_world_properties, take_screenshot,
         get_editor_camera, set_editor_camera, set_showflag, trigger_live_coding
 

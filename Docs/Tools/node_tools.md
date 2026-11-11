@@ -700,6 +700,94 @@ add_comparison_node(
 
 ---
 
+## 関数グラフツール
+
+イベントグラフ以外のグラフ (関数グラフ) を作り、その中にノードを置くためのツールです。
+
+### graph_name パラメータ
+
+`add_blueprint_event_node` と `add_blueprint_input_action_node` を除くすべてのノード系コマンドは、任意の `graph_name` を受け取ります。
+
+- 省略: イベントグラフが対象 (従来どおり)
+- 指定: その名前の関数グラフが対象。`add_function_graph` / `add_function_override` が返す `graph_name` を渡します
+- 存在しない名前はエラーになり、エラー文に Blueprint が持つグラフの一覧が入ります
+
+ノード ID はグラフごとに探されるため、関数グラフ内のノードを操作するときは毎回 `graph_name` を付けてください。
+
+### add_function_graph
+
+型つきの入力・出力を持つユーザー定義関数を作ります。
+
+**パラメータ:**
+- `blueprint_name` (string) - 対象のBlueprint名
+- `function_name` (string) - 関数名 (グラフ名にもなる)
+- `inputs` (array, optional) - `[{"name": "Base", "type": "Integer"}, ...]`。型は `add_blueprint_variable` と同じ
+- `outputs` (array, optional) - 同じ形式。空でなければ結果ノードが作られる
+- `is_pure` (boolean, optional) - 純粋関数にするか (デフォルト: false)
+- `path` (string, optional) - コンテンツブラウザパス (デフォルト: "/Game/Blueprints")
+
+**戻り値:**
+- `graph_name`, `entry_node_id`, `entry_pins`, `result_node_id`, `result_pins`
+- 関数の入力は **エントリノードの出力ピン**、関数の出力は **結果ノードの入力ピン** です
+
+**例:**
+```python
+fn = add_function_graph(
+    blueprint_name="BP_Test",
+    function_name="ComputeScore",
+    inputs=[{"name": "Base", "type": "Integer"}, {"name": "Bonus", "type": "Integer"}],
+    outputs=[{"name": "Total", "type": "Integer"}]
+)
+add = add_blueprint_function_node(
+    blueprint_name="BP_Test", graph_name=fn["graph_name"],
+    target="KismetMathLibrary", function_name="Add_IntInt"
+)
+connect_blueprint_nodes(
+    blueprint_name="BP_Test", graph_name=fn["graph_name"],
+    source_node_id=fn["entry_node_id"], source_pin="Base",
+    target_node_id=add["node_id"], target_pin="A"
+)
+```
+
+### add_function_override
+
+親クラス (またはインターフェース) の関数のうち、**戻り値や out 引数を持つもの**を関数グラフで override します。エディタの「関数をオーバーライド」と同じ操作です。
+
+**パラメータ:**
+- `blueprint_name` (string) - 対象のBlueprint名
+- `function_name` (string) - override する関数。関数名 (`CanJumpInternal`) でもエディタ上の名前 (`CanJump`) でも可
+- `path` (string, optional) - コンテンツブラウザパス (デフォルト: "/Game/Blueprints")
+
+**戻り値:**
+- `add_function_graph` と同じ形式に加えて `is_override: true`, `parent_class`
+- エントリノードと結果ノードは親関数のシグネチャを持ちます
+
+**注意:**
+- 戻り値も out 引数も無い関数は event ノードで override するものなので、このコマンドはエラーを返します。`add_blueprint_event_node` を使ってください
+- 既に override 済みの関数、親クラスに無い関数はエラーになります
+
+**例:**
+```python
+ov = add_function_override(blueprint_name="BP_MyCharacter", function_name="CanJumpInternal")
+set_node_pin_value(
+    blueprint_name="BP_MyCharacter", graph_name=ov["graph_name"],
+    node_id=ov["result_node_id"], pin_name="ReturnValue", pin_value="true"
+)
+```
+
+### list_blueprint_graphs
+
+Blueprint が持つグラフの一覧を返します。
+
+**パラメータ:**
+- `blueprint_name` (string) - 対象のBlueprint名
+- `path` (string, optional) - コンテンツブラウザパス (デフォルト: "/Game/Blueprints")
+
+**戻り値:**
+- `graphs`: `[{"graph_name": "EventGraph", "graph_type": "event", "node_count": 3}, ...]`。`graph_type` は `event` / `function` / `macro`
+
+---
+
 ## 制御フローワークフロー例
 
 SequenceノードとDelayノードを使用した例:

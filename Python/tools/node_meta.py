@@ -15,6 +15,9 @@ COMMANDS = {
     "add_blueprint_get_self_component_reference": "add_blueprint_get_self_component_reference",
     "add_blueprint_self_reference": "add_blueprint_self_reference",
     "find_blueprint_nodes": "find_blueprint_nodes",
+    "add_function_graph": "add_function_graph",
+    "add_function_override": "add_function_override",
+    "list_blueprint_graphs": "list_blueprint_graphs",
     "set_node_pin_value": "set_node_pin_value",
     "add_variable_get_node": "add_variable_get_node",
     "add_variable_set_node": "add_variable_set_node",
@@ -56,7 +59,11 @@ def register_node_meta_tool(mcp: FastMCP):
         add_forloop_with_break_node, add_print_string_node,
         add_math_node, add_comparison_node,
         add_external_property_set_node, add_external_property_get_node,
-        add_get_subsystem_node, add_make_container_node
+        add_get_subsystem_node, add_make_container_node,
+        add_function_graph, add_function_override, list_blueprint_graphs
+
+        Node commands work on the event graph unless params has graph_name
+        (a function graph made by add_function_graph / add_function_override).
 
         Level Blueprint support: every command in this tool accepts optional
         target_type="level_blueprint" to edit the current level's Level Script

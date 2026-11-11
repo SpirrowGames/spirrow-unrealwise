@@ -414,6 +414,10 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
             else if (CommandType == TEXT("connect_blueprint_nodes") || 
                      CommandType == TEXT("add_blueprint_get_self_component_reference") ||
                      CommandType == TEXT("add_blueprint_self_reference") ||
+                     // Function graphs
+                     CommandType == TEXT("add_function_graph") ||
+                     CommandType == TEXT("add_function_override") ||
+                     CommandType == TEXT("list_blueprint_graphs") ||
                      CommandType == TEXT("find_blueprint_nodes") ||
                      CommandType == TEXT("add_blueprint_event_node") ||
                      CommandType == TEXT("add_blueprint_input_action_node") ||

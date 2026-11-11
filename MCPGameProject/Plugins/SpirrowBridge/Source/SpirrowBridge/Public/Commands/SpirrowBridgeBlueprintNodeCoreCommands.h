@@ -26,4 +26,9 @@ private:
     // Event and function nodes
     TSharedPtr<FJsonObject> HandleAddBlueprintEvent(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleAddBlueprintFunctionCall(const TSharedPtr<FJsonObject>& Params);
+
+    // Function graphs (Issue #21) - SpirrowBridgeBlueprintNodeFunctionGraphCommands.cpp
+    TSharedPtr<FJsonObject> HandleAddFunctionGraph(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleAddFunctionOverride(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleListBlueprintGraphs(const TSharedPtr<FJsonObject>& Params);
 };

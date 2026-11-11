@@ -237,6 +237,79 @@ UEdGraph* FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(UBlueprint* Blueprin
     return NewGraph;
 }
 
+UEdGraph* FSpirrowBridgeCommonUtils::FindGraphByName(UBlueprint* Blueprint, const FString& GraphName)
+{
+    if (!Blueprint || GraphName.IsEmpty())
+    {
+        return nullptr;
+    }
+
+    UEdGraph* CaseInsensitiveMatch = nullptr;
+    auto Search = [&](const TArray<TObjectPtr<UEdGraph>>& Graphs) -> UEdGraph*
+    {
+        for (UEdGraph* Graph : Graphs)
+        {
+            if (!Graph)
+            {
+                continue;
+            }
+            if (Graph->GetName() == GraphName)
+            {
+                return Graph;
+            }
+            if (!CaseInsensitiveMatch && Graph->GetName().Equals(GraphName, ESearchCase::IgnoreCase))
+            {
+                CaseInsensitiveMatch = Graph;
+            }
+        }
+        return nullptr;
+    };
+
+    if (UEdGraph* Found = Search(Blueprint->UbergraphPages)) return Found;
+    if (UEdGraph* Found = Search(Blueprint->FunctionGraphs)) return Found;
+    if (UEdGraph* Found = Search(Blueprint->MacroGraphs)) return Found;
+    return CaseInsensitiveMatch;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeCommonUtils::ResolveTargetGraph(
+    const TSharedPtr<FJsonObject>& Params, UBlueprint* Blueprint, UEdGraph*& OutGraph)
+{
+    OutGraph = nullptr;
+
+    FString GraphName;
+    if (Params.IsValid())
+    {
+        Params->TryGetStringField(TEXT("graph_name"), GraphName);
+    }
+
+    if (GraphName.IsEmpty())
+    {
+        OutGraph = FindOrCreateEventGraph(Blueprint);
+        if (!OutGraph)
+        {
+            return CreateErrorResponse(ESpirrowErrorCode::GraphNotFound, TEXT("Failed to get event graph"));
+        }
+        return nullptr;
+    }
+
+    OutGraph = FindGraphByName(Blueprint, GraphName);
+    if (!OutGraph)
+    {
+        TArray<FString> Names;
+        if (Blueprint)
+        {
+            for (const UEdGraph* Graph : Blueprint->UbergraphPages) { if (Graph) Names.Add(Graph->GetName()); }
+            for (const UEdGraph* Graph : Blueprint->FunctionGraphs) { if (Graph) Names.Add(Graph->GetName()); }
+            for (const UEdGraph* Graph : Blueprint->MacroGraphs) { if (Graph) Names.Add(Graph->GetName()); }
+        }
+        return CreateErrorResponse(
+            ESpirrowErrorCode::GraphNotFound,
+            FString::Printf(TEXT("Graph '%s' not found. Graphs in this Blueprint: %s"),
+                *GraphName, *FString::Join(Names, TEXT(", "))));
+    }
+    return nullptr;
+}
+
 void FSpirrowBridgeCommonUtils::SafeCompileBlueprint(UBlueprint* Blueprint)
 {
     SpirrowBridgePrimitives::SafeCompileBlueprint(Blueprint);

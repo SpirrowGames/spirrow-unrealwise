@@ -217,6 +217,16 @@ public:
     static UBlueprint* FindBlueprintByName(const FString& BlueprintName, const FString& Path = TEXT("/Game/Blueprints"));
     static UEdGraph* FindOrCreateEventGraph(UBlueprint* Blueprint);
 
+    /** Find an event, function or macro graph of the Blueprint by name (exact, then case-insensitive). */
+    static UEdGraph* FindGraphByName(UBlueprint* Blueprint, const FString& GraphName);
+
+    /**
+     * Graph a node command should work on (Issue #21): the graph named by the
+     * optional "graph_name" param, or the event graph when it is absent.
+     * Returns an error response when the named graph does not exist.
+     */
+    static TSharedPtr<FJsonObject> ResolveTargetGraph(const TSharedPtr<FJsonObject>& Params, UBlueprint* Blueprint, UEdGraph*& OutGraph);
+
     /** GeneratedClass/SkeletonGeneratedClassの不整合を修正して安全にコンパイル */
     static void SafeCompileBlueprint(UBlueprint* Blueprint);
 

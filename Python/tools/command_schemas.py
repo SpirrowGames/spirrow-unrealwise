@@ -390,7 +390,7 @@ COMMAND_SCHEMAS = {
             "brief": "Add an event node (works on regular BP or Level Script BP)",
             "params": {
                 "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
-                "event_name": {"type": "str", "required": True, "desc": "Event name (e.g. BeginPlay, Tick, ActorBeginOverlap for LSB)"},
+                "event_name": {"type": "str", "required": True, "desc": "Event name (e.g. BeginPlay, Tick, ActorBeginOverlap for LSB). A parent function with a return value or out parameters is rejected: it needs a function-graph override, not an event node"},
                 "node_position": {"type": "list[int]", "default": [0, 0], "desc": "Node position [x,y]"},
                 "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
                 "target_type": {"type": "str", "default": "blueprint", "desc": "'blueprint' (default) or 'level_blueprint' to target the Level Script Blueprint"},
@@ -413,7 +413,7 @@ COMMAND_SCHEMAS = {
                 "blueprint_name": {"type": "str", "required": False, "desc": "Blueprint name (required unless target_type=level_blueprint)"},
                 "target": {"type": "str", "required": True, "desc": "Target class name (function owner, or owner of UPROPERTY for fallback)"},
                 "function_name": {"type": "str", "required": True, "desc": "Function name. If not found and starts with Set/Get/K2_Set/K2_Get, the handler falls back to spawning a UK2Node_VariableSet/Get for the matching UPROPERTY"},
-                "params": {"type": "dict", "default": {}, "desc": "Function parameters"},
+                "params": {"type": "dict", "default": {}, "desc": "Literal pin values by pin name. Vector pins take [X,Y,Z], Rotator pins [Pitch,Yaw,Roll]. A by-ref or container pin cannot take a literal: the call fails and no node is added; connect that pin instead"},
                 "node_position": {"type": "list[int]", "default": [0, 0], "desc": "Node position [x,y]"},
                 "path": {"type": "str", "default": "/Game/Blueprints", "desc": "Content path"},
                 "target_type": {"type": "str", "default": "blueprint", "desc": "'blueprint' or 'level_blueprint'"},

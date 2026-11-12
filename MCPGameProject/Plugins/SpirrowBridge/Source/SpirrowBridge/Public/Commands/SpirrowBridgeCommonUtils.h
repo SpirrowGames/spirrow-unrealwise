@@ -282,7 +282,16 @@ public:
      * and notifies both nodes. OutError says why a connection was refused.
      */
     static bool ConnectGraphNodes(UEdGraph* Graph, UEdGraphNode* SourceNode, const FString& SourcePinName,
-                                UEdGraphNode* TargetNode, const FString& TargetPinName, FString& OutError);
+                                UEdGraphNode* TargetNode, const FString& TargetPinName, FString& OutError,
+                                FString* OutReasonCode = nullptr);
+
+    /**
+     * A name for a node that does not depend on the editor's display language
+     * (Issue #39): the UFunction name for an event or a function call, the
+     * variable name for a variable get / set, otherwise the node object's name.
+     * Node titles are localized ("Event BeginPlay" is not that in every editor).
+     */
+    static FString GetNodeInternalName(const UEdGraphNode* Node);
 
     /**
      * Parse a type name into a pin type (Issue #23).
@@ -369,6 +378,26 @@ namespace SpirrowBridgePrimitives
         bool bHasErrors = false;
         TArray<FString> Errors;
         TArray<FString> Warnings;
+
+        /**
+         * One compiler message with the parts a caller can test without reading
+         * Text (Issue #39). Text is in the editor's display language; the other
+         * fields are not. The node / pin fields are empty when the compiler did
+         * not attach the message to a node.
+         */
+        struct FMessage
+        {
+            /** "error", "warning", "performance_warning" or "info". */
+            FString Severity;
+            FString Text;
+            FString NodeId;
+            FString NodeClass;
+            FString NodeName;
+            FString Graph;
+            FString PinName;
+        };
+        /** Every message, in compiler order. Errors / Warnings above are the same texts split by severity. */
+        TArray<FMessage> Messages;
     };
 
     /**

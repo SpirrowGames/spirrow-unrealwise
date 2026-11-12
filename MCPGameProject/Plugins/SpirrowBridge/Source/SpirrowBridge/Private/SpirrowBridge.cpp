@@ -679,6 +679,21 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                 // Set error status and include the error message
                 ResponseJson->SetStringField(TEXT("status"), TEXT("error"));
                 ResponseJson->SetStringField(TEXT("error"), ErrorMessage);
+
+                // Issue #39: handlers attach an error code and structured
+                // details, and both were dropped here, leaving the caller only
+                // the message text - which for engine-originated errors is in
+                // the editor's display language. Forward them.
+                double ErrorCode = 0;
+                if (ResultJson->TryGetNumberField(TEXT("error_code"), ErrorCode))
+                {
+                    ResponseJson->SetNumberField(TEXT("error_code"), ErrorCode);
+                }
+                const TSharedPtr<FJsonObject>* ErrorDetails = nullptr;
+                if (ResultJson->TryGetObjectField(TEXT("details"), ErrorDetails) && ErrorDetails && ErrorDetails->IsValid())
+                {
+                    ResponseJson->SetObjectField(TEXT("details"), *ErrorDetails);
+                }
             }
         }
         catch (const std::exception& e)

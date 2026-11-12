@@ -200,7 +200,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleConnectBl
 
     const int32 NodeCountBefore = EventGraph->Nodes.Num();
     FString ConnectError;
-    if (FSpirrowBridgeCommonUtils::ConnectGraphNodes(EventGraph, SourceNode, SourcePinName, TargetNode, TargetPinName, ConnectError))
+    FString ReasonCode;
+    if (FSpirrowBridgeCommonUtils::ConnectGraphNodes(EventGraph, SourceNode, SourcePinName, TargetNode, TargetPinName, ConnectError, &ReasonCode))
     {
         FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
         TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
@@ -217,9 +218,31 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleConnectBl
         return ResultObj;
     }
 
+    // Issue #39: when the schema refuses, ConnectError is the schema's message
+    // in the editor's display language. details says the same thing in fields
+    // that do not depend on it.
+    TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+    Details->SetStringField(TEXT("reason"), ReasonCode);
+    if (ReasonCode == TEXT("schema_disallow"))
+    {
+        Details->SetStringField(TEXT("schema_response"), TEXT("CONNECT_RESPONSE_DISALLOW"));
+    }
+    Details->SetStringField(TEXT("source_node_id"), SourceNodeId);
+    Details->SetStringField(TEXT("source_pin"), SourcePinName);
+    Details->SetStringField(TEXT("target_node_id"), TargetNodeId);
+    Details->SetStringField(TEXT("target_pin"), TargetPinName);
+    if (const UEdGraphPin* SourcePin = FSpirrowBridgeCommonUtils::FindPin(SourceNode, SourcePinName, EGPD_Output))
+    {
+        Details->SetStringField(TEXT("source_pin_type"), FSpirrowBridgeCommonUtils::DescribePinType(SourcePin->PinType));
+    }
+    if (const UEdGraphPin* TargetPin = FSpirrowBridgeCommonUtils::FindPin(TargetNode, TargetPinName, EGPD_Input))
+    {
+        Details->SetStringField(TEXT("target_pin_type"), FSpirrowBridgeCommonUtils::DescribePinType(TargetPin->PinType));
+    }
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(
         ESpirrowErrorCode::ConnectionFailed,
-        FString::Printf(TEXT("Failed to connect %s -> %s: %s"), *SourcePinName, *TargetPinName, *ConnectError));
+        FString::Printf(TEXT("Failed to connect %s -> %s: %s"), *SourcePinName, *TargetPinName, *ConnectError),
+        Details);
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCoreCommands::HandleDisconnectBlueprintNodes(const TSharedPtr<FJsonObject>& Params)

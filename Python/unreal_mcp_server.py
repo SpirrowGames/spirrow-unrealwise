@@ -195,10 +195,15 @@ class UnrealConnection:
                 error_message = response.get("error") or response.get("message", "Unknown Unreal error")
                 logger.error(f"Unreal error (success=false): {error_message}")
                 # Convert to the standard format expected by higher layers
-                response = {
+                converted = {
                     "status": "error",
                     "error": error_message
                 }
+                # Keep the machine-readable parts (Issue #39).
+                for key in ("error_code", "details"):
+                    if key in response:
+                        converted[key] = response[key]
+                response = converted
             
             # Always close the connection after command is complete
             # since Unreal will close it on its side anyway

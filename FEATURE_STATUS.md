@@ -375,7 +375,7 @@ spirrow-voxelworld の SeamOctree C5 修正の PIE 視覚検証中に発覚し�
 | Capture | `take_pie_screenshot` / `take_pie_pov_screenshot` / `take_high_res_screenshot` | PIE viewport 明示的取得 (`GameViewportClient::Viewport`) / **PIE pawn POV を SceneCapture2D 経由で取得 (確実)** / HighResShot N コマンド |
 | Camera | `get_pie_camera` / `set_pie_camera` | `APlayerController::GetPlayerViewPoint` / Pawn を `SetActorLocationAndRotation` で teleport (use_debug_cam=true で free-look) |
 | Debug Cam | `enable_debug_cam` / `disable_debug_cam` | `ToggleDebugCamera` console command |
-| Console | `exec_console_command` | `GEngine->Exec` + FOutputDevice subclass で出力 capture (Phase 2 完成形) |
+| Console | `exec_console_command` | `GEngine->Exec` + FOutputDevice subclass で出力 capture (Phase 2 完成形)。実行中に `GLog` へ書かれた行も `log` で返す (`py` の `print` / `unreal.log` はこちらに出る、Issue #38) |
 | Runtime | `set_global_time_dilation` / `simulate_pie_input` | `SetGlobalTimeDilation` / `APlayerController::InputKey(FInputKeyEventArgs)` で keyboard/mouse 発火 (press/release/tap) |
 | Introspection | `get_pie_actors` / `find_pie_actors_by_class` / `get_pie_actor_properties` | PIE world (`GEditor->PlayWorld`) の actor 列挙・class フィルタ・live property 読み取り |
 | Logs (disk) | `tail_ue_log` / `filter_ue_log` / `set_log_verbosity` / `get_ue_log_path` / `scan_ue_log_errors` / `search_ue_log` | `Saved/Logs/<Project>.log` の tail / category filter / runtime verbosity / 構造化 errors / keyword+severity+category 検索 |

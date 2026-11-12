@@ -380,6 +380,7 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("get_actor_components") ||
                      CommandType == TEXT("rename_actor") ||
                      CommandType == TEXT("rename_asset") ||
+                     CommandType == TEXT("save_asset") ||
                      CommandType == TEXT("spawn_blueprint_actor") ||
                      CommandType == TEXT("focus_viewport") ||
                      CommandType == TEXT("take_screenshot") ||

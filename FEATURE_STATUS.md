@@ -104,6 +104,16 @@ help(category="editor", command="spawn_actor")       # パラメータ詳細
 - `save_current_level` — 現在エディタで開いているレベルをディスクに保存 (UEditorLoadingAndSavingUtils::SaveCurrentLevel)
 - `open_level` — 指定された `.umap` をエディタで開く (UEditorLevelLibrary::LoadLevel)。dirty な状態で呼ぶと UE 側の save dialog が出るため、必要なら事前に `save_current_level` を呼ぶ
 
+### アセット保存 🆕 (1)
+- `save_asset` — アセット 1 つをディスクに保存 (UEditorLoadingAndSavingUtils::SavePackages)。bridge で作った Blueprint などは保存するまでメモリ上にしか無い (Issue #33)
+  - `asset_path` は `/Game/Dir/Name` (オブジェクトパス `/Game/Dir/Name.Name` も可)
+  - `only_if_dirty=true` で、変更が無く保存済みのアセットはスキップ (`saved=false`)
+  - 戻り値: `saved`, `was_dirty`, `was_on_disk`, `dirty`, `filename`
+
+```python
+editor(command="save_asset", params={"asset_path": "/Game/Blueprints/BP_Thing"})
+```
+
 ```python
 editor(command="create_level", params={"name": "MyMap", "path": "/Game/Maps"})
 editor(command="save_current_level")

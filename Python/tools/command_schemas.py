@@ -85,7 +85,7 @@ COMMAND_SCHEMAS = {
             },
         },
         "spawn_blueprint_actor": {
-            "brief": "Spawn an actor from a Blueprint",
+            "brief": "Spawn an actor from a Blueprint (works for a Blueprint that is not saved yet; the Blueprint must be compiled)",
             "params": {
                 "blueprint_name": {"type": "str", "required": True, "desc": "Blueprint name to spawn from"},
                 "actor_name": {"type": "str", "required": True, "desc": "Name for spawned actor"},
@@ -99,6 +99,13 @@ COMMAND_SCHEMAS = {
             "params": {
                 "old_path": {"type": "str", "required": True, "desc": "Current asset path"},
                 "new_name": {"type": "str", "required": True, "desc": "New name (not full path)"},
+            },
+        },
+        "save_asset": {
+            "brief": "Save one asset (Blueprint, DataAsset, ...) to disk. Assets created through the bridge exist only in memory until saved",
+            "params": {
+                "asset_path": {"type": "str", "required": True, "desc": "Asset path, e.g. '/Game/Blueprints/BP_Thing' (an object path '/Game/Blueprints/BP_Thing.BP_Thing' is accepted too)"},
+                "only_if_dirty": {"type": "bool", "default": False, "desc": "If true, skip the save when the asset has no unsaved changes and is already on disk (response has saved=false)"},
             },
         },
         "create_level": {

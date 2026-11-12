@@ -250,6 +250,11 @@ Spawn an actor from a Blueprint.
 **Returns:**
 - Information about the spawned actor including success status and message
 
+**Notes:**
+- The Blueprint does not have to be saved: one that was just created through the bridge and exists only in memory can be spawned (Issue #33). It must be compiled.
+- An `actor_name` that is already taken in the level is an error.
+- To write the Blueprint to disk, use `editor(command="save_asset", params={"asset_path": "/Game/Blueprints/MyActor"})`.
+
 **Example:**
 ```json
 {

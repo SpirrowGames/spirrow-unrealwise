@@ -39,10 +39,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCoreCommands::HandleCommand(const
     {
         return HandleCompileBlueprint(Params);
     }
-    else if (CommandType == TEXT("spawn_blueprint_actor"))
-    {
-        return HandleSpawnBlueprintActor(Params);
-    }
     else if (CommandType == TEXT("set_blueprint_property"))
     {
         return HandleSetBlueprintProperty(Params);
@@ -315,68 +311,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCoreCommands::HandleCompileBluepr
     ResultObj->SetArrayField(TEXT("errors"), ToJsonArray(Report.Errors));
     ResultObj->SetArrayField(TEXT("warnings"), ToJsonArray(Report.Warnings));
     return ResultObj;
-}
-
-TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCoreCommands::HandleSpawnBlueprintActor(const TSharedPtr<FJsonObject>& Params)
-{
-    // Validate required parameters
-    FString BlueprintName, ActorName;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
-    {
-        return Error;
-    }
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("actor_name"), ActorName))
-    {
-        return Error;
-    }
-
-    // Get optional parameters
-    FString Path;
-    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
-
-    // Validate and load Blueprint
-    UBlueprint* Blueprint = nullptr;
-    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
-    {
-        return Error;
-    }
-
-    // Get transform parameters
-    FVector Location(0.0f, 0.0f, 0.0f);
-    FRotator Rotation(0.0f, 0.0f, 0.0f);
-
-    if (Params->HasField(TEXT("location")))
-    {
-        Location = FSpirrowBridgeCommonUtils::GetVectorFromJson(Params, TEXT("location"));
-    }
-    if (Params->HasField(TEXT("rotation")))
-    {
-        Rotation = FSpirrowBridgeCommonUtils::GetRotatorFromJson(Params, TEXT("rotation"));
-    }
-
-    // Spawn the actor
-    UWorld* World = GEditor->GetEditorWorldContext().World();
-    if (!World)
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            ESpirrowErrorCode::UnknownError,
-            TEXT("Failed to get editor world"));
-    }
-
-    FTransform SpawnTransform;
-    SpawnTransform.SetLocation(Location);
-    SpawnTransform.SetRotation(FQuat(Rotation));
-
-    AActor* NewActor = World->SpawnActor<AActor>(Blueprint->GeneratedClass, SpawnTransform);
-    if (NewActor)
-    {
-        NewActor->SetActorLabel(*ActorName);
-        return FSpirrowBridgeCommonUtils::ActorToJsonObject(NewActor, true);
-    }
-
-    return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-        ESpirrowErrorCode::ActorSpawnFailed,
-        FString::Printf(TEXT("Failed to spawn blueprint actor '%s'"), *BlueprintName));
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCoreCommands::HandleSetBlueprintProperty(const TSharedPtr<FJsonObject>& Params)
